@@ -658,12 +658,12 @@ with left:
             else:
                 st.warning("No speech detected. Try again.")
 
-    # Typed input
-    typed_key = f"typed_{step.key}"
-    typed = st.text_input("Type (or use voice above) in English…", key=typed_key)
-    if st.button("Send ➤", use_container_width=True) and typed.strip():
+    # Typed input (use a form to avoid Streamlit session_state mutation errors)
+    with st.form(key=f"typed_form_{step.key}", clear_on_submit=True):
+        typed = st.text_input("Type (or use voice above) in English…", key=f"typed_{step.key}")
+        submitted = st.form_submit_button("Send ➤", use_container_width=True)
+    if submitted and typed.strip():
         process_user_line(typed.strip())
-        st.session_state[typed_key] = ""
         st.rerun()
 
     if step.key == "id_check":
