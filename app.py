@@ -7,6 +7,7 @@ import os
 
 import pandas as pd
 import streamlit as st
+from PIL import Image, ImageDraw, ImageFont
 
 # Voice input (mic recorder) + offline transcription (faster-whisper)
 from streamlit_mic_recorder import mic_recorder
@@ -175,13 +176,21 @@ INTENT_PHRASES = {
         "what are you doing here", "what is the purpose", "why are you here",
         "reason for your visit", "what brings you here", "what is your reason for visiting"
     ],
+    "ask_appointment": [
+        "do you have an appointment", "have you got an appointment", "do you have a meeting scheduled",
+        "do you have an appointment scheduled", "are you expected", "do you have a booking"
+    ],
+
     "ask_host": [
         "who are you meeting", "who do you have an appointment with", "with whom do you have a meeting",
         "who is your host", "who is expecting you"
     ],
     "ask_time": [
         "what time is the appointment", "what time is your meeting", "appointment time",
-        "when is the appointment", "what time is it scheduled"
+        "when is the appointment", "what time is it scheduled",
+        "what time is that", "what time is that delivery", "what time is the delivery",
+        "what time is your delivery", "what time is your inspection", "what time is that inspection",
+        "what time is that meeting", "what time is that appointment"
     ],
     "ask_topic": [
         "what is the appointment about", "what is the meeting about", "topic of the appointment",
@@ -255,6 +264,42 @@ INTENT_PHRASES = {
         "we close at four", "closing time is 16:00", "visitors must leave by 4 pm",
         "the base closes for visitors at 4", "all visitors must leave by four"
     ],
+
+# ----------------------------
+# Smalltalk / off-script handling
+# ----------------------------
+
+SMALLTALK_PATTERNS = {
+    "how_are_you": ["how are you", "how're you", "how are u", "how do you do"],
+    "greeting": ["hello", "hi", "good morning", "good afternoon", "good evening"],
+    "thanks": ["thank you", "thanks", "cheers"],
+}
+
+def is_smalltalk(text: str):
+    t = norm(text)
+    for k, pats in SMALLTALK_PATTERNS.items():
+        for p in pats:
+            if p in t:
+                return k
+    return None
+
+def smalltalk_response(kind: str) -> str:
+    if kind == "how_are_you":
+        return "I'm good, thank you. How can I help you?"
+    if kind == "greeting":
+        return "Hello. How can I help you today?"
+    if kind == "thanks":
+        return "You're welcome."
+    return "Okay."
+
+def echo_clarification(user_text: str) -> str:
+    cleaned = (user_text or "").strip()
+    if not cleaned:
+        return "Sorry—what exactly do you need to know?"
+    if cleaned.endswith("?"):
+        return f"Just to confirm: are you asking '{cleaned}'?"
+    return f"Just to confirm: are you saying '{cleaned}'?"
+
 }
 
 # ----------------------------
@@ -276,9 +321,9 @@ def build_steps():
             key="gate",
             title="1) Gate interview (5W’s + appointment details)",
             visitor_opening=["Good morning.", "I need to enter the base."],
-            required_intents=["ask_identity", "ask_purpose", "ask_host", "ask_topic", "ask_time"],
+            required_intents=["ask_identity", "ask_purpose", "ask_appointment", "ask_host", "ask_time", "ask_topic"],
             failure_response="Sorry—what exactly do you need to know?",
-            hint="Ask: name, purpose, host, topic, and appointment time."
+            hint="Ask: name, purpose, if they have an appointment, who with, what time, and what it is about."
         ),
         Step(
             key="id_check",
@@ -324,6 +369,11 @@ def build_steps():
 REVEAL_BY_INTENT = {
     "ask_identity": ["name", "org"],
     "ask_purpose": ["purpose"],
+    "ask_appointment": [
+        "do you have an appointment", "have you got an appointment", "do you have a meeting scheduled",
+        "do you have an appointment scheduled", "are you expected", "do you have a booking"
+    ],
+
     "ask_host": ["host"],
     "ask_topic": ["topic"],
     "ask_time": ["time"],
@@ -340,6 +390,16 @@ def reveal_from_card(intent: str, card: dict):
 
 def response_for_control_question(user_text: str, card: dict) -> str:
     t = norm(user_text)
+    if "age" in t:
+        try:
+            dob = dt.datetime.strptime(card["id"]["dob"], "%d %b %Y").date()
+            today = dt.date.today()
+            age = today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
+            return f"I am {age} years old."
+        except Exception:
+            return "My age is on my ID."
+    if ("where" in t and "live" in t) or "where do you live" in t:
+        return f"I live at {card['id']['address']}."
     if "date of birth" in t or "birthday" in t or "birth" in t:
         return f"My date of birth is {card['id']['dob']}."
     if "address" in t:
@@ -358,10 +418,21 @@ def response_for_control_question(user_text: str, card: dict) -> str:
 def visitor_response_for_intent(intent: str, user_text: str, card: dict) -> str:
     twist = card["twist_key"]
 
+    t = norm(user_text)
+    if "how do you spell" in t or "spell your name" in t or ("spell" in t and "name" in t):
+        name = card["name"]
+        spelled = " ".join(list(name.replace(" ", "")))
+        return f"It is spelled: {spelled}."
+
     if intent == "ask_identity":
         return f"My name is {card['name']}… that’s J-e-n-s-e-n." if twist == "typo_name" else f"My name is {card['name']}."
     if intent == "ask_purpose":
         return f"I'm here for {card['purpose']}."
+    if intent == "ask_appointment":
+        if twist == "no_appointment":
+            return "No, I don't have an appointment."
+        return "Yes, I have an appointment."
+
     if intent == "ask_host":
         return "Uh… I don't actually have an appointment. I was told I could come by." if twist == "no_appointment" else f"I'm meeting {card['host']}."
     if intent == "ask_topic":
@@ -524,6 +595,11 @@ def process_user_line(user_text: str):
 
     add_log("YOU", user_text)
 
+    kind = is_smalltalk(user_text)
+    if kind:
+        add_log("VISITOR", smalltalk_response(kind))
+        return
+
     remaining = [i for i in step.required_intents if not done.get(i, False)]
     matched = None
     for intent in remaining:
@@ -536,7 +612,10 @@ def process_user_line(user_text: str):
         reveal_from_card(matched, st.session_state.card)
         add_log("VISITOR", visitor_response_for_intent(matched, user_text, st.session_state.card))
     else:
-        add_log("VISITOR", "Could you be more specific, please?" if st.session_state.difficulty == "Advanced" else step.failure_response)
+        if st.session_state.difficulty == "Advanced":
+            add_log("VISITOR", "Could you be more specific, please?")
+        else:
+            add_log("VISITOR", echo_clarification(user_text))
 
     step_done = all(done.get(i, False) for i in step.required_intents)
     if step.key == "id_check" and step_done and len(st.session_state.nl_briefing.strip()) < 20:
@@ -551,6 +630,68 @@ def process_user_line(user_text: str):
             st.session_state.finished_at = now_iso()
             st.session_state.export_ready = True
             add_log("SYSTEM", "All steps completed. Export is now available in the sidebar.")
+
+
+
+def render_id_card_image(card: dict, revealed: dict):
+    idd = card["id"]
+    name = revealed.get("name", "—")
+    org = revealed.get("org", "—")
+
+    W, H = 900, 560
+    img = Image.new("RGB", (W, H), (245, 245, 245))
+    draw = ImageDraw.Draw(img)
+
+    border = (40, 40, 40)
+    header_bg = (30, 60, 120)
+    light = (230, 230, 230)
+
+    draw.rectangle([10, 10, W-10, H-10], outline=border, width=4)
+    draw.rectangle([10, 10, W-10, 110], fill=header_bg)
+
+    try:
+        font_big = ImageFont.truetype("DejaVuSans.ttf", 42)
+        font_mid = ImageFont.truetype("DejaVuSans.ttf", 28)
+        font_sm  = ImageFont.truetype("DejaVuSans.ttf", 22)
+    except Exception:
+        font_big = font_mid = font_sm = ImageFont.load_default()
+
+    draw.text((30, 30), "TRAINING ID CARD", fill=(255, 255, 255), font=font_big)
+    draw.text((30, 78), "Fictional document for classroom practice", fill=(210, 220, 245), font=font_sm)
+
+    draw.rectangle([30, 140, 260, 410], fill=light, outline=border, width=3)
+    draw.ellipse([90, 180, 200, 290], outline=(90, 90, 90), width=5)
+    draw.rectangle([105, 285, 185, 380], outline=(90, 90, 90), width=5)
+    draw.text((55, 420), "PHOTO", fill=(90, 90, 90), font=font_sm)
+
+    x0, y0 = 300, 150
+    line_h = 52
+
+    fields = [
+        ("Name", name),
+        ("Company", org),
+        ("Nationality", idd.get("nationality", "—")),
+        ("Date of birth", idd.get("dob", "—")),
+        ("Address", idd.get("address", "—")),
+        ("ID No.", idd.get("id_no", "—")),
+        ("Expiry", idd.get("expiry", "—")),
+    ]
+
+    for i, (k, v) in enumerate(fields):
+        y = y0 + i * line_h
+        draw.text((x0, y), f"{k}:", fill=(0, 0, 0), font=font_mid)
+        if k == "Address" and len(str(v)) > 42:
+            parts = str(v).split(",")
+            v1 = parts[0].strip()
+            v2 = ",".join(parts[1:]).strip()
+            draw.text((x0 + 210, y), v1, fill=(0, 0, 0), font=font_mid)
+            draw.text((x0 + 210, y + 30), v2, fill=(0, 0, 0), font=font_sm)
+        else:
+            draw.text((x0 + 210, y), str(v), fill=(0, 0, 0), font=font_mid)
+
+    draw.rectangle([10, H-70, W-10, H-10], fill=(240, 240, 240))
+    draw.text((30, H-55), "Reminder: prohibited items include weapons, drugs, and alcohol.", fill=(60, 60, 60), font=font_sm)
+    return img
 
 # ----------------------------
 # UI
@@ -583,11 +724,12 @@ with st.sidebar:
             reset_run(); st.rerun()
 
     st.divider()
-    st.header("Known so far (revealed)")
-    if st.session_state.revealed:
-        st.write({k: v for k, v in st.session_state.revealed.items() if k != "id"})
-    else:
-        st.caption("Nothing revealed yet. Ask the correct questions to reveal details.")
+    with st.expander("Hints (optional)", expanded=False):
+        st.caption("Use this only if a student is stuck. Normally they should write details in their notebook.")
+        if st.session_state.revealed:
+            st.write({k: v for k, v in st.session_state.revealed.items() if k != "id"})
+        else:
+            st.caption("Nothing revealed yet.")
 
     st.divider()
     st.header("Export")
@@ -615,15 +757,9 @@ with left:
 
     if "id" in st.session_state.revealed:
         with st.expander("🪪 ID Card (revealed)", expanded=(step.key == "id_check")):
-            idd = st.session_state.revealed["id"]
-            name = st.session_state.revealed.get("name", "—")
-            st.markdown(f"**Name:** {name}")
-            st.markdown(f"**Nationality:** {idd.get('nationality','—')}")
-            st.markdown(f"**Date of birth:** {idd.get('dob','—')}")
-            st.markdown(f"**Address:** {idd.get('address','—')}")
-            st.markdown(f"**ID No.:** {idd.get('id_no','—')}")
-            st.markdown(f"**Expiry:** {idd.get('expiry','—')}")
-            st.caption("Fictional training ID.")
+            img = render_id_card_image(st.session_state.card, st.session_state.revealed)
+            st.image(img, use_container_width=True)
+            st.caption("Fictional training ID for classroom practice.")
 
     st.markdown("### Conversation")
     chat = st.container(height=360)
