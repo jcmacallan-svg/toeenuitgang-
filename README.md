@@ -22,3 +22,9 @@ streamlit run app.py
 
 ## Deploy
 GitHub Pages cannot run Streamlit. Use Streamlit Community Cloud.
+
+
+## Manual step button + feedback
+- The right-side checklist was removed.
+- Students can press **“I'm done with this step (continue)”** to move on.
+- At the end, the app shows which intents were missed, with example sentences.

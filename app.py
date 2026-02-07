@@ -234,6 +234,35 @@ INTENT_PHRASES_BASE = {
 }
 ALL_INTENTS = list(INTENT_PHRASES_BASE.keys())
 
+
+# Example sentences for feedback (shown at the end)
+EXAMPLE_BY_INTENT = {
+    "ask_identity": "Could you tell me your name, please?",
+    "ask_purpose": "What are you doing here today?",
+    "ask_appointment": "Do you have an appointment?",
+    "ask_host": "With whom do you have an appointment?",
+    "ask_time": "What time is your appointment?",
+    "ask_topic": "What is the appointment about?",
+    "request_id": "May I see your ID, please?",
+    "control_question": "Can you tell me your date of birth, please?",
+    "contact_supervisor": "One moment, I will contact my supervisor.",
+    "inform_search_threat": "Due to an increased threat level, you will be searched before entry.",
+    "prohibited_items": "You are not allowed to bring weapons, drugs, or alcohol onto the base.",
+    "request_surrender": "If you have any prohibited items, please hand them over now.",
+    "explain_patdown": "I will conduct a security search (a pat-down).",
+    "ask_sharp": "Do you have any sharp objects on you?",
+    "empty_pockets": "Please empty your pockets and place the items in the tray.",
+    "remove_jacket": "Please remove your jacket/coat.",
+    "announce_armpits": "I am searching under your armpits.",
+    "announce_waist": "I am searching around your waist.",
+    "announce_private": "I am searching around your private parts.",
+    "leg_instruction": "Please place your foot on your knee.",
+    "issue_visitor_pass_rule": "Here is your visitor pass. Wear it visibly at all times.",
+    "return_pass_rule": "Please return the visitor pass at the end of your visit.",
+    "alarm_rally_point": "If the alarm sounds, go to the assembly area (rally point).",
+    "closing_time": "The base is closed to visitors after 16:00. All visitors must have left by then.",
+}
+
 def merged_intent_phrases(pb: dict) -> dict:
     merged = {k: list(v) for k, v in INTENT_PHRASES_BASE.items()}
     extra = (pb.get("intents", {}) or {})
@@ -735,19 +764,22 @@ with st.sidebar:
     else:
         st.caption("Finish the run to enable CSV export.")
 
-left, right = st.columns([1.35, 0.65])
+main = st.container()
+
 steps = st.session_state.steps
 step = steps[st.session_state.step_index]
 done = st.session_state.done_intents
 
-with left:
+with main:
     st.subheader(step.title)
 
+    # Opening lines once per step
     if step.key not in st.session_state.opened:
         for line in step.visitor_opening:
             add_log("VISITOR", line)
         st.session_state.opened.add(step.key)
 
+    # ID Card
     if "id" in st.session_state.revealed:
         with st.expander("🪪 ID Card (revealed)", expanded=(step.key == "id_check")):
             img = render_id_card_image(st.session_state.card, st.session_state.revealed)
@@ -792,22 +824,43 @@ with left:
         if st.button("📨 Send briefing", use_container_width=True):
             st.session_state.nl_briefing_sent = True
             add_log("SYSTEM", "NL briefing sent to supervisor (training).")
-            step_done = all(st.session_state.done_intents.get(i, False) for i in step.required_intents)
-            if step_done and st.session_state.step_index < len(st.session_state.steps) - 1:
-                add_log("SYSTEM", "Step complete. Proceed to next step.")
-                st.session_state.step_index += 1
             st.rerun()
 
-with right:
-    st.subheader("Checklist")
-    for intent in step.required_intents:
-        st.write(f"{fmt_check(done.get(intent, False))} {intent}")
-
     st.divider()
-    all_required = [i for s in steps for i in s.required_intents]
-    total = len(all_required)
-    completed = sum(1 for i in all_required if done.get(i, False))
-    st.metric("Completed intents", f"{completed} / {total}")
-    st.progress(completed / total if total else 0.0)
+
+    # Manual step advance (teacher can assess later using feedback)
+    c1, c2 = st.columns([1, 1])
+    with c1:
+        if st.button("✅ I'm done with this step (continue)", use_container_width=True):
+            add_log("SYSTEM", f"Student ended step '{step.key}' manually.")
+            if st.session_state.step_index < len(st.session_state.steps) - 1:
+                st.session_state.step_index += 1
+                st.rerun()
+            else:
+                st.session_state.finished_at = now_iso()
+                st.session_state.export_ready = True
+                add_log("SYSTEM", "Run ended. Export and feedback are now available.")
+                st.rerun()
+    with c2:
+        if st.button("💡 Show step hint", use_container_width=True):
+            st.info(step.hint)
+
+    # End-of-run feedback
+    if st.session_state.export_ready:
+        st.subheader("Feedback (what to improve next time)")
+        missing_any = False
+        for s in steps:
+            missing = [i for i in s.required_intents if not done.get(i, False)]
+            if missing:
+                missing_any = True
+                st.markdown(f"**{s.title}**")
+                for intent in missing:
+                    example = EXAMPLE_BY_INTENT.get(intent, "")
+                    if example:
+                        st.write(f"- **{intent}** → e.g., “{example}”")
+                    else:
+                        st.write(f"- **{intent}**")
+        if not missing_any:
+            st.success("Nice work — you completed all required parts for every step.")
 
 st.caption("Deploy note: GitHub Pages cannot run Streamlit. Use Streamlit Community Cloud for a public URL.")

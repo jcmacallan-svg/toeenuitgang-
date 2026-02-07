@@ -32,53 +32,13 @@
     }
   ],
   "off_script": {
-    "reflect_question_template": "Are you asking '{q}'?"
+    "reflect_question_template": "Just to confirm: are you asking '{q}'?"
   },
   "intents": {
     "ask_time": [
       "what time is that delivery",
       "what time is the delivery",
       "what time is your delivery"
-    ],
-    "explain_patdown": [
-      "We are going to search you.",
-      "everyone is searched due to increased threat",
-      "Everyone is searched"
-    ],
-    "leg_instruction": [
-      "put your leg on my knee"
-    ],
-    "issue_visitor_pass_rule": [
-      "Here is your visitors pass, wear it visibly."
-    ],
-    "return_pass_rule": [
-      "You need to return it when you leave",
-      "'Return it when you leave the base."
-    ],
-    "closing_time": [
-      "the base closes at",
-      "You must leave when the base closes"
-    ],
-    "ask_topic": [
-      "what is the meeting about"
-    ],
-    "request_id": [
-      "can I see your ID please"
-    ],
-    "ask_identity": [
-      "can I see your passport please",
-      "Can I see your drivers license"
-    ],
-    "prohibited_items": [
-      "Do you have any illegal items with you?"
-    ],
-    "request_surrender": [
-      "If you have anything, hand it in",
-      "hand it over"
-    ],
-    "announce_armpits": [
-      "I am searching around your armpits",
-      "I am going to search around your armpit"
     ]
   }
 }
