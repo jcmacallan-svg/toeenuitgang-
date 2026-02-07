@@ -1,15 +1,24 @@
-# VIVA Entry Control English Trainer (v4)
+# VIVA Entry Control English Trainer (v6)
 
 Streamlit webapp for VIVA students to practice entry control English.
 
-## Changes in v4
-- More flexible time question recognition (e.g. 'what time is that delivery?')
-- Off-script questions: visitor reflects the question back (confirmation)
-- Smalltalk responses (e.g. 'How are you?')
-- 'Known so far' hidden behind optional Hints expander
-- ID card shown as a generated image
-- Control questions: DOB, age, address, nationality; spelling name
+## Privacy mode
+- Only the latest VISITOR answer is shown on screen.
+- If TTS is enabled, the answer is spoken and the visible text hides 5 seconds after speech ends.
+- When the next question is asked, the previous answer is replaced.
 
-## Run
+## Phrasebank
+- Keep `phrasebank.json` next to `app.py`.
+- Use the sidebar to add extra phrases to intents to improve recognition.
+
+## Photos on the ID card
+- Add rights-cleared images to `assets/photos/`.
+
+## Run locally
+```bash
 pip install -r requirements.txt
 streamlit run app.py
+```
+
+## Deploy
+GitHub Pages cannot run Streamlit. Use Streamlit Community Cloud.
