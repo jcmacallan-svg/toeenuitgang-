@@ -1,0 +1,29 @@
+{
+  "smalltalk": [
+    {
+      "name": "how_are_you",
+      "patterns": ["how are you", "how're you", "how are u", "how do you do"],
+      "response": "I'm good, thank you. How can I help you?"
+    },
+    {
+      "name": "greeting",
+      "patterns": ["hello", "hi", "good morning", "good afternoon", "good evening"],
+      "response": "Hello. How can I help you today?"
+    },
+    {
+      "name": "thanks",
+      "patterns": ["thank you", "thanks", "cheers"],
+      "response": "You're welcome."
+    }
+  ],
+  "off_script": {
+    "reflect_question_template": "Just to confirm: are you asking '{q}'?"
+  },
+  "intents": {
+    "ask_time": [
+      "what time is that delivery",
+      "what time is the delivery",
+      "what time is your delivery"
+    ]
+  }
+}
