@@ -480,6 +480,7 @@ function visitorResponseForIntent(state, intent, userText, card){
     case "request_id":
         markAsked(state, "request_id");
         updateIdVisibility(state);
+        updateVisitorAvatar(state);
       return "Sure, here is my ID.";
     case "control_question":
       return responseForControlQuestion(userText, card, state);
@@ -800,6 +801,8 @@ function goToStep(state, stepKey){
     state.stepIndex = idx;
     state.stepKey = stepKey;
     setStepUI(state);
+    updateVisitorAvatar(state);
+    updateIdVisibility(state);
     if(typeof updateActionButtons === 'function') updateActionButtons(state);
     updateIdVisibility(state);
   }
@@ -846,16 +849,10 @@ function setStepUI(state){
     }
 
 function updateIdVisibility(state){
-  const idPanel = $("#idPanel") || $("#idCardPanel") || $("#idCard");
-  // Try common wrappers
-  const wrapper = $("#idCardWrap") || $("#idCardContainer") || $("#idCardPanel") || $("#idCard");
-  const cardEl = $("#idCard");
-    const step = currentStep(state);
+  const panel = $("#idCardPanel");
+  const step = currentStep(state);
   const show = (step && step.key !== "gate") || (state.asked && state.asked["request_id"]);
-  const target = $("#idCardSection") || $("#idCardPanel") || $("#idCardWrap") || $("#idCard");
-  const el = $("#idCardPanel") || $("#idCardSection") || $("#idCardWrap") || $("#idCard");
-  if(el) el.style.display = show ? "" : "none";
-  if(cardEl) cardEl.style.display = show ? "" : "none";
+  if(panel) panel.style.display = show ? "" : "none";
 }
 
 function updateActionButtons(state){
@@ -1121,6 +1118,8 @@ function finishRun(state){
     }).catch(() => {});
 
     // Now begin
+    updateIdVisibility(state);
+    updateVisitorAvatar(state);
     showVisitor("Good morning.");
     renderMood(state);
   });
@@ -1212,6 +1211,8 @@ $("#btnDoneStep").addEventListener("click", () => {
     $("#stepHelp").textContent = "";
     updateMeta(state);
     setStepUI(state);
+    updateIdVisibility(state);
+    updateVisitorAvatar(state);
     showVisitor("Good morning.");
   });
 
@@ -1597,3 +1598,9 @@ function openTeacher(){
   }
 
 })();
+
+function updateVisitorAvatar(state){
+  const img = $("#visitorAvatar");
+  if(!img || !state || !state.card) return;
+  img.src = state.card.headshot || "";
+}

@@ -68,3 +68,12 @@ body.teacher .teacherOnly{display:block !important}
 
 .btn.subtle{opacity:.85}
 .btn.subtle:hover{opacity:1}
+
+#idCardPanel{display:none;}
+
+.visitorRow{display:flex;gap:12px;align-items:flex-start}
+.visitorAvatar{width:44px;height:44px;border-radius:999px;object-fit:cover;border:1px solid rgba(255,255,255,.18)}
+.visitorCol{flex:1}
+
+.idCard{min-height:240px}
+.idCard .idFooter{font-size:12px;line-height:1.15}
