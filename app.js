@@ -222,7 +222,7 @@ const INTENT_PHRASES_BASE = {
 };
 
 function norm(s){
-  return (s||"").toLowerCase().trim().replace(/\s+/g," ");
+  return String(s ?? "").toLowerCase().trim().replace(/\s+/g," ");
 }
 
 // Normalized Levenshtein similarity
@@ -479,6 +479,7 @@ function visitorResponseForIntent(state, intent, userText, card){
       return `It's about ${card.topic}.`;
     case "request_id":
         markAsked(state, "request_id");
+        updateIdVisibility(state);
       return "Sure, here is my ID.";
     case "control_question":
       return responseForControlQuestion(userText, card, state);
@@ -799,7 +800,7 @@ function goToStep(state, stepKey){
     state.stepIndex = idx;
     state.stepKey = stepKey;
     setStepUI(state);
-    updateActionButtons(state);
+    if(typeof updateActionButtons === 'function') updateActionButtons(state);
     updateIdVisibility(state);
   }
 }
@@ -820,11 +821,11 @@ function setStepUI(state){
       if(stepNow.key === "id_check"){
         $("#stepHelp").textContent = "Use the button: Contact supervisor → fill 5W → then Return to visitor.";
         state.pendingReturnToVisitor = true;
-        updateActionButtons(state);
+        if(typeof updateActionButtons === 'function') updateActionButtons(state);
         showVisitor("✅ ID-check complete. Next: contact supervisor (button), then return to the visitor.");
       } else if(stepNow.key === "threat_rules"){
         $("#stepHelp").textContent = "Press “Go to person search” to proceed to the pat-down.";
-        updateActionButtons(state);
+        if(typeof updateActionButtons === 'function') updateActionButtons(state);
         showVisitor("✅ Step complete. Press “Go to person search” to continue to the pat-down.");
       } else {
         const nextStep = (state.stepIndex < STEPS.length - 1) ? STEPS[state.stepIndex + 1] : null;
@@ -849,7 +850,8 @@ function updateIdVisibility(state){
   // Try common wrappers
   const wrapper = $("#idCardWrap") || $("#idCardContainer") || $("#idCardPanel") || $("#idCard");
   const cardEl = $("#idCard");
-  const show = (state.stepKey !== "gate") || (state.asked && state.asked["request_id"]);
+    const step = currentStep(state);
+  const show = (step && step.key !== "gate") || (state.asked && state.asked["request_id"]);
   const target = $("#idCardSection") || $("#idCardPanel") || $("#idCardWrap") || $("#idCard");
   const el = $("#idCardPanel") || $("#idCardSection") || $("#idCardWrap") || $("#idCard");
   if(el) el.style.display = show ? "" : "none";
@@ -1167,7 +1169,7 @@ $("#btnHint").addEventListener("click", () => {
     closeSupervisorModal();
     showVisitor("Alright. Everything checks out. You are allowed on the base.");
     state.pendingReturnToVisitor = false;
-    updateActionButtons(state);
+    if(typeof updateActionButtons === 'function') updateActionButtons(state);
   
     // Auto-advance to threat rules (you will return to visitor next)
     goToStep(state, "threat_rules");
@@ -1177,12 +1179,12 @@ $("#btnDoneStep").addEventListener("click", () => {
     if(step.key === "id_check"){
       $("#stepHelp").textContent = "Use Contact supervisor → fill 5W → Return to visitor.";
       showVisitor("Use the supervisor flow buttons in this step.");
-      updateActionButtons(state);
+      if(typeof updateActionButtons === 'function') updateActionButtons(state);
       return;
     }
     if(step.key === "threat_rules"){
       $("#stepHelp").textContent = "Press “Go to person search” to proceed to the pat-down.";
-      updateActionButtons(state);
+      if(typeof updateActionButtons === 'function') updateActionButtons(state);
       showVisitor("Press “Go to person search” to continue.");
       return;
     }
@@ -1202,6 +1204,7 @@ $("#btnDoneStep").addEventListener("click", () => {
     state.card = generateVisitorCard(seed);
     state.revealed = { id:false };
     state.stepIndex = 0;
+    state.stepKey = STEPS[0].key;
     state.openedSteps = new Set();
     state.done = {};
     state.startedAt = new Date().toISOString();
