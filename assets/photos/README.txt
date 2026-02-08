@@ -1,3 +1,1 @@
-Put a few rights-cleared headshot images here (jpg/png/webp).
-The app will randomly pick one for the ID card.
-If none exist, it uses a placeholder.
+Place your headshots here as headshot_01.png ... headshot_10.png

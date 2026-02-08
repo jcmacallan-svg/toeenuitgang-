@@ -202,7 +202,7 @@ const INTENT_PHRASES_BASE = {
   ask_topic: ["what is the appointment about","what is the meeting about","topic of the appointment","what is it regarding","what is the purpose of the meeting"],
   request_id: ["can i see your id","show me your id","id please","identification please","may i see your identification","could you show your id"],
   control_question: ["date of birth","what is your date of birth","what is your birthday","what is your address","what is your postcode","what is your zip code",
-                     "nationality","how old are you","what is your age","where do you live"],
+                     "nationality","how old are you","what is your age","where do you live","dob","what is your dob","what's your dob","when is your birthday","when were you born","you are","you're","confirm your age","confirm your date of birth"],
   contact_supervisor: ["i will contact my supervisor","i will call my supervisor","one moment i will contact my supervisor","please wait i will contact","i will check with my supervisor"],
   inform_search_threat: ["heightened threat","increased threat","security level","you will be searched","for security reasons you will be searched","due to a higher threat level"],
   prohibited_items: ["no weapons","no drugs","no alcohol","prohibited items","weapons drugs or alcohol","you are not allowed to bring weapons","you are not allowed to bring drugs","you are not allowed to bring alcohol"],
@@ -953,6 +953,16 @@ function finishRun(state){
 (async function init(){
   const state = buildState();
 
+  // Preload heavy assets so Start feels instant
+  const preloadPhrasebankPromise = (async () => {
+    const pb = await loadPhrasebank();
+    state.phrasebank = pb;
+    state.intentPhrases = mergedIntentPhrases(pb);
+    if(typeof teacherRefreshOnLoad === 'function') teacherRefreshOnLoad();
+    return pb;
+  })();
+
+
   // UI hooks
   $("#btnResetLocal").addEventListener("click", () => {
     localStorage.removeItem("veva_practice_counter");
@@ -962,30 +972,44 @@ function finishRun(state){
     localStorage.removeItem("veva_phrasebank_use_draft");
 });
 
+  
   $("#btnStart").addEventListener("click", async () => {
     const name = $("#studentName").value.trim();
     if(!name){
       alert("Vul eerst je naam in.");
       return;
     }
+
     state.student = name;
     state.className = $("#className").value.trim();
     state.difficulty = $("#difficulty").value;
 
-    // Load phrasebank
-    state.phrasebank = await loadPhrasebank();
-    state.intentPhrases = mergedIntentPhrases(state.phrasebank);
-    if(typeof teacherRefreshOnLoad === 'function') teacherRefreshOnLoad();
+    // Option 2: switch screens immediately (feels fast)
+    setScreen("#screen-train");
+    updateMeta(state);
+    setStepUI(state);
 
-    // log start
-    await logEvent({
+    // Temporary loading message while we finalize preloads
+    showVisitor("Loading scenario…");
+
+    // Await preloaded phrasebank (Option 1)
+    await preloadPhrasebankPromise;
+
+    // Fire-and-forget start log (don't block UI)
+    logEvent({
       event: "start",
       student: state.student,
       className: state.className,
       runId: state.runId,
       ts: new Date().toISOString(),
       stats: { difficulty: state.difficulty, userAgent: navigator.userAgent }
-    });
+    }).catch(() => {});
+
+    // Now begin
+    showVisitor("Good morning.");
+    renderMood(state);
+  });
+
   // Enter-to-start (login screen)
   ["#studentName","#className"].forEach(sel => {
     const el = $(sel);
@@ -998,15 +1022,7 @@ function finishRun(state){
       });
     }
   });
-
-
-    setScreen("#screen-train");
-    updateMeta(state);
-    setStepUI(state);
-    showVisitor("Good morning.");
-  });
-
-  $("#btnHint").addEventListener("click", () => {
+$("#btnHint").addEventListener("click", () => {
     const step = currentStep(state);
     $("#stepHelp").textContent = step.hint;
   });
@@ -1026,7 +1042,19 @@ function finishRun(state){
     }
   });
 
-  $("#btnDoneStep").addEventListener("click", () => {
+  
+  // Supervisor modal buttons
+  $("#btnContactSupervisor")?.addEventListener("click", () => openSupervisorModal(state));
+  $("#btnCloseModal")?.addEventListener("click", () => closeSupervisorModal());
+  $("#btnSendSupervisor")?.addEventListener("click", () => sendToSupervisor(state));
+  // Return to visitor
+  $("#btnReturnVisitor")?.addEventListener("click", () => {
+    closeSupervisorModal();
+    showVisitor("Alright. Everything checks out. You are allowed on the base.");
+    state.pendingReturnToVisitor = false;
+    updateActionButtons(state);
+  });
+$("#btnDoneStep").addEventListener("click", () => {
     const step = currentStep(state);
     if(step.key === "id_check"){
       $("#stepHelp").textContent = "Use Contact supervisor → fill 5W → Return to visitor.";
@@ -1145,7 +1173,48 @@ function finishRun(state){
     return tag === "INPUT" || tag === "TEXTAREA" || t.isContentEditable;
   }
 
-  function openTeacher(){
+  
+function openSupervisorModal(state){
+  const modal = $("#supervisorModal");
+  if(!modal) return;
+  modal.classList.remove("hidden");
+  // clear fields
+  ["wWho","wWhat","wWithWhom","wTime","wWhy"].forEach(id => { const el = $("#"+id); if(el) el.value = ""; });
+  const resp = $("#supervisorResponse"); if(resp) resp.textContent = "";
+  state.supervisorModalUsed = true;
+}
+
+function closeSupervisorModal(){
+  const modal = $("#supervisorModal");
+  if(modal) modal.classList.add("hidden");
+}
+
+function sendToSupervisor(state){
+  const who = ($("#wWho")?.value || "").trim();
+  const what = ($("#wWhat")?.value || "").trim();
+  const withWhom = ($("#wWithWhom")?.value || "").trim();
+  const time = ($("#wTime")?.value || "").trim();
+  const why = ($("#wWhy")?.value || "").trim();
+
+  const resp = $("#supervisorResponse");
+  if(resp){
+    resp.textContent = "Supervisor: Approved. Allow the visitor to proceed to the next check.";
+  }
+
+  state.supervisorApproved = true;
+  // Log event (non-blocking)
+  logEvent({
+    event: "supervisor_briefing",
+    student: state.student,
+    className: state.className,
+    runId: state.runId,
+    ts: new Date().toISOString(),
+    stats: { who, what, withWhom, time, why, difficulty: state.difficulty, userAgent: navigator.userAgent }
+  }).catch(()=>{});
+
+  updateActionButtons(state);
+}
+function openTeacher(){
     if(!teacherModal) return;
     teacherModal.classList.remove("hidden");
     exportStatus.textContent = "";
