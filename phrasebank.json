@@ -8,7 +8,7 @@
         "how are u",
         "how do you do"
       ],
-      "response": "I'm good, thank you. How can I help you?"
+      "response": "I'm good, Can I help you?"
     },
     {
       "name": "greeting",
@@ -32,7 +32,7 @@
     }
   ],
   "off_script": {
-    "reflect_question_template": "Just to confirm: are you asking '{q}'?"
+    "reflect_question_template": "I am not sure what you want me to say?"
   },
   "intents": {
     "ask_time": [
@@ -42,6 +42,7 @@
       "what time is that delivery?",
       "what time is your appointment",
       "what time is your appointment?"
+      "What time is your meeting?"
     ],
     "ask_purpose": [
       "what are you here for",
@@ -52,6 +53,9 @@
       "what brings you here?",
       "why are you here",
       "why are you here?"
+      "what are you doing here"
+      "How can I help?"
+      "How can I help you?"
     ],
     "ask_host": [
       "with whom is the meeting",
@@ -60,6 +64,12 @@
       "with who is the meeting?",
       "who is the meeting with",
       "who is the meeting with?"
+      "with who?"
+      "with whom?"
+      "with who is the appointment?"
+      "who are you here for?"
+      "who do you want to talk to?"
+      "who do you want to speak to?"
     ],
     "ask_appointment": [
       "do you have a meeting",
@@ -78,6 +88,8 @@
       "can i see your id?",
       "please show me your id",
       "please show me your id?"
+      "can you show me your passport?"
+      "Can show me you drivers license?"
     ]
   }
 }
