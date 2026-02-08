@@ -59,3 +59,5 @@ body.teacher .teacherOnly{display:block !important}
 .btn.danger:hover{background:rgba(239,68,68,.18)}
 
 .visitorMood{margin:8px 0 14px 0; font-style:italic; opacity:.85}
+
+.runId{color:rgba(20,45,90,.35)!important}

@@ -19,6 +19,10 @@ function renderMood(state){
 
 const $ = (sel) => document.querySelector(sel);
 
+function escapeHtml(s){
+  return (s||"").replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
 function safeOn(el, evt, fn){ if(el) el.addEventListener(evt, fn); }
 
 function parseHotkey(str){
@@ -133,28 +137,54 @@ const DATA = {
   ]
 };
 
+
+
+const VISITORS = [
+  { photo:"assets/photos/headshot_01.png", name:"Mark Visser", org:"MedLogistics", role:"courier",
+    purpose:"a delivery", topic:"spare parts delivery", host:"Sgt. De Boer", time:"09:00", nationality:"Dutch" },
+  { photo:"assets/photos/headshot_02.png", name:"Tom Bakker", org:"AeroTech Services", role:"technical inspector",
+    purpose:"an inspection", topic:"fire safety inspection", host:"Captain Smit", time:"10:30", nationality:"Dutch" },
+  { photo:"assets/photos/headshot_03.png", name:"James Khan", org:"BlueShield Contractors", role:"contractor electrician",
+    purpose:"maintenance work", topic:"equipment repair", host:"Lt. Van Dijk", time:"13:00", nationality:"British" },
+  { photo:"assets/photos/headshot_04.png", name:"Lucas Jansen", org:"NetSecure BV", role:"security vendor",
+    purpose:"a meeting", topic:"security briefing", host:"Major Jansen", time:"14:30", nationality:"Dutch" },
+  { photo:"assets/photos/headshot_05.png", name:"Daan Martens", org:"NorthRail", role:"mechanic",
+    purpose:"maintenance work", topic:"vehicle inspection", host:"Sgt. De Boer", time:"15:15", nationality:"Belgian" },
+  { photo:"assets/photos/headshot_06.png", name:"Pieter Smit", org:"TriCom Systems", role:"it specialist",
+    purpose:"a meeting", topic:"IT audit meeting", host:"Captain De Vries", time:"09:00", nationality:"Dutch" },
+  { photo:"assets/photos/headshot_07.png", name:"Ahmed Omar", org:"MedLogistics", role:"driver",
+    purpose:"a delivery", topic:"equipment delivery", host:"Lt. Van Dijk", time:"10:30", nationality:"German" },
+  { photo:"assets/photos/headshot_08.png", name:"Robert Brown", org:"AeroTech Services", role:"briefing attendee",
+    purpose:"a briefing", topic:"training coordination", host:"Captain Smit", time:"13:00", nationality:"British" },
+  { photo:"assets/photos/headshot_09.png", name:"Kevin Johnson", org:"BlueShield Contractors", role:"contractor",
+    purpose:"maintenance work", topic:"HVAC maintenance", host:"Major Jansen", time:"14:30", nationality:"French" },
+  { photo:"assets/photos/headshot_10.png", name:"Hassan De Vries", org:"NetSecure BV", role:"supplier",
+    purpose:"a delivery", topic:"package delivery", host:"Captain De Vries", time:"15:15", nationality:"Dutch" }
+];
+
+
 const STEPS = [
-  { key:"gate", title:"1) Gate interview (appointment intake)",
+  { key:"gate", title:"1) Poort (intake)",
     opening:["Good morning.","I need to enter the base."],
     required:["ask_identity","ask_purpose","ask_appointment","ask_host","ask_time","ask_topic"],
     hint:"Ask: name, purpose, appointment, who with, what time, and what it is about."
   },
-  { key:"id_check", title:"2) ID-check + control question + contact supervisor",
+  { key:"id_check", title:"2) ID-check + controlevraag + contact leidinggevende",
     opening:["Sure. Where do you want me to go?"],
     required:["request_id","control_question","contact_supervisor"],
     hint:"Request ID, ask one control question, then contact supervisor."
   },
-  { key:"threat_rules", title:"3) Entry decision: search warning + prohibited items",
+  { key:"threat_rules", title:"3) Toelaten + dreiging + verboden items",
     opening:["Can I go in now?"],
     required:["inform_search_threat","prohibited_items","request_surrender"],
     hint:"Explain search due to threat. State prohibited items. Ask to surrender them."
   },
-  { key:"patdown", title:"4) Pat-down / search instructions",
+  { key:"patdown", title:"4) Fouilleren / zoekinstructies",
     opening:["Alright. What do I need to do?"],
     required:["explain_patdown","ask_sharp","empty_pockets","remove_jacket","announce_armpits","announce_waist","announce_private","leg_instruction"],
     hint:"Explain pat-down, ask sharp objects, empty pockets, remove jacket, announce areas, leg instruction."
   },
-  { key:"registration_rules", title:"5) Registration + base rules briefing",
+  { key:"registration_rules", title:"5) Registratie + kazerne regels",
     opening:["Okay. Am I good to go?"],
     required:["issue_visitor_pass_rule","return_pass_rule","alarm_rally_point","closing_time"],
     hint:"Visitor pass rules, return rule, rally point, and closing time."
@@ -306,35 +336,39 @@ function listPhotoFiles(){
 }
 
 function generateVisitorCard(seed){
-  let s = seed >>> 0;
+  // Deterministic selection based on seed so students can replay same run if needed
+  const idx = (seed >>> 0) % VISITORS.length;
+  const base = deepClone(VISITORS[idx]);
+
+  // Deterministic RNG for the remaining fields (DOB/ID/expiry + mood)
+  let s = (seed ^ 0xA5A5A5A5) >>> 0;
   const rnd = () => (s = (s*1664525 + 1013904223) >>> 0) / 4294967296;
 
-  const name = `${randChoice(DATA.FIRST, rnd)} ${randChoice(DATA.LAST, rnd)}`;
-  const org = randChoice(DATA.ORG, rnd);
-  const host = randChoice(DATA.HOST, rnd);
-  const purpose = randChoice(Object.keys(PURPOSE_TO_TOPICS), rnd);
-  const topic = randChoice(PURPOSE_TO_TOPICS[purpose], rnd);
-  const time = randChoice(DATA.TIME, rnd);
-  const twist = randChoice(DATA.TWISTS, rnd)[0];
-
   const dob = makeDob(rnd);
-  const nationality = randChoice(DATA.NAT, rnd);
-  const address = makeAddress(rnd);
   const id_no = makeIdNumber(rnd);
   const expiry = makeExpiry(rnd);
 
-  const photo = randChoice(listPhotoFiles(), rnd);
+  // Mood line (shown below visitor text)
   const moodLine = randChoice(DATA.MOOD, rnd);
 
+  // Optional twist (kept coherent: a delivery/inspection/meeting/briefing/maintenance still stays same)
+  const twist = randChoice(DATA.TWISTS, rnd)[0];
+
   return {
-    name, org, host, purpose, topic, time, twist,
-    id: { id_no, dob, nationality, address, expiry },
-    photo,
+    ...base,
+    twist,
+    id: {
+      id_no,
+      dob,
+      nationality: base.nationality,
+      address: makeAddress(rnd), // kept internally for 'where do you live' questions, but NOT displayed on ID
+      expiry
+    },
     moodLine
   };
 }
 
-function responseForControlQuestion(userText, card){
+function responseForControlQuestionfunction responseForControlQuestion(userText, card){
   const t = norm(userText);
 
   // If student challenges a previous wrong confirmation, offer an excuse
@@ -532,7 +566,7 @@ function showVisitor(text){
 
 function updateMeta(state){
   const meta = $("#meta");
-  meta.textContent = state.student ? `Student: ${state.student} • Run: ${state.runId}` : "";
+  meta.innerHTML = state.student ? `Student: <b>${escapeHtml(state.student)}</b> <span class="runId">• Run: ${escapeHtml(state.runId)}</span>` : "";
 }
 
 function currentStep(state){ return STEPS[state.stepIndex]; }
@@ -666,16 +700,8 @@ function renderIdCard(state){
   }
 
   function drawFields(){
-    // Footer reminder
+    // Card footer (no instructional/reminder text)
     ctx.fillStyle = "#f0f0f0"; ctx.fillRect(10,H-70,W-20,60);
-    ctx.fillStyle = "#3c3c3c"; ctx.font = "22px system-ui";    // If ID not revealed yet: show a blank card message
-    if(!state.revealed.id){
-      ctx.fillStyle = "#333";
-      ctx.font = "bold 28px system-ui";
-      ctx.fillText("Ask for ID to reveal.", 300, 180);
-      // still show ID No + Expiry? keep hidden until request_id
-      return;
-    }
 
     const card = state.card;
     const id = card.id;
@@ -684,7 +710,6 @@ function renderIdCard(state){
     const nat  = (state.revealed.id || state.revealed.nationality) ? id.nationality : "—";
     const dob  = (state.revealed.id || state.revealed.dob) ? id.dob : "—";
     const age  = (state.revealed.id || state.revealed.age) ? ((computeAge(id.dob) ?? "—").toString()) : "—";
-    const addr = (state.revealed.id || state.revealed.address) ? id.address : "—";
 
     field("Name", name, 170);
     field("Company", org, 222);
@@ -692,7 +717,6 @@ function renderIdCard(state){
     field("Date of birth", dob, 326);
     field("Age", age, 378);
     field("ID No.", id.id_no, 510);
-, id.id_no, 510);
     field("Expiry", id.expiry, 552);
   }
 }
@@ -715,10 +739,6 @@ function buildState(){
     done: {},
     lastStudentText: "",
     pendingReflect: null,
-
-    supervisorApproved: false,
-    supervisorModalUsed: false,
-    pendingReturnToVisitor: false,
 
     supervisorApproved: false,
     supervisorModalUsed: false,
