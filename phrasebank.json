@@ -78,6 +78,34 @@
       "can i see your id?",
       "please show me your id",
       "please show me your id?"
+    ],
+    "ask_age": [
+      "how old are you",
+      "how old are you?",
+      "what is your age",
+      "what is your age?",
+      "are you 42",
+      "are you 42?"
+    ],
+    "ask_dob": [
+      "what is your date of birth",
+      "what is your date of birth?",
+      "what's your date of birth",
+      "dob",
+      "date of birth",
+      "when is your birthday",
+      "when were you born"
+    ],
+    "challenge": [
+      "you look tired",
+      "why do you look tired",
+      "why are you tired",
+      "you seem tired",
+      "you look nervous",
+      "why are you nervous",
+      "you seem uneasy",
+      "why are you uneasy",
+      "why are you not cooperating"
     ]
   }
 }

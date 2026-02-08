@@ -448,7 +448,7 @@ function responseForControlQuestion(userText, card, state){
   return null;
 }
 
-function visitorResponseForIntent(intent, userText, card){
+function visitorResponseForIntent(state, intent, userText, card){
   const t = norm(userText);
   if(t.includes("spell") && t.includes("name")){
     const spelled = card.name.replace(/\s+/g,"").split("").join("-");
@@ -459,16 +459,21 @@ function visitorResponseForIntent(intent, userText, card){
     case "ask_identity":
       return card.twist==="typo_name" ? `My name is ${card.name}… that’s J-e-n-s-e-n.` : `My name is ${card.name}.`;
     case "ask_purpose":
+        markAsked(state, "purpose");
       return `I'm here for ${card.purpose}.`;
     case "ask_appointment":
+        markAsked(state, "appointment");
       return card.twist==="no_appointment" ? "No, I don't have an appointment." : "Yes, I have an appointment.";
     case "ask_host":
+        markAsked(state, "host");
       return card.twist==="no_appointment" ? "Uh… I don't actually have an appointment. I was told I could come by." : `I'm meeting ${card.host}.`;
     case "ask_time":
+        markAsked(state, "time");
       return card.twist==="vague_time" ? "I think it's sometime this afternoon… I'm not sure." : `It's at ${card.time}.`;
     case "ask_topic":
       return `It's about ${card.topic}.`;
     case "request_id":
+        markAsked(state, "request_id");
       return "Sure, here is my ID.";
     case "control_question":
       return responseForControlQuestion(userText, card, state);
@@ -484,7 +489,25 @@ function visitorResponseForIntent(intent, userText, card){
       return (card.twist==="sharp_object" || card.twist==="alcohol") ? "Alright, I will hand it over." : "Okay.";
     case "ask_sharp":
       return card.twist==="sharp_object" ? "I already mentioned the pocket knife—nothing else." : "No.";
-    default:
+    case "ask_age":
+        return "I'm " + state.card.age + " years old.";
+
+      case "ask_dob":
+        return "My date of birth is " + formatDob(state.card.dob) + ".";
+
+      case "challenge":
+        // Mood can shift when challenged
+        if(state.card){
+          state.card.mood = "uneasy";
+          renderMood(state);
+        }
+        return randChoice([
+          "I'm just tired from a long drive, that's all.",
+          "Sorry, it's been a long day. I'm fine.",
+          "I'm a bit stressed because I'm running late, but everything is in order."
+        ]);
+
+      default:
       return "Understood.";
   }
 }
@@ -748,12 +771,28 @@ function buildState(){
     done: {},
     lastStudentText: "",
     pendingReflect: null,
+    asked: {},
+    gateComplete: false,
+    supervisorComplete: false,
+    threatRulesComplete: false,
 
     supervisorApproved: false,
     supervisorModalUsed: false,
     pendingReturnToVisitor: false,
 
   };
+}
+
+
+function goToStep(state, stepKey){
+  const idx = STEPS.findIndex(s => s.key === stepKey);
+  if(idx >= 0){
+    state.stepIndex = idx;
+    state.stepKey = stepKey;
+    setStepUI(state);
+    updateActionButtons(state);
+    updateIdVisibility(state);
+  }
 }
 
 function setStepUI(state){
@@ -795,6 +834,19 @@ function setStepUI(state){
         }
       }
     }
+
+function updateIdVisibility(state){
+  const idPanel = $("#idPanel") || $("#idCardPanel") || $("#idCard");
+  // Try common wrappers
+  const wrapper = $("#idCardWrap") || $("#idCardContainer") || $("#idCardPanel") || $("#idCard");
+  const cardEl = $("#idCard");
+  const show = (state.stepKey !== "gate") || (state.asked && state.asked["request_id"]);
+  const target = $("#idCardSection") || $("#idCardPanel") || $("#idCardWrap") || $("#idCard");
+  const el = $("#idCardPanel") || $("#idCardSection") || $("#idCardWrap") || $("#idCard");
+  if(el) el.style.display = show ? "" : "none";
+  if(cardEl) cardEl.style.display = show ? "" : "none";
+}
+
 function updateActionButtons(state){
   const step = currentStep(state);
   const btnContact = $("#btnContactSupervisor");
@@ -833,7 +885,59 @@ function smalltalkResponse(text, phrasebank){
   return hit ? hit.response : null;
 }
 
+
+function markAsked(state, key){
+  if(!state.asked) state.asked = {};
+  state.asked[key] = true;
+}
+
+function hasAsked(state, keys){
+  return keys.every(k => state.asked && state.asked[k]);
+}
+
+function maybeAutoAdvanceFromGate(state){
+  // Required for gate: who, purpose, appointment, host, time, about
+  const req = ["who","purpose","appointment","host","time","about"];
+  if(state.stepKey === "gate" && hasAsked(state, req)){
+    state.gateComplete = true;
+    // Move to ID step
+    goToStep(state, "id_check");
+    showVisitor("Okay. Please show me your ID for verification.");
+    renderMood(state);
+    return true;
+  }
+  return false;
+}
+
+function maybeAutoAdvanceAfterSupervisor(state){
+  if(state.stepKey === "id_check" && state.supervisorComplete){
+    goToStep(state, "threat_rules");
+    showVisitor("Everything checks out. Before you enter: no weapons, no drugs, and no alcohol. Due to an increased threat level, everyone is searched.");
+    renderMood(state);
+    return true;
+  }
+  return false;
+}
+
+function maybeAutoAdvanceAfterThreatRules(state){
+  if(state.stepKey === "threat_rules" && state.threatRulesComplete){
+    goToStep(state, "person_search");
+    showVisitor("Please follow me to the person search area.");
+    renderMood(state);
+    return true;
+  }
+  return false;
+}
+
 function processUserLine(state, userText){
+  // threat rules completion (simple)
+  if(state.stepKey === "threat_rules"){
+    const t = norm(userText);
+    if(t.includes("no weapons") || t.includes("no drugs") || t.includes("no alcohol") || t.includes("prohibited") || t.includes("searched") || t.includes("search") || t.includes("pat-down") || t.includes("due to") ){
+      state.threatRulesComplete = true;
+    }
+  }
+
   // handle reflect yes/no
   if(state.pendingReflect){
     const t = norm(userText);
@@ -1093,6 +1197,10 @@ $("#btnDoneStep").addEventListener("click", () => {
     setStepUI(state);
     showVisitor("Good morning.");
   });
+
+  // Teacher button (visible for now)
+  safeOn($("#btnTeacher"), "click", () => { openTeacher(); });
+
 
   $("#btnFinishRun").addEventListener("click", async () => {
     finishRun(state);
@@ -1445,6 +1553,14 @@ function openTeacher(){
       e.preventDefault();
       if(teacherModal.classList.contains("hidden")) openTeacher();
       else closeTeacher();
+    }
+  }, true);
+
+  // F2 quick open teacher mode
+  window.addEventListener("keydown", (e) => {
+    if(e.key === "F2"){
+      e.preventDefault();
+      openTeacher();
     }
   }, true);
 
