@@ -38,7 +38,46 @@
     "ask_time": [
       "what time is that delivery",
       "what time is the delivery",
-      "what time is your delivery"
+      "what time is your delivery",
+      "what time is that delivery?",
+      "what time is your appointment",
+      "what time is your appointment?"
+    ],
+    "ask_purpose": [
+      "what are you here for",
+      "what are you here for?",
+      "what is the reason for your visit",
+      "what is the reason for your visit?",
+      "what brings you here",
+      "what brings you here?",
+      "why are you here",
+      "why are you here?"
+    ],
+    "ask_host": [
+      "with whom is the meeting",
+      "with whom is the meeting?",
+      "with who is the meeting",
+      "with who is the meeting?",
+      "who is the meeting with",
+      "who is the meeting with?"
+    ],
+    "ask_appointment": [
+      "do you have a meeting",
+      "do you have a meeting?",
+      "do you have an appointment",
+      "do you have an appointment?",
+      "have you got an appointment",
+      "have you got an appointment?"
+    ],
+    "request_id": [
+      "do you have an id",
+      "do you have an id?",
+      "may i see your id",
+      "may i see your id?",
+      "can i see your id",
+      "can i see your id?",
+      "please show me your id",
+      "please show me your id?"
     ]
   }
 }

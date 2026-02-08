@@ -60,3 +60,10 @@ See `GOOGLE_SHEETS_LOGGING.md` for the step-by-step setup.
 
 ## Logging note (CORS)
 The app sends log events using `mode: no-cors` with `text/plain` so Google Apps Script can receive them from GitHub Pages without CORS issues.
+
+
+## Teacher mode hotkey
+Teacher mode now opens with **Ctrl+Alt+Shift+P** (configurable via `teacherHotkey` in `config.js`) to avoid Chrome conflicts.
+
+## Recognition additions
+Added common variants like 'what are you here for', 'with whom is the meeting', and 'do you have an ID'.

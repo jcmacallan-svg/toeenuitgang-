@@ -14,6 +14,27 @@ const $ = (sel) => document.querySelector(sel);
 
 function safeOn(el, evt, fn){ if(el) el.addEventListener(evt, fn); }
 
+function parseHotkey(str){
+  const s = (str||"").toLowerCase().replace(/\s+/g,"");
+  const parts = s.split("+").filter(Boolean);
+  return {
+    ctrl: parts.includes("ctrl") || parts.includes("control"),
+    alt: parts.includes("alt") || parts.includes("option"),
+    shift: parts.includes("shift"),
+    meta: parts.includes("meta") || parts.includes("cmd") || parts.includes("command"),
+    key: parts.find(p => !["ctrl","control","alt","option","shift","meta","cmd","command"].includes(p)) || ""
+  };
+}
+function matchesHotkey(e, hk){
+  if(!hk) return false;
+  const key = (e.key || "").toLowerCase();
+  return (!!hk.ctrl === !!e.ctrlKey) &&
+         (!!hk.alt === !!e.altKey) &&
+         (!!hk.shift === !!e.shiftKey) &&
+         (!!hk.meta === !!e.metaKey) &&
+         (hk.key === key);
+}
+
 function deepClone(obj){ return JSON.parse(JSON.stringify(obj)); }
 
 function downloadJson(filename, obj){
@@ -640,6 +661,8 @@ function buildState(){
     openedSteps: new Set(),
     done: {},
     lastStudentText: "",
+    pendingReflect: null,
+
     supervisorApproved: false,
     supervisorModalUsed: false,
     pendingReturnToVisitor: false,
@@ -728,6 +751,21 @@ function smalltalkResponse(text, phrasebank){
 }
 
 function processUserLine(state, userText){
+  // handle reflect yes/no
+  if(state.pendingReflect){
+    const t = norm(userText);
+    if(["yes","yeah","yep","correct","that's right","right","affirmative","sure"].includes(t)){
+      state.pendingReflect = null;
+      showVisitor("Okay. What do you want to know?");
+      return;
+    }
+    if(["no","nope","negative","not really"].includes(t)){
+      state.pendingReflect = null;
+      showVisitor("No problem. Please ask your security questions.");
+      return;
+    }
+  }
+
   state.lastStudentText = userText;
   const pb = state.phrasebank;
   const step = currentStep(state);
@@ -772,6 +810,7 @@ function processUserLine(state, userText){
         }
       });
     }
+    state.pendingReflect = userText;
     const reflect = state.difficulty === "Advanced"
       ? "Could you be more specific, please?"
       : offScriptReflect(userText, pb);

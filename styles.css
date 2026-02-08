@@ -51,3 +51,9 @@ h2{margin:0 0 10px 0;font-size:18px}
 
 /* Ensure modals can be hidden even though .modal sets display:flex */
 .modal.hidden{display:none !important}
+
+.teacherOnly{display:none !important}
+body.teacher .teacherOnly{display:block !important}
+
+.btn.danger{border-color:rgba(239,68,68,.6);background:rgba(239,68,68,.12)}
+.btn.danger:hover{background:rgba(239,68,68,.18)}
