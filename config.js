@@ -10,11 +10,6 @@ window.APP_CONFIG = {
   logUnknownQuestions: true // log unrecognized student questions to Google Sheets
 // The endpoint should accept JSON POST:
   // {event, student, className, runId, ts, stats}
-function doGet() {
-  return ContentService
-    .createTextOutput("OK — VEVA logger is running. Use POST to log.")
-    .setMimeType(ContentService.MimeType.TEXT);
-}
 
 };
 
