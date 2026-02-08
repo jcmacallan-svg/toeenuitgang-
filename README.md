@@ -56,3 +56,7 @@ See `GOOGLE_SHEETS_LOGGING.md` for the step-by-step setup.
 
 ## Unknown questions logging
 - Set `logUnknownQuestions: true` in `config.js` to send unrecognized student questions to Google Sheets (event `unknown_question`).
+
+
+## Logging note (CORS)
+The app sends log events using `mode: no-cors` with `text/plain` so Google Apps Script can receive them from GitHub Pages without CORS issues.

@@ -514,9 +514,10 @@ async function logEvent(payload){
   try{
     await fetch(ep, {
       method:"POST",
-      headers:{ "Content-Type":"application/json" },
-      body: JSON.stringify(payload),
-      mode:"cors"
+      // Apps Script Web Apps often do not return CORS headers. Use a simple request.
+      mode:"no-cors",
+      headers:{ "Content-Type":"text/plain;charset=utf-8" },
+      body: JSON.stringify(payload)
     });
   }catch(_){}
 }
