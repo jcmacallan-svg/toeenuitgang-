@@ -57,3 +57,10 @@ body.teacher .teacherOnly{display:block !important}
 
 .btn.danger{border-color:rgba(239,68,68,.6);background:rgba(239,68,68,.12)}
 .btn.danger:hover{background:rgba(239,68,68,.18)}
+
+#runId{color:rgba(30,64,175,.22) !important}
+
+#studentInput{font-size:18px;padding:14px 14px}
+
+.toast{position:fixed;right:16px;bottom:16px;max-width:min(520px,92vw);background:#0f1a2e;border:1px solid rgba(148,163,184,.25);border-radius:14px;padding:12px 14px;box-shadow:0 12px 40px rgba(0,0,0,.35);z-index:9998}
+.toast.hidden{display:none !important}

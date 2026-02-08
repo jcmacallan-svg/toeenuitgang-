@@ -38,6 +38,15 @@ function matchesHotkey(e, hk){
 function deepClone(obj){ return JSON.parse(JSON.stringify(obj)); }
 
 function downloadJson(filename, obj){
+function showHintToast(msg){
+  const el = document.getElementById("hintToast");
+  if(!el) return;
+  el.textContent = msg;
+  el.classList.remove("hidden");
+  window.clearTimeout(showHintToast._t);
+  showHintToast._t = window.setTimeout(()=>{ el.classList.add("hidden"); }, 4200);
+}
+
   const text = JSON.stringify(obj, null, 2);
   const blob = new Blob([text], { type:"application/json;charset=utf-8" });
   const a = document.createElement("a");
@@ -119,7 +128,7 @@ const DATA = {
 };
 
 const STEPS = [
-  { key:"gate", title:"1) Gate interview (appointment intake)",
+  { key:"gate", title:"1) Poort (intake)",
     opening:["Good morning.","I need to enter the base."],
     required:["ask_identity","ask_purpose","ask_appointment","ask_host","ask_time","ask_topic"],
     hint:"Ask: name, purpose, appointment, who with, what time, and what it is about."
@@ -290,6 +299,14 @@ function listPhotoFiles(){
   return files;
 }
 
+const VISITOR_MOODS = [
+  "The visitor looks relaxed.",
+  "The visitor looks uneasy and keeps glancing around.",
+  "The visitor is fidgeting and avoids eye contact.",
+  "The visitor looks impatient but stays polite.",
+  "The visitor looks tired and speaks softly."
+];
+
 function generateVisitorCard(seed){
   let s = seed >>> 0;
   const rnd = () => (s = (s*1664525 + 1013904223) >>> 0) / 4294967296;
@@ -453,7 +470,9 @@ function showVisitor(text){
   window.clearTimeout(window.__hideTimer);
   window.__hideTimer = window.setTimeout(() => {
     bubble.textContent = "Ask your next question…";
-  }, 8000);
+  
+  if($("#visitorMood") && state && state.visitorMood){ $("#visitorMood").textContent = state.visitorMood; }
+}, 8000);
 }
 
 function updateMeta(state){
@@ -662,14 +681,20 @@ function buildState(){
     done: {},
     lastStudentText: "",
     pendingReflect: null,
+    visitorMood: "",
+
 
     supervisorApproved: false,
     supervisorModalUsed: false,
     pendingReturnToVisitor: false,
+    allowSupervisorEarly: false,
+
 
     supervisorApproved: false,
     supervisorModalUsed: false,
     pendingReturnToVisitor: false,
+    allowSupervisorEarly: false,
+
 
   };
 }
@@ -720,6 +745,10 @@ function updateActionButtons(state){
 
   // defaults: hidden
   [btnContact, btnReturn, btnGo].forEach(b => { if(b) { b.style.display = "none"; b.disabled = false; } });
+
+  if(step.key === "gate" && state.allowSupervisorEarly){
+    if(btnContact) btnContact.style.display = "inline-flex";
+  }
 
   if(step.key === "id_check"){
     // Show contact supervisor after ID requested + control question done (or anytime, if teacher wants)
@@ -792,6 +821,11 @@ function processUserLine(state, userText){
     reveal(matched, state);
     const answer = visitorResponseForIntent(matched, userText, state.card);
     showVisitor(answer);
+    // If visitor has no appointment, allow supervisor verification at the gate
+    if(matched === "ask_appointment" && /no,? i don't have an appointment|do not have an appointment|don't have an appointment|no appointment/i.test(answer)){
+      state.allowSupervisorEarly = true;
+      try{ updateActionButtons(state); }catch(_){ }
+    }
     renderIdCard(state);
   } else {
     // Log unknown questions (optional)
@@ -811,6 +845,16 @@ function processUserLine(state, userText){
       });
     }
     state.pendingReflect = userText;
+    // contextual hint: show missing required question(s)
+    try{
+      const step = currentStep(state);
+      const missing = step.required.filter(i => !state.done[i]);
+      if(missing.length){
+        const first = missing[0];
+        const ex = (state.intentPhrases && state.intentPhrases[first] && state.intentPhrases[first][0]) ? state.intentPhrases[first][0] : first;
+        showHintToast(`Hint: you still need: ${first}. Example: "${ex}"`);
+      }
+    }catch(_){ }
     const reflect = state.difficulty === "Advanced"
       ? "Could you be more specific, please?"
       : offScriptReflect(userText, pb);
@@ -869,6 +913,7 @@ function finishRun(state){
 
 (async function init(){
   const state = buildState();
+  window._visitorMoodText = state.card && state.card.mood ? state.card.mood : "";
 
   // UI hooks
   $("#btnResetLocal").addEventListener("click", () => {
@@ -929,7 +974,11 @@ function finishRun(state){
 
   $("#btnDoneStep").addEventListener("click", () => {
     const step = currentStep(state);
-    if(step.key === "id_check"){
+    if(step.key === "gate" && state.allowSupervisorEarly){
+    if(btnContact) btnContact.style.display = "inline-flex";
+  }
+
+  if(step.key === "id_check"){
       $("#stepHelp").textContent = "Use Contact supervisor → fill 5W → Return to visitor.";
       showVisitor("Use the supervisor flow buttons in this step.");
       updateActionButtons(state);
