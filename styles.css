@@ -43,3 +43,11 @@ h2{margin:0 0 10px 0;font-size:18px}
 .modalHead{display:flex;justify-content:space-between;align-items:center;gap:10px}
 .modalTitle{font-weight:800;font-size:18px}
 .actionBar{margin-top:10px}
+
+.tabs{display:flex;gap:8px;margin:12px 0;flex-wrap:wrap}
+.tab{border-radius:999px;border:1px solid rgba(148,163,184,.25);background:#0b1220;color:#e5e7eb;padding:8px 12px;cursor:pointer}
+.tab.active{background:rgba(59,130,246,.2);border-color:rgba(59,130,246,.55)}
+.tabPanel{margin-top:6px}
+
+/* Ensure modals can be hidden even though .modal sets display:flex */
+.modal.hidden{display:none !important}

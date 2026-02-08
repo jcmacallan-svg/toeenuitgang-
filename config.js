@@ -2,7 +2,12 @@
 // Paste your Google Apps Script Web App URL here.
 // If empty, logging is disabled (only local device counter is used).
 window.APP_CONFIG = {
-  logEndpoint: "https://script.google.com/macros/s/AKfycbx6ijbIHpsW478LEaPVvGiz-eKi8uRzxCGSXp7ABZ8/dev"
-  // The endpoint should accept JSON POST:
+  // Teacher mode (hidden editor)
+  teacherPin: "", // optional, e.g. "1234". Leave empty to disable PIN unlock.
+
+  logEndpoint: "PASTE_YOUR_APPS_SCRIPT_WEBAPP_URL_HERE"
+  ,
+  logUnknownQuestions: true // log unrecognized student questions to Google Sheets
+// The endpoint should accept JSON POST:
   // {event, student, className, runId, ts, stats}
 };

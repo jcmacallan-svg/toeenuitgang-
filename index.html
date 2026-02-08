@@ -159,6 +159,127 @@
       </div>
     </div>
 
+
+    <!-- Teacher Mode (hidden phrasebank editor) -->
+    <div class="modal hidden" id="teacherModal" role="dialog" aria-modal="true">
+      <div class="modalCard">
+        <div class="modalHead">
+          <div class="modalTitle">Teacher mode — Phrasebank editor</div>
+          <div class="row">
+            <button class="btn" id="btnTeacherClose">Close</button>
+          </div>
+        </div>
+
+        <p class="muted small">
+          This editor is hidden. Open with <b>Ctrl+Shift+T</b>. Changes are kept as a local draft and exported as <code>phrasebank.json</code>.
+          Students will not see this unless teacher mode is opened.
+        </p>
+
+        <details class="details" id="teacherUnlockBox">
+          <summary>Optional PIN unlock</summary>
+          <div class="detailsBody">
+            <p class="muted small">If you set <code>teacherPin</code> in <code>config.js</code>, you must enter it to edit.</p>
+            <div class="row">
+              <input id="teacherPinInput" placeholder="PIN" type="password" />
+              <button class="btn primary" id="btnTeacherUnlock">Unlock</button>
+              <span class="muted small" id="teacherUnlockStatus"></span>
+            </div>
+          </div>
+        </details>
+
+        <div class="tabs">
+          <button class="tab active" data-tab="tab-intents">Intents (question patterns)</button>
+          <button class="tab" data-tab="tab-smalltalk">Smalltalk (Q → A)</button>
+          <button class="tab" data-tab="tab-export">Import / Export</button>
+        </div>
+
+        <div class="tabPanel" id="tab-intents">
+          <div class="grid2">
+            <label class="field">
+              <span>Intent</span>
+              <select id="intentSelect"></select>
+            </label>
+
+            <label class="field">
+              <span>New pattern</span>
+              <input id="intentNewPattern" placeholder="e.g. what time is that delivery" />
+            </label>
+          </div>
+
+          <div class="row">
+            <button class="btn primary" id="btnAddIntentPattern">Add pattern</button>
+            <button class="btn" id="btnDeleteIntentPattern">Delete selected</button>
+            <span class="muted small" id="intentStatus"></span>
+          </div>
+
+          <div class="divider"></div>
+          <div class="panel" style="max-height:240px; overflow:auto;">
+            <div class="panelTitle">Patterns for selected intent</div>
+            <select id="intentPatternList" size="8" style="width:100%; margin-top:8px;"></select>
+          </div>
+        </div>
+
+        <div class="tabPanel hidden" id="tab-smalltalk">
+          <div class="grid2">
+            <label class="field">
+              <span>New smalltalk name</span>
+              <input id="stName" placeholder="e.g. how_are_you" />
+            </label>
+            <label class="field">
+              <span>Response</span>
+              <input id="stResponse" placeholder="e.g. I'm good, thank you." />
+            </label>
+          </div>
+          <label class="field">
+            <span>Patterns (comma separated)</span>
+            <input id="stPatterns" placeholder="e.g. how are you, how're you, how are u" />
+          </label>
+          <div class="row">
+            <button class="btn primary" id="btnAddSmalltalk">Add smalltalk</button>
+            <button class="btn" id="btnDeleteSmalltalk">Delete selected</button>
+            <span class="muted small" id="smalltalkStatus"></span>
+          </div>
+
+          <div class="divider"></div>
+          <div class="panel" style="max-height:240px; overflow:auto;">
+            <div class="panelTitle">Smalltalk entries</div>
+            <select id="smalltalkList" size="8" style="width:100%; margin-top:8px;"></select>
+          </div>
+        </div>
+
+        <div class="tabPanel hidden" id="tab-export">
+          <div class="row">
+            <button class="btn primary" id="btnExportPhrasebank">Download phrasebank.json</button>
+            <button class="btn" id="btnUseDraftNow">Use draft for recognition (this browser)</button>
+            <button class="btn" id="btnDiscardDraft">Discard local draft</button>
+          </div>
+
+          <div class="divider"></div>
+
+          <label class="field">
+            <span>Import phrasebank.json</span>
+            <input type="file" id="phrasebankFile" accept="application/json" />
+          </label>
+          <div class="row">
+            <button class="btn" id="btnImportPhrasebank">Import</button>
+            <span class="muted small" id="exportStatus"></span>
+          </div>
+
+          <details class="details">
+            <summary>How to apply changes for everyone</summary>
+            <div class="detailsBody">
+              <ol>
+                <li>Use this editor to add patterns/questions.</li>
+                <li>Click <b>Download phrasebank.json</b>.</li>
+                <li>Replace the repo file <code>phrasebank.json</code> with the downloaded one.</li>
+                <li>Commit + push to GitHub (Pages updates).</li>
+              </ol>
+            </div>
+          </details>
+        </div>
+      </div>
+    </div>
+
 </main>
 
   <script src="config.js"></script>

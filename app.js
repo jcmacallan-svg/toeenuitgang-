@@ -12,6 +12,21 @@
 
 const $ = (sel) => document.querySelector(sel);
 
+function safeOn(el, evt, fn){ if(el) el.addEventListener(evt, fn); }
+
+function deepClone(obj){ return JSON.parse(JSON.stringify(obj)); }
+
+function downloadJson(filename, obj){
+  const text = JSON.stringify(obj, null, 2);
+  const blob = new Blob([text], { type:"application/json;charset=utf-8" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
+
 const DIFFICULTY = {
   Basic:    { threshold: 0.68 },
   Standard: { threshold: 0.72 },
@@ -374,8 +389,20 @@ function reveal(intent, state){
 }
 
 async function loadPhrasebank(){
+  // Base phrasebank from repo
   const res = await fetch("phrasebank.json", { cache:"no-store" });
-  return await res.json();
+  const base = await res.json();
+
+  // Optional local draft (teacher use)
+  const useDraft = localStorage.getItem("veva_phrasebank_use_draft") === "1";
+  const draftRaw = localStorage.getItem("veva_phrasebank_draft");
+  if(useDraft && draftRaw){
+    try{
+      const draft = JSON.parse(draftRaw);
+      return draft;
+    }catch(_){}
+  }
+  return base;
 }
 
 function mergedIntentPhrases(phrasebank){
@@ -616,6 +643,10 @@ function buildState(){
     supervisorModalUsed: false,
     pendingReturnToVisitor: false,
 
+    supervisorApproved: false,
+    supervisorModalUsed: false,
+    pendingReturnToVisitor: false,
+
   };
 }
 
@@ -724,6 +755,22 @@ function processUserLine(state, userText){
     showVisitor(answer);
     renderIdCard(state);
   } else {
+    // Log unknown questions (optional)
+    if(window.APP_CONFIG && window.APP_CONFIG.logUnknownQuestions){
+      logEvent({
+        event: "unknown_question",
+        student: state.student,
+        className: state.className,
+        runId: state.runId,
+        ts: new Date().toISOString(),
+        stats: {
+          difficulty: state.difficulty,
+          step: currentStep(state).key,
+          text: userText,
+          userAgent: navigator.userAgent
+        }
+      });
+    }
     const reflect = state.difficulty === "Advanced"
       ? "Could you be more specific, please?"
       : offScriptReflect(userText, pb);
@@ -802,6 +849,7 @@ function finishRun(state){
     // Load phrasebank
     state.phrasebank = await loadPhrasebank();
     state.intentPhrases = mergedIntentPhrases(state.phrasebank);
+    if(typeof teacherRefreshOnLoad === 'function') teacherRefreshOnLoad();
 
     // log start
     await logEvent({
@@ -910,4 +958,288 @@ function finishRun(state){
     a.remove();
   });
 
+
+  // ---------- Teacher mode (hidden phrasebank editor) ----------
+  const teacherModal = $("#teacherModal");
+  const teacherClose = $("#btnTeacherClose");
+  const teacherUnlockBox = $("#teacherUnlockBox");
+  const teacherPinInput = $("#teacherPinInput");
+  const teacherUnlockBtn = $("#btnTeacherUnlock");
+  const teacherUnlockStatus = $("#teacherUnlockStatus");
+
+  const TABS = Array.from(document.querySelectorAll(".tab"));
+  const PANELS = Array.from(document.querySelectorAll(".tabPanel"));
+
+  const intentSelect = $("#intentSelect");
+  const intentNewPattern = $("#intentNewPattern");
+  const intentPatternList = $("#intentPatternList");
+  const btnAddIntentPattern = $("#btnAddIntentPattern");
+  const btnDeleteIntentPattern = $("#btnDeleteIntentPattern");
+  const intentStatus = $("#intentStatus");
+
+  const stName = $("#stName");
+  const stResponse = $("#stResponse");
+  const stPatterns = $("#stPatterns");
+  const smalltalkList = $("#smalltalkList");
+  const btnAddSmalltalk = $("#btnAddSmalltalk");
+  const btnDeleteSmalltalk = $("#btnDeleteSmalltalk");
+  const smalltalkStatus = $("#smalltalkStatus");
+
+  const btnExportPhrasebank = $("#btnExportPhrasebank");
+  const btnUseDraftNow = $("#btnUseDraftNow");
+  const btnDiscardDraft = $("#btnDiscardDraft");
+  const fileInput = $("#phrasebankFile");
+  const btnImportPhrasebank = $("#btnImportPhrasebank");
+  const exportStatus = $("#exportStatus");
+
+  let teacherUnlocked = false;
+
+  function hasTeacherPin(){
+    return (window.APP_CONFIG && window.APP_CONFIG.teacherPin && window.APP_CONFIG.teacherPin.length > 0);
+  }
+
+  function isTypingTarget(e){
+    const t = e.target;
+    if(!t) return false;
+    const tag = (t.tagName || "").toUpperCase();
+    return tag === "INPUT" || tag === "TEXTAREA" || t.isContentEditable;
+  }
+
+  function openTeacher(){
+    if(!teacherModal) return;
+    teacherModal.classList.remove("hidden");
+    exportStatus.textContent = "";
+    intentStatus.textContent = "";
+    smalltalkStatus.textContent = "";
+
+    if(hasTeacherPin()){
+      teacherUnlockBox.open = true;
+      teacherUnlockStatus.textContent = teacherUnlocked ? "Unlocked" : "Locked";
+    } else {
+      teacherUnlockBox.open = false;
+      teacherUnlocked = true;
+      teacherUnlockStatus.textContent = "Unlocked";
+    }
+
+    refreshTeacherUI();
+    setTeacherEditingEnabled();
+  }
+
+  function closeTeacher(){
+    if(!teacherModal) return;
+    teacherModal.classList.add("hidden");
+  }
+
+  function setTeacherEditingEnabled(){
+    const locked = hasTeacherPin() && !teacherUnlocked;
+    [
+      btnAddIntentPattern, btnDeleteIntentPattern,
+      btnAddSmalltalk, btnDeleteSmalltalk,
+      btnExportPhrasebank, btnUseDraftNow, btnDiscardDraft, btnImportPhrasebank
+    ].forEach(el => { if(el) el.disabled = locked; });
+    [intentSelect, intentNewPattern, intentPatternList, stName, stResponse, stPatterns, smalltalkList, fileInput]
+      .forEach(el => { if(el) el.disabled = locked; });
+  }
+
+  function getDraftOrBase(){
+    const raw = localStorage.getItem("veva_phrasebank_draft");
+    if(raw){
+      try{ return JSON.parse(raw); }catch(_){}
+    }
+    return state.phrasebank ? deepClone(state.phrasebank) : null;
+  }
+
+  function saveDraft(pb){
+    localStorage.setItem("veva_phrasebank_draft", JSON.stringify(pb));
+  }
+
+  function refreshTeacherUI(){
+    let pb = getDraftOrBase();
+    if(!pb){
+      exportStatus.textContent = "Phrasebank not loaded yet — start a run once, or refresh.";
+      return;
+    }
+    pb.intents = pb.intents || {};
+    pb.smalltalk = pb.smalltalk || [];
+    pb.off_script = pb.off_script || { reflect_question_template: "Just to confirm: are you asking '{q}'?" };
+
+    const intentKeys = Object.keys(INTENT_PHRASES_BASE).sort();
+    intentSelect.innerHTML = "";
+    for(const k of intentKeys){
+      const opt = document.createElement("option");
+      opt.value = k; opt.textContent = k;
+      intentSelect.appendChild(opt);
+    }
+    const prev = intentSelect.dataset.prev;
+    if(prev && intentKeys.includes(prev)) intentSelect.value = prev;
+
+    intentSelect.dataset.prev = intentSelect.value;
+    const sel = intentSelect.value;
+    const patterns = Array.isArray(pb.intents[sel]) ? pb.intents[sel] : [];
+    intentPatternList.innerHTML = "";
+    patterns.forEach((p, idx) => {
+      const opt = document.createElement("option");
+      opt.value = String(idx);
+      opt.textContent = p;
+      intentPatternList.appendChild(opt);
+    });
+
+    smalltalkList.innerHTML = "";
+    pb.smalltalk.forEach((e, idx) => {
+      const opt = document.createElement("option");
+      opt.value = String(idx);
+      opt.textContent = `${e.name || "smalltalk"} — ${((e.patterns||[])[0]||"pattern…")} → ${e.response||""}`;
+      smalltalkList.appendChild(opt);
+    });
+  }
+
+  // Tabs
+  TABS.forEach(btn => {
+    btn.addEventListener("click", () => {
+      TABS.forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      const id = btn.dataset.tab;
+      PANELS.forEach(p => p.classList.add("hidden"));
+      document.getElementById(id).classList.remove("hidden");
+    });
+  });
+
+  safeOn(intentSelect, "change", () => {
+    intentSelect.dataset.prev = intentSelect.value;
+    refreshTeacherUI();
+  });
+
+  safeOn(btnAddIntentPattern, "click", () => {
+    const pattern = (intentNewPattern.value || "").trim();
+    if(!pattern){ intentStatus.textContent = "Enter a pattern first."; return; }
+    let pb = getDraftOrBase(); if(!pb) return;
+    pb.intents = pb.intents || {};
+    const key = intentSelect.value;
+    pb.intents[key] = Array.isArray(pb.intents[key]) ? pb.intents[key] : [];
+    if(pb.intents[key].map(norm).includes(norm(pattern))){
+      intentStatus.textContent = "Pattern already exists.";
+      return;
+    }
+    pb.intents[key].push(pattern);
+    saveDraft(pb);
+    intentNewPattern.value = "";
+    intentStatus.textContent = "Added to local draft.";
+    refreshTeacherUI();
+  });
+
+  safeOn(btnDeleteIntentPattern, "click", () => {
+    const selIdx = intentPatternList.value;
+    if(selIdx === "" || selIdx == null){ intentStatus.textContent = "Select a pattern to delete."; return; }
+    let pb = getDraftOrBase(); if(!pb) return;
+    const key = intentSelect.value;
+    const arr = Array.isArray(pb.intents[key]) ? pb.intents[key] : [];
+    const idx = parseInt(selIdx, 10);
+    if(Number.isNaN(idx) || idx < 0 || idx >= arr.length) return;
+    arr.splice(idx, 1);
+    pb.intents[key] = arr;
+    saveDraft(pb);
+    intentStatus.textContent = "Deleted from local draft.";
+    refreshTeacherUI();
+  });
+
+  safeOn(btnAddSmalltalk, "click", () => {
+    const name = (stName.value || "").trim() || "smalltalk";
+    const resp = (stResponse.value || "").trim();
+    const pats = (stPatterns.value || "").split(",").map(s => s.trim()).filter(Boolean);
+    if(!resp || pats.length === 0){
+      smalltalkStatus.textContent = "Provide patterns and a response.";
+      return;
+    }
+    let pb = getDraftOrBase(); if(!pb) return;
+    pb.smalltalk = pb.smalltalk || [];
+    pb.smalltalk.push({ name, patterns: pats, response: resp });
+    saveDraft(pb);
+    stName.value = ""; stResponse.value = ""; stPatterns.value = "";
+    smalltalkStatus.textContent = "Added to local draft.";
+    refreshTeacherUI();
+  });
+
+  safeOn(btnDeleteSmalltalk, "click", () => {
+    const selIdx = smalltalkList.value;
+    if(selIdx === "" || selIdx == null){ smalltalkStatus.textContent = "Select an entry to delete."; return; }
+    let pb = getDraftOrBase(); if(!pb) return;
+    const idx = parseInt(selIdx, 10);
+    if(Number.isNaN(idx) || idx < 0 || idx >= pb.smalltalk.length) return;
+    pb.smalltalk.splice(idx, 1);
+    saveDraft(pb);
+    smalltalkStatus.textContent = "Deleted from local draft.";
+    refreshTeacherUI();
+  });
+
+  safeOn(btnExportPhrasebank, "click", () => {
+    let pb = getDraftOrBase(); if(!pb) return;
+    pb.off_script = pb.off_script || { reflect_question_template: "Just to confirm: are you asking '{q}'?" };
+    downloadJson("phrasebank.json", pb);
+    exportStatus.textContent = "Downloaded. Replace repo file and commit to GitHub.";
+  });
+
+  safeOn(btnUseDraftNow, "click", async () => {
+    const raw = localStorage.getItem("veva_phrasebank_draft");
+    if(!raw){ exportStatus.textContent = "No local draft found."; return; }
+    localStorage.setItem("veva_phrasebank_use_draft", "1");
+    state.phrasebank = await loadPhrasebank();
+    state.intentPhrases = mergedIntentPhrases(state.phrasebank);
+    if(typeof teacherRefreshOnLoad === 'function') teacherRefreshOnLoad();
+    exportStatus.textContent = "Draft enabled for recognition in this browser.";
+  });
+
+  safeOn(btnDiscardDraft, "click", () => {
+    localStorage.removeItem("veva_phrasebank_draft");
+    localStorage.removeItem("veva_phrasebank_use_draft");
+    exportStatus.textContent = "Local draft discarded.";
+    refreshTeacherUI();
+  });
+
+  safeOn(btnImportPhrasebank, "click", async () => {
+    const f = fileInput.files && fileInput.files[0];
+    if(!f){ exportStatus.textContent = "Choose a file first."; return; }
+    try{
+      const text = await f.text();
+      const pb = JSON.parse(text);
+      saveDraft(pb);
+      exportStatus.textContent = "Imported into local draft.";
+      refreshTeacherUI();
+    }catch(err){
+      exportStatus.textContent = "Import failed: " + String(err);
+    }
+  });
+
+  safeOn(teacherUnlockBtn, "click", () => {
+    if(!hasTeacherPin()){
+      teacherUnlocked = true;
+      teacherUnlockStatus.textContent = "Unlocked";
+      setTeacherEditingEnabled();
+      return;
+    }
+    const pin = (teacherPinInput.value || "").trim();
+    if(pin && pin === window.APP_CONFIG.teacherPin){
+      teacherUnlocked = true;
+      teacherUnlockStatus.textContent = "Unlocked";
+    } else {
+      teacherUnlocked = false;
+      teacherUnlockStatus.textContent = "Wrong PIN";
+    }
+    setTeacherEditingEnabled();
+  });
+
+  safeOn(teacherClose, "click", closeTeacher);
+  safeOn(teacherModal, "click", (e) => { if(e.target === teacherModal) closeTeacher(); });
+
+  window.addEventListener("keydown", (e) => {
+    if(isTypingTarget(e)) return;
+    if(e.ctrlKey && e.shiftKey && (e.key.toLowerCase() === "t")){
+      e.preventDefault();
+      if(teacherModal.classList.contains("hidden")) openTeacher();
+      else closeTeacher();
+    }
+  }, true);
+
+  function teacherRefreshOnLoad(){
+    try{ refreshTeacherUI(); setTeacherEditingEnabled(); }catch(_){}
+  }
 })();

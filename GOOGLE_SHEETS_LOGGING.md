@@ -16,7 +16,7 @@ You will create:
 
 Create this header row (row 1):
 
-| ts | event | student | className | runId | difficulty | top3 | userAgent |
+| ts | event | student | className | runId | difficulty | top3 | step | text | userAgent |
 |---|---|---|---|---|---|---|---|
 
 (You can add more columns later.)
@@ -42,7 +42,7 @@ function doPost(e) {
 
     // Ensure header exists
     if (sh.getLastRow() === 0) {
-      sh.appendRow(["ts","event","student","className","runId","difficulty","top3","userAgent"]);
+      sh.appendRow(["ts","event","student","className","runId","difficulty","top3","step","text","userAgent"]);
     }
 
     const body = e && e.postData && e.postData.contents ? e.postData.contents : "{}";
@@ -55,9 +55,11 @@ function doPost(e) {
     const runId = data.runId || "";
     const difficulty = (data.stats && data.stats.difficulty) ? data.stats.difficulty : "";
     const top3 = (data.stats && data.stats.top3) ? JSON.stringify(data.stats.top3) : "";
+    const step = (data.stats && data.stats.step) ? data.stats.step : "";
+    const text = (data.stats && data.stats.text) ? data.stats.text : "";
     const userAgent = (data.stats && data.stats.userAgent) ? data.stats.userAgent : (data.userAgent || "");
 
-    sh.appendRow([ts, event, student, className, runId, difficulty, top3, userAgent]);
+    sh.appendRow([ts, event, student, className, runId, difficulty, top3, step, text, userAgent]);
 
     return ContentService
       .createTextOutput(JSON.stringify({ok:true}))
@@ -112,3 +114,7 @@ Commit & push to GitHub. Now every start/finish will be appended to your Sheet.
   - move to Supabase/Firebase with auth.
 
 ---
+
+
+### Unknown questions
+If `logUnknownQuestions` is enabled in `config.js`, the app will log `event: unknown_question` with `step` and `text`.

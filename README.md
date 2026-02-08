@@ -45,3 +45,14 @@ See `GOOGLE_SHEETS_LOGGING.md` for the step-by-step setup.
 - After supervisor approves, press **Return to visitor** to continue.
 - After threat/rules, press **Go to person search** to proceed to the pat-down.
 - Steps auto-advance when all required items are completed.
+
+
+## Teacher mode (hidden phrasebank editor)
+- Open with **Ctrl+Shift+T**.
+- Adds/edits are saved as a **local draft** in your browser and are **not visible** to students unless you open teacher mode.
+- Use **Download phrasebank.json** and commit it to GitHub to publish changes.
+- Optional: set a PIN in `config.js` (`teacherPin`) to lock editing.
+
+
+## Unknown questions logging
+- Set `logUnknownQuestions: true` in `config.js` to send unrecognized student questions to Google Sheets (event `unknown_question`).
