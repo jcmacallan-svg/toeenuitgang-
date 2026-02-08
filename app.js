@@ -1,3 +1,10 @@
+
+function renderMood(state){
+  const el = $("#visitorMood");
+  if(!el) return;
+  el.textContent = (state && state.card && state.card.moodLine) ? state.card.moodLine : "";
+}
+
 // VEVA Entry Control Trainer — GitHub Pages (static)
 //
 // Notes:
@@ -38,15 +45,6 @@ function matchesHotkey(e, hk){
 function deepClone(obj){ return JSON.parse(JSON.stringify(obj)); }
 
 function downloadJson(filename, obj){
-function showHintToast(msg){
-  const el = document.getElementById("hintToast");
-  if(!el) return;
-  el.textContent = msg;
-  el.classList.remove("hidden");
-  window.clearTimeout(showHintToast._t);
-  showHintToast._t = window.setTimeout(()=>{ el.classList.add("hidden"); }, 4200);
-}
-
   const text = JSON.stringify(obj, null, 2);
   const blob = new Blob([text], { type:"application/json;charset=utf-8" });
   const a = document.createElement("a");
@@ -108,12 +106,20 @@ const PURPOSE_TO_TOPICS = {
 };
 
 const DATA = {
-  FIRST: ["Mark","Sarah","James","Nina","Tom","Aisha","Lucas","Emma","Daan","Sofia"],
+  FIRST: ["Mark","Tom","James","Lucas","Daan","Pieter","Ahmed","Omar","Robert","Kevin","Hassan","Marco"],
   LAST:  ["Jensen","Bakker","Williams","De Vries","Khan","Smit","Brown","Visser","Johnson","Martens"],
   ORG:   ["NetSecure BV","NorthRail","TriCom Systems","BlueShield Contractors","AeroTech Services","MedLogistics"],
   HOST:  ["Captain De Vries","Lt. Van Dijk","Major Jansen","Sgt. De Boer","Captain Smit"],
   TIME:  ["09:00","10:30","13:00","14:30","15:15"],
   NAT:   ["Dutch","German","Belgian","British","French","Spanish","Polish","Italian"],
+  MOOD: [
+    "The visitor looks relaxed and confident.",
+    "The visitor looks slightly nervous and fidgets with his hands.",
+    "The visitor seems impatient and keeps checking his watch.",
+    "The visitor looks uneasy and keeps glancing around.",
+    "The visitor looks tired but cooperative.",
+    "The visitor looks annoyed but stays polite."
+  ],
   STREET:["Oak Street","Main Street","Station Road","Maple Avenue","Church Lane","Parkstraat","Wilhelminastraat"],
   CITY:  ["Ede","Arnhem","Utrecht","Apeldoorn","Zwolle","Amersfoort"],
   PC:    ["6711 AB","6811 CD","3511 EF","7311 GH","8011 JK","3811 LM"],
@@ -128,7 +134,7 @@ const DATA = {
 };
 
 const STEPS = [
-  { key:"gate", title:"1) Poort (intake)",
+  { key:"gate", title:"1) Gate interview (appointment intake)",
     opening:["Good morning.","I need to enter the base."],
     required:["ask_identity","ask_purpose","ask_appointment","ask_host","ask_time","ask_topic"],
     hint:"Ask: name, purpose, appointment, who with, what time, and what it is about."
@@ -299,14 +305,6 @@ function listPhotoFiles(){
   return files;
 }
 
-const VISITOR_MOODS = [
-  "The visitor looks relaxed.",
-  "The visitor looks uneasy and keeps glancing around.",
-  "The visitor is fidgeting and avoids eye contact.",
-  "The visitor looks impatient but stays polite.",
-  "The visitor looks tired and speaks softly."
-];
-
 function generateVisitorCard(seed){
   let s = seed >>> 0;
   const rnd = () => (s = (s*1664525 + 1013904223) >>> 0) / 4294967296;
@@ -326,38 +324,85 @@ function generateVisitorCard(seed){
   const expiry = makeExpiry(rnd);
 
   const photo = randChoice(listPhotoFiles(), rnd);
+  const moodLine = randChoice(DATA.MOOD, rnd);
 
   return {
     name, org, host, purpose, topic, time, twist,
     id: { id_no, dob, nationality, address, expiry },
-    photo
+    photo,
+    moodLine
   };
 }
 
 function responseForControlQuestion(userText, card){
   const t = norm(userText);
+
+  // If student challenges a previous wrong confirmation, offer an excuse
+  if(t.includes("but you said") || t.includes("but your id") || t.includes("that's not") || t.includes("that is not correct") || t.includes("your id says")){
+    return randChoice([
+      "Sorry, I must have misheard you.",
+      "Sorry, I didn’t hear you correctly.",
+      "Sorry, I got confused for a moment."
+    ], Math.random);
+  }
+
+  // Helper: sometimes correct the student, sometimes let it slide
+  const correctMode = card._correctMode || (card._correctMode = (Math.random() < 0.7 ? "correct" : "let_slide"));
+
+  // AGE assertion like "You're 39, right?"
+  const ageMatch = t.match(/\b(\d{2})\b/);
+  if((t.includes("old") || t.includes("age") || t.includes("years")) && ageMatch){
+    const guessed = parseInt(ageMatch[1], 10);
+    const real = computeAge(card.id.dob);
+    if(real != null){
+      if(guessed === real) return "Yes, that's right.";
+      return (correctMode === "correct")
+        ? `No, I'm actually ${real} years old.`
+        : "Yes, that's right.";
+    }
+  }
+
+  // Date of birth assertion or question
+  if(t.includes("date of birth") || t.includes("birthdate") || t.includes("born")){
+    // if student includes a year guess, we can correct
+    const yearGuess = (t.match(/\b(19\d{2}|20\d{2})\b/) || [])[1];
+    if(yearGuess){
+      const realYear = (card.id.dob.split(" ").pop() || "").trim();
+      if(realYear && yearGuess !== realYear){
+        return (correctMode === "correct")
+          ? `No, my correct date of birth is ${card.id.dob}.`
+          : `Yes, that's correct.`;
+      }
+    }
+    return `My date of birth is ${card.id.dob}.`;
+  }
+
+  // Nationality checks / assertions
+  const natList = (DATA && DATA.NAT) ? DATA.NAT.map(x=>x.toLowerCase()) : [];
+  const mentionedNat = natList.find(n => t.includes(n));
+  if(t.includes("nationality") || t.includes("citizen") || mentionedNat){
+    const realNat = card.id.nationality;
+    if(mentionedNat){
+      const guess = mentionedNat.charAt(0).toUpperCase() + mentionedNat.slice(1);
+      if(guess.toLowerCase() === realNat.toLowerCase()) return "Yes, that's right.";
+      return (correctMode === "correct") ? `No, I'm actually ${realNat}.` : "Yes, that's right.";
+    }
+    return `My nationality is ${realNat}.`;
+  }
+
+  // Address / where do you live
+  if((t.includes("where") && t.includes("live")) || t.includes("address")){
+    return `I live at ${card.id.address}.`;
+  }
+
+  // Default: age question
   if(t.includes("age") || t.includes("how old")){
     const age = computeAge(card.id.dob);
     return age != null ? `I am ${age} years old.` : "My age is on my ID.";
   }
-  if((t.includes("where") && t.includes("live")) || t.includes("address")){
-    return `I live at ${card.id.address}.`;
-  }
-  if(t.includes("postcode") || t.includes("zip")){
-    const m = card.id.address.match(/,\s*([0-9]{4}\s*[A-Z]{2})\s+/);
-    return m ? `My postcode is ${m[1]}.` : "My postcode is on the ID.";
-  }
-  if(t.includes("nationality")){
-    return `My nationality is ${card.id.nationality}.`;
-  }
-  if(t.includes("date of birth") || t.includes("birthday") || t.includes("birth")){
-    return `My date of birth is ${card.id.dob}.`;
-  }
-  if(t.includes("spell") && t.includes("name")){
-    const spelled = card.name.replace(/\s+/g,"").split("").join("-");
-    return `It is spelled: ${spelled}.`;
-  }
-  return "It’s written on the ID.";
+
+  // fallback
+  return "It’s on my ID card.";
 }
 
 function visitorResponseForIntent(intent, userText, card){
@@ -428,8 +473,14 @@ function reveal(intent, state){
 
 async function loadPhrasebank(){
   // Base phrasebank from repo
-  const res = await fetch("phrasebank.json", { cache:"no-store" });
-  const base = await res.json();
+  let base = null;
+  try{
+    const res = await fetch("phrasebank.json", { cache:"no-store" });
+    base = await res.json();
+  }catch(err){
+    console.error("Failed to load phrasebank.json", err);
+    base = { smalltalk: [], off_script: { reflect_question_template: "Just to confirm: are you asking '{q}'?" }, intents: {} };
+  }
 
   // Optional local draft (teacher use)
   const useDraft = localStorage.getItem("veva_phrasebank_use_draft") === "1";
@@ -438,7 +489,13 @@ async function loadPhrasebank(){
     try{
       const draft = JSON.parse(draftRaw);
       return draft;
-    }catch(_){}
+    }catch(err){
+      console.warn("Invalid local phrasebank draft — falling back to base.", err);
+      // Clear broken draft so the app can start normally
+      localStorage.removeItem("veva_phrasebank_draft");
+      localStorage.removeItem("veva_phrasebank_use_draft");
+      try{ showToast("Local phrasebank draft was invalid and has been reset."); }catch(_){}
+    }
   }
   return base;
 }
@@ -470,9 +527,7 @@ function showVisitor(text){
   window.clearTimeout(window.__hideTimer);
   window.__hideTimer = window.setTimeout(() => {
     bubble.textContent = "Ask your next question…";
-  
-  if($("#visitorMood") && state && state.visitorMood){ $("#visitorMood").textContent = state.visitorMood; }
-}, 8000);
+  }, 8000);
 }
 
 function updateMeta(state){
@@ -613,10 +668,7 @@ function renderIdCard(state){
   function drawFields(){
     // Footer reminder
     ctx.fillStyle = "#f0f0f0"; ctx.fillRect(10,H-70,W-20,60);
-    ctx.fillStyle = "#3c3c3c"; ctx.font = "22px system-ui";
-    ctx.fillText("Reminder: prohibited items include weapons, drugs, and alcohol.", 30, H-32);
-
-    // If ID not revealed yet: show a blank card message
+    ctx.fillStyle = "#3c3c3c"; ctx.font = "22px system-ui";    // If ID not revealed yet: show a blank card message
     if(!state.revealed.id){
       ctx.fillStyle = "#333";
       ctx.font = "bold 28px system-ui";
@@ -639,26 +691,8 @@ function renderIdCard(state){
     field("Nationality", nat, 274);
     field("Date of birth", dob, 326);
     field("Age", age, 378);
-
-    // Address may be long; wrap
-    ctx.fillStyle = "#000"; ctx.font = "bold 28px system-ui";
-    ctx.fillText("Address:", 300, 430);
-    ctx.font = "22px system-ui";
-    const maxW = 560;
-    const words = addr.split(" ");
-    let line = "", y = 430;
-    let x = 510;
-    for(const w of words){
-      const test = line ? line + " " + w : w;
-      if(ctx.measureText(test).width > maxW){
-        ctx.fillText(line, x, y);
-        y += 26;
-        line = w;
-      } else line = test;
-    }
-    if(line) ctx.fillText(line, x, y);
-
     field("ID No.", id.id_no, 510);
+, id.id_no, 510);
     field("Expiry", id.expiry, 552);
   }
 }
@@ -681,20 +715,14 @@ function buildState(){
     done: {},
     lastStudentText: "",
     pendingReflect: null,
-    visitorMood: "",
-
 
     supervisorApproved: false,
     supervisorModalUsed: false,
     pendingReturnToVisitor: false,
-    allowSupervisorEarly: false,
-
 
     supervisorApproved: false,
     supervisorModalUsed: false,
     pendingReturnToVisitor: false,
-    allowSupervisorEarly: false,
-
 
   };
 }
@@ -704,6 +732,7 @@ function setStepUI(state){
   $("#stepTitle").textContent = step.title;
   $("#stepHelp").textContent = "";
   ensureOpenings(state);
+  renderMood(state);
   renderIdCard(state);
 
     // If this step is now complete, auto-advance (except where a button is required)
@@ -745,10 +774,6 @@ function updateActionButtons(state){
 
   // defaults: hidden
   [btnContact, btnReturn, btnGo].forEach(b => { if(b) { b.style.display = "none"; b.disabled = false; } });
-
-  if(step.key === "gate" && state.allowSupervisorEarly){
-    if(btnContact) btnContact.style.display = "inline-flex";
-  }
 
   if(step.key === "id_check"){
     // Show contact supervisor after ID requested + control question done (or anytime, if teacher wants)
@@ -821,11 +846,6 @@ function processUserLine(state, userText){
     reveal(matched, state);
     const answer = visitorResponseForIntent(matched, userText, state.card);
     showVisitor(answer);
-    // If visitor has no appointment, allow supervisor verification at the gate
-    if(matched === "ask_appointment" && /no,? i don't have an appointment|do not have an appointment|don't have an appointment|no appointment/i.test(answer)){
-      state.allowSupervisorEarly = true;
-      try{ updateActionButtons(state); }catch(_){ }
-    }
     renderIdCard(state);
   } else {
     // Log unknown questions (optional)
@@ -845,16 +865,6 @@ function processUserLine(state, userText){
       });
     }
     state.pendingReflect = userText;
-    // contextual hint: show missing required question(s)
-    try{
-      const step = currentStep(state);
-      const missing = step.required.filter(i => !state.done[i]);
-      if(missing.length){
-        const first = missing[0];
-        const ex = (state.intentPhrases && state.intentPhrases[first] && state.intentPhrases[first][0]) ? state.intentPhrases[first][0] : first;
-        showHintToast(`Hint: you still need: ${first}. Example: "${ex}"`);
-      }
-    }catch(_){ }
     const reflect = state.difficulty === "Advanced"
       ? "Could you be more specific, please?"
       : offScriptReflect(userText, pb);
@@ -913,13 +923,15 @@ function finishRun(state){
 
 (async function init(){
   const state = buildState();
-  window._visitorMoodText = state.card && state.card.mood ? state.card.mood : "";
 
   // UI hooks
   $("#btnResetLocal").addEventListener("click", () => {
     localStorage.removeItem("veva_practice_counter");
     alert("Lokale telling gereset (alleen op dit apparaat).");
-  });
+  
+    localStorage.removeItem("veva_phrasebank_draft");
+    localStorage.removeItem("veva_phrasebank_use_draft");
+});
 
   $("#btnStart").addEventListener("click", async () => {
     const name = $("#studentName").value.trim();
@@ -945,6 +957,19 @@ function finishRun(state){
       ts: new Date().toISOString(),
       stats: { difficulty: state.difficulty, userAgent: navigator.userAgent }
     });
+  // Enter-to-start (login screen)
+  ["#studentName","#className"].forEach(sel => {
+    const el = $(sel);
+    if(el){
+      el.addEventListener("keydown", (e) => {
+        if(e.key === "Enter"){
+          e.preventDefault();
+          $("#btnStart").click();
+        }
+      });
+    }
+  });
+
 
     setScreen("#screen-train");
     updateMeta(state);
@@ -974,11 +999,7 @@ function finishRun(state){
 
   $("#btnDoneStep").addEventListener("click", () => {
     const step = currentStep(state);
-    if(step.key === "gate" && state.allowSupervisorEarly){
-    if(btnContact) btnContact.style.display = "inline-flex";
-  }
-
-  if(step.key === "id_check"){
+    if(step.key === "id_check"){
       $("#stepHelp").textContent = "Use Contact supervisor → fill 5W → Return to visitor.";
       showVisitor("Use the supervisor flow buttons in this step.");
       updateActionButtons(state);
@@ -1331,4 +1352,16 @@ function finishRun(state){
   function teacherRefreshOnLoad(){
     try{ refreshTeacherUI(); setTeacherEditingEnabled(); }catch(_){}
   }
+
+  // Enter-to-send (question box)  // Enter-to-send
+  const q = $("#typedInput") || $("#userInput");
+  if(q){
+    q.addEventListener("keydown", (e) => {
+      if(e.key === "Enter" && !e.shiftKey){
+        e.preventDefault();
+        $("#btnSend").click();
+      }
+    });
+  }
+
 })();
