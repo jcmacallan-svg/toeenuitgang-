@@ -37,3 +37,9 @@ h2{margin:0 0 10px 0;font-size:18px}
 .feedbackBox{background:#0b1220;border:1px solid rgba(148,163,184,.2);border-radius:16px;padding:14px;margin:12px 0}
 .footer{display:flex;justify-content:center;padding:10px 0}
 @media(max-width:900px){.grid2{grid-template-columns:1fr}.gridTrain{grid-template-columns:1fr}}
+
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:18px;z-index:9999}
+.modalCard{width:min(900px,100%);background:#0f1a2e;border:1px solid rgba(148,163,184,.25);border-radius:16px;padding:16px;box-shadow:0 20px 60px rgba(0,0,0,.45)}
+.modalHead{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.modalTitle{font-weight:800;font-size:18px}
+.actionBar{margin-top:10px}

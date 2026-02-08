@@ -360,7 +360,7 @@ const REVEAL_BY_INTENT = {
 function reveal(intent, state){
   const fields = REVEAL_BY_INTENT[intent] || [];
   for(const f of fields){
-    if(f==="id") state.revealed.id = true;
+    if(f==="id") { state.revealed.id = true; state.revealed.name = true; state.revealed.dob = true; state.revealed.nationality = true; state.revealed.address = true; state.revealed.age = true; }
     else state.revealed[f] = true;
   }
   // Additional reveals for control questions based on what they asked
@@ -561,10 +561,10 @@ function renderIdCard(state){
     const id = card.id;
     const name = state.revealed.name ? card.name : "—";
     const org  = state.revealed.org ? card.org : "—";
-    const nat  = state.revealed.nationality ? id.nationality : "—";
-    const dob  = state.revealed.dob ? id.dob : "—";
-    const age  = state.revealed.age ? (computeAge(id.dob) ?? "—").toString() : "—";
-    const addr = state.revealed.address ? id.address : "—";
+    const nat  = (state.revealed.id || state.revealed.nationality) ? id.nationality : "—";
+    const dob  = (state.revealed.id || state.revealed.dob) ? id.dob : "—";
+    const age  = (state.revealed.id || state.revealed.age) ? ((computeAge(id.dob) ?? "—").toString()) : "—";
+    const addr = (state.revealed.id || state.revealed.address) ? id.address : "—";
 
     field("Name", name, 170);
     field("Company", org, 222);
@@ -612,6 +612,10 @@ function buildState(){
     openedSteps: new Set(),
     done: {},
     lastStudentText: "",
+    supervisorApproved: false,
+    supervisorModalUsed: false,
+    pendingReturnToVisitor: false,
+
   };
 }
 
@@ -621,6 +625,69 @@ function setStepUI(state){
   $("#stepHelp").textContent = "";
   ensureOpenings(state);
   renderIdCard(state);
+
+    // If this step is now complete, auto-advance (except where a button is required)
+    const stepNow = currentStep(state);
+    const complete = stepNow.required.every(i => state.done[i]);
+    if(complete){
+      // Special case: in ID-check we require a supervisor-return flow
+      if(stepNow.key === "id_check"){
+        $("#stepHelp").textContent = "Use the button: Contact supervisor → fill 5W → then Return to visitor.";
+        state.pendingReturnToVisitor = true;
+        updateActionButtons(state);
+        showVisitor("✅ ID-check complete. Next: contact supervisor (button), then return to the visitor.");
+      } else if(stepNow.key === "threat_rules"){
+        $("#stepHelp").textContent = "Press “Go to person search” to proceed to the pat-down.";
+        updateActionButtons(state);
+        showVisitor("✅ Step complete. Press “Go to person search” to continue to the pat-down.");
+      } else {
+        const nextStep = (state.stepIndex < STEPS.length - 1) ? STEPS[state.stepIndex + 1] : null;
+        const msg = nextStep ? `✅ Step complete. Moving to: ${nextStep.title}` : "✅ Step complete. Finishing run.";
+        showVisitor(msg);
+        if(nextStep){
+          // advance after a short delay so the student can read the message
+          window.setTimeout(() => {
+            state.stepIndex++;
+            $("#stepHelp").textContent = "";
+            setStepUI(state);
+            showVisitor(nextStep.opening[0] || "Okay.");
+          }, 1200);
+        } else {
+          window.setTimeout(() => finishRun(state), 800);
+        }
+      }
+    }
+function updateActionButtons(state){
+  const step = currentStep(state);
+  const btnContact = $("#btnContactSupervisor");
+  const btnReturn = $("#btnReturnVisitor");
+  const btnGo = $("#btnGoPersonSearch");
+
+  // defaults: hidden
+  [btnContact, btnReturn, btnGo].forEach(b => { if(b) { b.style.display = "none"; b.disabled = false; } });
+
+  if(step.key === "id_check"){
+    // Show contact supervisor after ID requested + control question done (or anytime, if teacher wants)
+    if(btnContact) btnContact.style.display = "inline-flex";
+    if(state.supervisorApproved && btnReturn){
+      btnReturn.style.display = "inline-flex";
+    }
+  }
+
+  // After supervisor approved, we want an explicit return step before moving to threat_rules
+  if(state.pendingReturnToVisitor && btnReturn){
+    btnReturn.style.display = "inline-flex";
+    if(btnContact) btnContact.style.display = "none";
+  }
+
+  // Gate to person search: after threat_rules complete show button to proceed (optional)
+  if(step.key === "threat_rules"){
+    if(btnGo) btnGo.style.display = "inline-flex";
+  }
+  if(step.key === "patdown"){
+    // no special buttons
+  }
+}
 }
 
 function smalltalkResponse(text, phrasebank){
@@ -773,14 +840,25 @@ function finishRun(state){
   });
 
   $("#btnDoneStep").addEventListener("click", () => {
-    // manual advance
+    const step = currentStep(state);
+    if(step.key === "id_check"){
+      $("#stepHelp").textContent = "Use Contact supervisor → fill 5W → Return to visitor.";
+      showVisitor("Use the supervisor flow buttons in this step.");
+      updateActionButtons(state);
+      return;
+    }
+    if(step.key === "threat_rules"){
+      $("#stepHelp").textContent = "Press “Go to person search” to proceed to the pat-down.";
+      updateActionButtons(state);
+      showVisitor("Press “Go to person search” to continue.");
+      return;
+    }
     if(state.stepIndex < STEPS.length - 1){
       state.stepIndex++;
       $("#stepHelp").textContent = "";
       setStepUI(state);
-      showVisitor("Okay.");
+      showVisitor(currentStep(state).opening[0] || "Okay.");
     } else {
-      // last step -> finish
       finishRun(state);
     }
   });

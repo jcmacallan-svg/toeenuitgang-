@@ -85,6 +85,12 @@
             <input id="studentInput" placeholder="Type your question in English…" />
             <button class="btn primary" id="btnSend">Send</button>
           </div>
+          <div class="row actionBar">
+            <button class="btn" id="btnContactSupervisor" title="Open supervisor 5W briefing (Step 2)">Contact supervisor</button>
+            <button class="btn" id="btnReturnVisitor" title="Return to visitor after supervisor response">Return to visitor</button>
+            <button class="btn" id="btnGoPersonSearch" title="Proceed to person search / pat-down">Go to person search</button>
+          </div>
+
           <div class="muted small">Tip: schrijf de antwoorden in je eigen boekje.</div>
 
           <div class="divider"></div>
@@ -126,7 +132,34 @@
     <footer class="footer">
       <span class="muted small">Hosted on GitHub Pages (static). No TTS/voice. For central tracking: configure an external endpoint in <code>config.js</code>.</span>
     </footer>
-  </main>
+  
+    <!-- Supervisor modal (5W briefing) -->
+    <div class="modal hidden" id="supervisorModal" role="dialog" aria-modal="true">
+      <div class="modalCard">
+        <div class="modalHead">
+          <div class="modalTitle">Supervisor call (5W briefing)</div>
+          <button class="btn" id="btnCloseModal">Close</button>
+        </div>
+        <p class="muted small">Fill in the 5W briefing (can be in Dutch). Then send to supervisor.</p>
+
+        <div class="grid2">
+          <label class="field"><span>Who are you?</span><input id="wWho" placeholder="Naam bezoeker" /></label>
+          <label class="field"><span>What are you doing here?</span><input id="wWhat" placeholder="Doel (delivery/inspection/etc.)" /></label>
+          <label class="field"><span>With whom is the meeting?</span><input id="wWithWhom" placeholder="Host / contactpersoon" /></label>
+          <label class="field"><span>What time is the meeting?</span><input id="wTime" placeholder="Bijv. 10:30" /></label>
+          <label class="field"><span>Why is the meeting?</span><input id="wWhy" placeholder="Onderwerp / reden" /></label>
+        </div>
+
+        <div class="row">
+          <button class="btn primary" id="btnSendSupervisor">Send to supervisor</button>
+        </div>
+
+        <div class="divider"></div>
+        <div class="muted small" id="supervisorResponse"></div>
+      </div>
+    </div>
+
+</main>
 
   <script src="config.js"></script>
   <script src="app.js"></script>

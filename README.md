@@ -33,3 +33,15 @@ Edit `phrasebank.json` and add extra patterns under `intents`.
 
 ## Google Sheets logging
 See `GOOGLE_SHEETS_LOGGING.md` for the step-by-step setup.
+
+
+## UX updates
+- When a step is completed, the app shows a clear next-action hint (what to do next).
+- ID card now reveals nationality / DOB / age / address immediately after asking for ID.
+
+
+## Supervisor flow (Step 2)
+- When ID-check is complete, use **Contact supervisor** to open the 5W modal.
+- After supervisor approves, press **Return to visitor** to continue.
+- After threat/rules, press **Go to person search** to proceed to the pat-down.
+- Steps auto-advance when all required items are completed.
