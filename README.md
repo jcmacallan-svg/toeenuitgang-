@@ -1,30 +1,35 @@
-# VIVA Entry Control English Trainer (v6)
+# VEVA Entry Control Trainer — GitHub Pages (static)
 
-Streamlit webapp for VIVA students to practice entry control English.
+This is a **pure static** version for **GitHub Pages**:
+- No Streamlit / no Python server.
+- Designed for **writing practice**: only the latest visitor answer is shown briefly.
+- Manual step button: **“I'm done with this step”**.
+- End feedback shows **biggest 3 misses** + all missed items with example sentences.
+- Generates an **ID card with a photo** (assets in `assets/photos/`).
 
-## Privacy mode
-- Only the latest VISITOR answer is shown on screen.
-- If TTS is enabled, the answer is spoken and the visible text hides 5 seconds after speech ends.
-- When the next question is asked, the previous answer is replaced.
+## Central tracking (who practiced / how often)
+GitHub Pages is static. If you want a **central** dashboard, you need an external backend:
+- simplest: **Google Sheets** via Google Apps Script Web App
+- or: **Supabase / Firebase**
 
-## Phrasebank
-- Keep `phrasebank.json` next to `app.py`.
-- Use the sidebar to add extra phrases to intents to improve recognition.
+Configure the endpoint in `config.js`:
 
-## Photos on the ID card
-- Add rights-cleared images to `assets/photos/`.
-
-## Run locally
-```bash
-pip install -r requirements.txt
-streamlit run app.py
+```js
+window.APP_CONFIG = { logEndpoint: "https://..." };
 ```
 
-## Deploy
-GitHub Pages cannot run Streamlit. Use Streamlit Community Cloud.
+The app will POST JSON events `{event:"start"/"finish", student, className, runId, ts, stats}`.
+
+If `logEndpoint` is empty, it still keeps a **local counter** on the device (not shared).
+
+## Deploy to GitHub Pages
+1. Push this repo to GitHub.
+2. In GitHub: Settings → Pages → Deploy from branch → choose `main` and `/root`.
+3. Open the Pages URL.
+
+## Customize phrase recognition
+Edit `phrasebank.json` and add extra patterns under `intents`.
 
 
-## Manual step button + feedback
-- The right-side checklist was removed.
-- Students can press **“I'm done with this step (continue)”** to move on.
-- At the end, the app shows which intents were missed, with example sentences.
+## Google Sheets logging
+See `GOOGLE_SHEETS_LOGGING.md` for the step-by-step setup.
