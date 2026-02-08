@@ -21,7 +21,7 @@
 
     <!-- Screen 1: Name -->
     <section class="card" id="screen-login">
-      <h1>VEVA – Ingang/Uitgang Trainer</h1>
+      <h1>Start</h1>
       <p class="muted">Vul je naam in. Daarna start de oefening.</p>
 
       <div class="grid2">
@@ -49,7 +49,18 @@
         <button class="btn" id="btnResetLocal" title="Verwijdert alleen lokaal opgeslagen data">Reset lokaal</button>
       </div>
 
-      </section>
+      <details class="details">
+        <summary>Docent: logging & telling “wie heeft geoefend”</summary>
+        <div class="detailsBody">
+          <p>GitHub Pages is statisch. Wil je centraal kunnen zien wie geoefend heeft en hoe vaak, dan heb je een extern logpunt nodig (bijv. Google Sheet via Apps Script of Supabase/Firebase).</p>
+          <p>In deze versie kun je:</p>
+          <ul>
+            <li><b>Zonder backend</b>: alleen lokaal (op het apparaat) bijhouden.</li>
+            <li><b>Met backend</b>: stel in <code>config.js</code> een endpoint in om starts/finishes te loggen.</li>
+          </ul>
+        </div>
+      </details>
+    </section>
 
     <!-- Screen 2: Training -->
     <section class="card hidden" id="screen-train">
@@ -270,8 +281,6 @@
       </div>
     </div>
 
-
-    <div class="toast hidden" id="hintToast"></div>
 </main>
 
   <script src="config.js"></script>

@@ -17,11 +17,7 @@
         "hi",
         "good morning",
         "good afternoon",
-        "good evening",
-        "can i help you",
-        "can i help you?",
-        "how can i help",
-        "how can i help?"
+        "good evening"
       ],
       "response": "Can you help me, please?"
     },
@@ -63,17 +59,7 @@
       "with who is the meeting",
       "with who is the meeting?",
       "who is the meeting with",
-      "who is the meeting with?",
-      "who are you here for",
-      "who are you here for?",
-      "who are you here to see",
-      "who are you here to see?",
-      "who told you to come",
-      "who told you to come?",
-      "by who",
-      "by who?",
-      "by whom",
-      "by whom?"
+      "who is the meeting with?"
     ],
     "ask_appointment": [
       "do you have a meeting",
@@ -92,14 +78,6 @@
       "can i see your id?",
       "please show me your id",
       "please show me your id?"
-    ],
-    "ask_topic": [
-      "what kind of inspection",
-      "what kind of inspection?",
-      "what kind of an inspection",
-      "what kind of an inspection?",
-      "what is the inspection about",
-      "what is the inspection about?"
     ]
   }
 }
