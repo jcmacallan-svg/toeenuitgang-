@@ -368,75 +368,84 @@ function generateVisitorCard(seed){
   };
 }
 
-function responseForControlQuestionfunction responseForControlQuestion(userText, card){
-  const t = norm(userText);
+function responseForControlQuestion(userText, card, state){
+  const t = (userText || "").toLowerCase();
 
-  // If student challenges a previous wrong confirmation, offer an excuse
-  if(t.includes("but you said") || t.includes("but your id") || t.includes("that's not") || t.includes("that is not correct") || t.includes("your id says")){
+  // If the student challenges after we previously accepted a wrong value, apologize + give correct.
+  if(state && state.lastWrongAccepted && (t.includes("but your id") || t.includes("that's not correct") || t.includes("that is not correct") || t.includes("it says") || t.includes("your id says"))){
+    const correct = state.lastWrongAccepted.correct;
+    state.lastWrongAccepted = null;
     return randChoice([
-      "Sorry, I must have misheard you.",
-      "Sorry, I didn’t hear you correctly.",
-      "Sorry, I got confused for a moment."
+      `Sorry, I must have misheard you. The correct information is ${correct}.`,
+      `Sorry, I got confused for a moment. The correct information is ${correct}.`,
+      `My apologies — I misspoke. The correct information is ${correct}.`
     ], Math.random);
   }
 
-  // Helper: sometimes correct the student, sometimes let it slide
-  const correctMode = card._correctMode || (card._correctMode = (Math.random() < 0.7 ? "correct" : "let_slide"));
+  // Detect control questions about DOB / age / nationality / spelling name
+  const wantsDob = t.includes("date of birth") || t.includes("dob") || t.includes("born");
+  const wantsAge = t.includes("age") || t.includes("years old") || /are you\s+\d{2}/.test(t);
+  const wantsNationality = t.includes("nationality") || t.includes("citizen") || t.includes("from which country");
+  const wantsSpell = t.includes("spell") && t.includes("name");
 
-  // AGE assertion like "You're 39, right?"
-  const ageMatch = t.match(/\b(\d{2})\b/);
-  if((t.includes("old") || t.includes("age") || t.includes("years")) && ageMatch){
-    const guessed = parseInt(ageMatch[1], 10);
-    const real = computeAge(card.id.dob);
-    if(real != null){
-      if(guessed === real) return "Yes, that's right.";
-      return (correctMode === "correct")
-        ? `No, I'm actually ${real} years old.`
-        : "Yes, that's right.";
-    }
-  }
+  // If the student proposes a wrong value, sometimes correct, sometimes accept (then allow challenge)
+  const correctChance = 0.7;
 
-  // Date of birth assertion or question
-  if(t.includes("date of birth") || t.includes("birthdate") || t.includes("born")){
-    // if student includes a year guess, we can correct
-    const yearGuess = (t.match(/\b(19\d{2}|20\d{2})\b/) || [])[1];
-    if(yearGuess){
-      const realYear = (card.id.dob.split(" ").pop() || "").trim();
-      if(realYear && yearGuess !== realYear){
-        return (correctMode === "correct")
-          ? `No, my correct date of birth is ${card.id.dob}.`
-          : `Yes, that's correct.`;
+  if(wantsDob && card && card.id && card.id.dob){
+    const correctDob = formatDob(card.id.dob);
+    const hasYear = /\b(19|20)\d{2}\b/.test(t);
+    const year = (card.id.dob || "").slice(0,4);
+    // If they mention a year and it's not the correct year -> mismatch
+    if(hasYear && year && !t.includes(year)){
+      if(Math.random() < correctChance){
+        return `No, my date of birth is ${correctDob}.`;
       }
+      if(state){
+        state.lastWrongAccepted = { type:"dob", correct: correctDob };
+      }
+      return "Yes, that's right.";
     }
-    return `My date of birth is ${card.id.dob}.`;
+    // otherwise answer normally
+    return `My date of birth is ${correctDob}.`;
   }
 
-  // Nationality checks / assertions
-  const natList = (DATA && DATA.NAT) ? DATA.NAT.map(x=>x.toLowerCase()) : [];
-  const mentionedNat = natList.find(n => t.includes(n));
-  if(t.includes("nationality") || t.includes("citizen") || mentionedNat){
-    const realNat = card.id.nationality;
-    if(mentionedNat){
-      const guess = mentionedNat.charAt(0).toUpperCase() + mentionedNat.slice(1);
-      if(guess.toLowerCase() === realNat.toLowerCase()) return "Yes, that's right.";
-      return (correctMode === "correct") ? `No, I'm actually ${realNat}.` : "Yes, that's right.";
+  if(wantsAge && card && card.id && String(card.id.age)){
+    const correctAge = String(card.id.age);
+    const n = (t.match(/\b(\d{2})\b/)||[])[1];
+    if(n && n !== correctAge){
+      if(Math.random() < correctChance){
+        return `No, I'm actually ${correctAge}.`;
+      }
+      if(state){
+        state.lastWrongAccepted = { type:"age", correct: correctAge };
+      }
+      return "Yes, that's right.";
     }
-    return `My nationality is ${realNat}.`;
+    return `I'm ${correctAge} years old.`;
   }
 
-  // Address / where do you live
-  if((t.includes("where") && t.includes("live")) || t.includes("address")){
-    return `I live at ${card.id.address}.`;
+  if(wantsNationality && card && card.id && card.id.nationality){
+    const nat = card.id.nationality;
+    // if they propose a specific nationality and it's wrong
+    const prop = (t.match(/\b(dutch|belgian|german|french|british|italian|spanish|turkish|danish|norwegian|swedish|polish|moroccan|nigerian)\b/)||[])[1];
+    if(prop && nat && prop.toLowerCase() !== nat.toLowerCase()){
+      if(Math.random() < correctChance){
+        return `No, my nationality is ${nat}.`;
+      }
+      if(state){
+        state.lastWrongAccepted = { type:"nationality", correct: nat };
+      }
+      return "Yes, that's right.";
+    }
+    return `My nationality is ${nat}.`;
   }
 
-  // Default: age question
-  if(t.includes("age") || t.includes("how old")){
-    const age = computeAge(card.id.dob);
-    return age != null ? `I am ${age} years old.` : "My age is on my ID.";
+  if(wantsSpell && card && card.name){
+    const spelled = card.name.split("").filter(ch => ch !== " ").join("-").toUpperCase();
+    return `Sure. It's ${spelled}.`;
   }
 
-  // fallback
-  return "It’s on my ID card.";
+  return null;
 }
 
 function visitorResponseForIntent(intent, userText, card){
@@ -462,7 +471,7 @@ function visitorResponseForIntent(intent, userText, card){
     case "request_id":
       return "Sure, here is my ID.";
     case "control_question":
-      return responseForControlQuestion(userText, card);
+      return responseForControlQuestion(userText, card, state);
     case "contact_supervisor":
       return "Okay, I'll wait.";
     case "inform_search_threat":
@@ -1091,6 +1100,7 @@ function finishRun(state){
 
   // ---------- Teacher mode (hidden phrasebank editor) ----------
   const teacherModal = $("#teacherModal");
+  const btnTeacherOpen = $("#btnTeacherOpen");
   const teacherClose = $("#btnTeacherClose");
   const teacherUnlockBox = $("#teacherUnlockBox");
   const teacherPinInput = $("#teacherPinInput");

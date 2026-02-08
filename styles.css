@@ -61,3 +61,7 @@ body.teacher .teacherOnly{display:block !important}
 .visitorMood{margin:8px 0 14px 0; font-style:italic; opacity:.85}
 
 .runId{color:rgba(20,45,90,.35)!important}
+
+.topbar{display:flex;align-items:center;justify-content:space-between}
+.topActions{display:flex;gap:8px;align-items:center}
+.btn.small{padding:6px 10px;font-size:12px}
