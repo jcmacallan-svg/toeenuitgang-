@@ -459,6 +459,11 @@ function visitorResponseForIntent(state, intent, userText, card){
     case "ask_identity":
       return card.twist==="typo_name" ? `My name is ${card.name}… that’s J-e-n-s-e-n.` : `My name is ${card.name}.`;
     case "ask_purpose":
+        // HOW_CAN_I_HELP_SPECIAL
+        if(norm(userText) === "how can i help" || norm(userText) === "how can i help?"){
+          markAsked(state, "purpose");
+          return "I would like to get on the base, please.";
+        }
         markAsked(state, "purpose");
       return `I'm here for ${card.purpose}.`;
     case "ask_appointment":
@@ -506,6 +511,10 @@ function visitorResponseForIntent(state, intent, userText, card){
           "Sorry, it's been a long day. I'm fine.",
           "I'm a bit stressed because I'm running late, but everything is in order."
         ]);
+
+      case "ask_who":
+        markAsked(state, "who");
+        return "My name is " + state.card.name + ".";
 
       default:
       return "Understood.";
@@ -1153,11 +1162,16 @@ $("#btnHint").addEventListener("click", () => {
   $("#btnSendSupervisor")?.addEventListener("click", () => sendToSupervisor(state));
   // Return to visitor
   $("#btnReturnVisitor")?.addEventListener("click", () => {
+    state.supervisorComplete = true;
+
     closeSupervisorModal();
     showVisitor("Alright. Everything checks out. You are allowed on the base.");
     state.pendingReturnToVisitor = false;
     updateActionButtons(state);
-  });
+  
+    // Auto-advance to threat rules (you will return to visitor next)
+    goToStep(state, "threat_rules");
+});
 $("#btnDoneStep").addEventListener("click", () => {
     const step = currentStep(state);
     if(step.key === "id_check"){
