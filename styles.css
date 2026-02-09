@@ -95,3 +95,56 @@ label{font-size: 14px}
 input[type="text"], textarea{font-size:16px; padding:12px 14px}
 #studentInput{min-height:44px}
 #visitorAnswer{min-height:56px;font-size:16px}
+
+/* --- Fullscreen readability mode (default) --- */
+:root{
+  --base-font: 18px;
+  --card-pad: 26px;
+  --radius: 18px;
+}
+html, body { font-size: var(--base-font); }
+body { padding: 12px !important; }
+
+.container{
+  width: 96vw !important;
+  max-width: 1400px !important;
+  margin: 0 auto !important;
+}
+
+header{
+  padding: 14px 16px !important;
+}
+
+.card{
+  padding: var(--card-pad) !important;
+  border-radius: var(--radius) !important;
+}
+
+h1{ font-size: 28px !important; }
+h2{ font-size: 24px !important; }
+h3{ font-size: 18px !important; }
+
+small, .muted{ font-size: 0.92em !important; }
+
+input[type="text"], select, textarea{
+  font-size: 18px !important;
+  padding: 14px 16px !important;
+  border-radius: 12px !important;
+}
+
+button, .btn{
+  font-size: 16px !important;
+  padding: 10px 14px !important;
+  border-radius: 12px !important;
+}
+
+#visitorAnswer{ min-height: 72px !important; font-size: 18px !important; }
+#studentInput{ min-height: 52px !important; }
+
+@media (min-width: 1200px){
+  /* give the training panel more breathing room */
+  .panel { padding: 22px !important; }
+}
+
+/* Make the training area feel more 'screen-filling' */
+main { min-height: calc(100vh - 120px); }

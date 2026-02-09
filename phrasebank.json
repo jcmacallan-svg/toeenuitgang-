@@ -81,7 +81,15 @@
       "can i see your id",
       "can i see your id?",
       "please show me your id",
-      "please show me your id?"
+      "please show me your id?",
+      "do you have ID",
+      "do you have ID?",
+      "do you have a id",
+      "do you have a id?",
+      "do you have an id card",
+      "do you have an id card?",
+      "can you show me your id",
+      "can you show me your id?"
     ],
     "ask_age": [
       "how old are you",
@@ -160,7 +168,13 @@
       "do you have drugs",
       "do you have drugs?",
       "do you have alcohol",
-      "do you have alcohol?"
+      "do you have alcohol?",
+      "do you have any sharp objects",
+      "do you have any sharp objects?",
+      "do you have any prohibited items",
+      "do you have any prohibited items?",
+      "do you have any weapons drugs alcohol or sharp objects",
+      "do you have any weapons drugs alcohol or sharp objects?"
     ]
   }
 }

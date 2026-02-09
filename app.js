@@ -514,7 +514,15 @@ function visitorResponseForIntent(state, intent, userText, card){
         updateIdVisibility(state);
         updateIdVisibility(state);
         updateVisitorAvatar(state);
-      return "Sure, here is my ID.";
+      // If still in gate, move into ID check step automatically
+        try{
+          const step = currentStep(state);
+          if(step && step.key === "gate"){
+            goToStep(state, "id_check");
+          }
+          updateIdVisibility(state);
+        }catch(e){}
+        return "Sure, here is my ID.";
     case "control_question":
       return responseForControlQuestion(userText, card, state);
     case "contact_supervisor":
@@ -1023,7 +1031,7 @@ function processUserLine(state, userText){
   }
 
   if(step && step.key === "gate" && gateComplete(state)){
-    showVisitor("Thank you. Please show me your ID.");
+    showVisitor("Thank you. Please show me your ID. (Ask: \"Can I see your ID?\" )");
     goToStep(state, "id_check");
     updateIdVisibility(state);
   }
@@ -1690,4 +1698,20 @@ function denyEntrance(state){
   const btn = $("#btnSend");
   if(inp) inp.disabled = true;
   if(btn) btn.disabled = true;
+}
+
+function idCheckComplete(state){
+  const a = state.asked || {};
+  return !!a.request_id && !!a.control_question;
+}
+
+function bindGoToPersonSearch(state){
+  const a = $("#btnGoToPersonSearch") || $("#btnGoPersonSearch");
+  if(a){
+    a.addEventListener("click", () => {
+      goToStep(state, "person_search");
+      updateIdVisibility(state);
+      focusQuestion();
+    });
+  }
 }
