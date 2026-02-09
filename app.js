@@ -428,81 +428,99 @@
 
   // ---- ID Canvas ----
   function drawIdCard(visitor) {
-    const canvas = $id("idCanvas");
-    const panel = $id("idPanel");
-    if (!canvas || !panel) return;
+  const canvas = $id("idCanvas");
+  const panel = $id("idPanel");
 
-    // show panel inline (your CSS handles size)
-    panel.style.display = "";
-    const ctx = canvas.getContext("2d");
-    const W = canvas.width, H = canvas.height;
+  if (!panel || !canvas) {
+    console.warn("[VEVA] ID elements missing. Need #idPanel and #idCanvas in HTML.");
+    return;
+  }
 
-    ctx.clearRect(0, 0, W, H);
-    ctx.fillStyle = "#f4f6fb";
-    ctx.fillRect(0, 0, W, H);
+  // Always show via body class (prevents CSS conflicts)
+  document.body.classList.add("show-id");
 
-    ctx.fillStyle = "#163a66";
-    ctx.fillRect(0, 0, W, 92);
+  // Ensure panel is visible (in case)
+  panel.style.display = "block";
 
-    ctx.fillStyle = "#ffffff";
-    ctx.font = "bold 38px system-ui, -apple-system, Segoe UI, Roboto, Arial";
-    ctx.fillText("VISITOR ID", 32, 58);
+  // Ensure canvas has real pixel size
+  // (If width/height are missing in HTML, canvas defaults to 300x150 and may look broken)
+  if (!canvas.width || canvas.width < 600) canvas.width = 980;
+  if (!canvas.height || canvas.height < 300) canvas.height = 560;
 
-    ctx.font = "16px system-ui, -apple-system, Segoe UI, Roboto, Arial";
-    ctx.fillStyle = "rgba(255,255,255,0.85)";
-    ctx.fillText("Checkpoint Access Card", 34, 80);
+  const ctx = canvas.getContext("2d");
+  const W = canvas.width, H = canvas.height;
 
-    // photo box
-    ctx.fillStyle = "#e8ecf5";
-    ctx.fillRect(34, 128, 190, 240);
+  // background
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = "#f4f6fb";
+  ctx.fillRect(0, 0, W, H);
+
+  // header bar
+  ctx.fillStyle = "#163a66";
+  ctx.fillRect(0, 0, W, 110);
+
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "bold 46px system-ui, -apple-system, Segoe UI, Roboto, Arial";
+  ctx.fillText("VISITOR ID", 36, 70);
+
+  ctx.font = "18px system-ui, -apple-system, Segoe UI, Roboto, Arial";
+  ctx.fillStyle = "rgba(255,255,255,0.88)";
+  ctx.fillText("Checkpoint Access Card", 38, 98);
+
+  // photo box
+  ctx.fillStyle = "#e8ecf5";
+  ctx.fillRect(40, 150, 230, 290);
+  ctx.strokeStyle = "rgba(0,0,0,0.12)";
+  ctx.strokeRect(40, 150, 230, 290);
+
+  const v = visitor.id;
+
+  const rows = [
+    ["Name", v.name],
+    ["Nationality", v.nationality],
+    ["DOB", formatDobDMY(v.dob)],
+    ["Age", String(v.age)],
+    ["ID nr", v.idNumber],
+    ["Expiry", formatDobDMY(v.expiry)]
+  ];
+
+  let y = 180;
+  ctx.fillStyle = "#111827";
+  for (const [label, value] of rows) {
+    ctx.font = "800 22px system-ui, -apple-system, Segoe UI, Roboto, Arial";
+    ctx.fillText(label + ":", 310, y);
+    ctx.font = "22px system-ui, -apple-system, Segoe UI, Roboto, Arial";
+    ctx.fillText(String(value), 460, y);
+    y += 58;
+  }
+
+  // footer
+  ctx.fillStyle = "rgba(17,24,39,0.75)";
+  ctx.font = "16px system-ui, -apple-system, Segoe UI, Roboto, Arial";
+  ctx.fillText("Valid only for stated purpose. Subject to search and denial.", 40, H - 28);
+
+  // load face on top
+  const img = new Image();
+  img.onload = () => {
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(40, 150, 230, 290);
+    ctx.clip();
+    // cover crop
+    ctx.drawImage(img, 40, 150, 230, 290);
+    ctx.restore();
     ctx.strokeStyle = "rgba(0,0,0,0.12)";
-    ctx.strokeRect(34, 128, 190, 240);
+    ctx.strokeRect(40, 150, 230, 290);
+  };
+  img.onerror = () => {};
+  img.src = visitor.headshot;
+}
 
-    const v = visitor.id;
-    const rows = [
-      ["Name", v.name],
-      ["Nationality", v.nationality],
-      ["DOB", formatDobDMY(v.dob)],
-      ["Age", String(v.age)],
-      ["ID nr", v.idNumber],
-      ["Expiry", formatDobDMY(v.expiry)]
-    ];
-
-    let y = 150;
-    ctx.fillStyle = "#111827";
-    for (const [label, value] of rows) {
-      ctx.font = "700 18px system-ui, -apple-system, Segoe UI, Roboto, Arial";
-      ctx.fillText(label + ":", 260, y);
-      ctx.font = "18px system-ui, -apple-system, Segoe UI, Roboto, Arial";
-      ctx.fillText(String(value), 380, y);
-      y += 44;
-    }
-
-    // footer
-    ctx.fillStyle = "rgba(17,24,39,0.75)";
-    ctx.font = "14px system-ui, -apple-system, Segoe UI, Roboto, Arial";
-    ctx.fillText("Valid only for stated purpose. Subject to search and denial.", 34, H - 22);
-
-    // load face
-    const img = new Image();
-    img.onload = () => {
-      ctx.save();
-      ctx.beginPath();
-      ctx.rect(34, 128, 190, 240);
-      ctx.clip();
-      ctx.drawImage(img, 34, 128, 190, 240);
-      ctx.restore();
-      ctx.strokeStyle = "rgba(0,0,0,0.12)";
-      ctx.strokeRect(34, 128, 190, 240);
-    };
-    img.onerror = () => {};
-    img.src = visitor.headshot;
-  }
-
-  function hideIdCard() {
-    const panel = $id("idPanel");
-    if (panel) panel.style.display = "none";
-  }
+function hideIdCard() {
+  const panel = $id("idPanel");
+  if (panel) panel.style.display = "none";
+  document.body.classList.remove("show-id");
+}
 
   // ---- Control answers (lie/inconsistency) ----
   function makeFakeControl(visitor, kind) {
