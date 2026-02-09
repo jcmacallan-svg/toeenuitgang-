@@ -226,3 +226,105 @@ main { min-height: calc(100vh - 120px); }
   text-align:left; /* keep bubble text readable */
   max-width: 70%;
 }
+/* ==============================
+   VEVA WhatsApp-style UI patch
+   ============================== */
+
+:root{
+  --bg: #070c16;
+  --panel: rgba(255,255,255,.06);
+  --panelBorder: rgba(255,255,255,.10);
+  --text: rgba(255,255,255,.92);
+  --muted: rgba(255,255,255,.65);
+
+  --visitorBubble: rgba(255,255,255,.08);
+  --visitorText: #d6d9e2;           /* light grey text */
+
+  --studentBubble: rgba(25,118,210,.18);
+  --studentBorder: rgba(25,118,210,.55);
+  --studentText: #4aa3ff;           /* blue text */
+  --danger: #ff3b3b;
+  --dangerBg: rgba(255,59,59,.14);
+}
+
+html, body{
+  background: radial-gradient(1200px 800px at 30% 10%, rgba(30,80,160,.40), var(--bg));
+  color: var(--text);
+}
+
+.card{
+  background: var(--panel);
+  border: 1px solid var(--panelBorder);
+  backdrop-filter: blur(6px);
+}
+
+.muted{ color: var(--muted); }
+
+/* Make action bar look cleaner */
+.actionBar{
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* Hide the supervisor button (you wanted TEXT trigger only) */
+#btnContactSupervisor{
+  display: none !important;
+}
+
+/* Deny entrance pops */
+#btnDenyEntrance, .btn.danger{
+  background: var(--dangerBg) !important;
+  border-color: rgba(255,59,59,.55) !important;
+  color: #fff !important;
+}
+#btnDenyEntrance:hover, .btn.danger:hover{
+  filter: brightness(1.08);
+}
+
+/* WhatsApp rows: visitor left, student right */
+.visitorRow,
+.studentRow{
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+.studentRow{
+  justify-content: flex-end;
+}
+
+/* Avatar sizing + same size */
+.visitorAvatar,
+.studentAvatar{
+  width: 56px !important;
+  height: 56px !important;
+  border-radius: 50% !important;
+  object-fit: cover !important;
+  flex: 0 0 56px;
+  border: 1px solid rgba(255,255,255,.18);
+  background: rgba(255,255,255,.06);
+}
+
+/* Bubble colors */
+#visitorBubble.bubble{
+  background: var(--visitorBubble) !important;
+  color: var(--visitorText) !important;
+  border: 1px solid rgba(255,255,255,.10);
+}
+#studentBubble.bubble.me{
+  background: var(--studentBubble) !important;
+  color: var(--studentText) !important;        /* blue text */
+  border: 1px solid var(--studentBorder) !important;
+}
+
+/* Mood text under visitor bubble */
+#visitorMood{
+  margin-top: 6px;
+  font-size: 12px;
+  color: rgba(255,255,255,.65);
+}
+
+/* On mobile: hide the right panel (ID panel) entirely */
+@media (max-width: 900px){
+  #idPanel{ display:none !important; }
+}
