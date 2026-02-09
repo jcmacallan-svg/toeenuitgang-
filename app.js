@@ -381,7 +381,10 @@ function offScriptReflect(userText, phrasebank){
   return tpl.replace("{q}", q);
 }
 
-function randChoice(arr, rnd){ return arr[Math.floor(rnd()*arr.length)]; }
+function randChoice(arr, rnd){
+  const r = (typeof rnd === "function") ? rnd : Math.random;
+  return arr[Math.floor(r()*arr.length)];
+}
 
 function makeIdNumber(rnd){
   const a = Math.floor(100000 + rnd()*900000);
@@ -494,10 +497,33 @@ function getDobISO(card){
   }catch(e){}
   return null;
 }
+function formatDob(iso){
+  // iso: yyyy-mm-dd -> "13 Jul 1992"
+  try{
+    if(!iso || typeof iso !== "string") return "";
+    const m = iso.trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if(!m) return iso;
+    const y = parseInt(m[1],10); const mm = parseInt(m[2],10); const d = parseInt(m[3],10);
+    const mons = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+    const mon = mons[Math.max(0, Math.min(11, mm-1))];
+    return `${String(d).padStart(2,"0")} ${mon} ${y}`;
+  }catch(e){ return iso; }
+}
+
+
 function safeAgeFromCard(card){
-  const iso = getDobISO(card);
-  const a = computeAgeFromDob(iso);
-  return (typeof a === "number" && isFinite(a)) ? a : null;
+  try{
+    if(card && card.id && typeof card.id.age === "number") return card.id.age;
+    const dob = getDobISO(card);
+    if(dob){
+      const a = computeAgeFromDob(dob);
+      if(typeof a === "number" && isFinite(a)) return a;
+    }
+    // fallback: plausible adult age
+    return 30 + Math.floor(Math.random()*25);
+  }catch(e){
+    return 30 + Math.floor(Math.random()*25);
+  }
 }
 
 function moodMistakeRate(state){
@@ -1116,6 +1142,7 @@ function setStepUI(state){
 function updateActionButtons(state){
   const step = currentStep(state);
   const btnContact = $("#btnContactSupervisor");
+  if(btnContact) btnContact.style.display = 'none';
   const btnReturn = $("#btnReturnVisitor");
   const btnGo = $("#btnGoPersonSearch");
 
@@ -1204,7 +1231,6 @@ function processUserLine(state, userText){
 
   // threat rules completion (simple)
   if(state.stepKey === "threat_rules"){
-    const t = norm(userText);
 
   // HAND_BACK_ID_V41: hide ID after handing it back
   if(t.includes("here is your id back") || t.includes("here's your id back") || t.includes("have your id back") || t.includes("giving you your id back")){
@@ -2316,3 +2342,17 @@ function denyEntrance(state){
   }catch(e){}
 })();
 ;
+
+;
+/*CHAT_ALIGN_FIX_V45*/
+(function(){
+  try{
+    const style = document.createElement("style");
+    style.textContent = `
+      .chatRow.me{justify-content:flex-end;}
+      .chatRow.me .bubble{margin-left:auto;}
+      .chatAvatar.me, .chatAvatar.visitor{width:72px;height:72px;border-radius:999px;object-fit:cover;}
+    `;
+    document.head.appendChild(style);
+  }catch(e){}
+})();
