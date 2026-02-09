@@ -499,13 +499,13 @@ function responseForControlQuestion(userText, card, state){
   }
 
   // Detect control questions about DOB / age / nationality / spelling name
-  const wantsDob = t.includes("date of birth") || t.includes("dob") || t.includes("born");
-  const wantsAge = t.includes("age") || t.includes("years old") || /are you\s+\d{2}/.test(t);
+  const wantsDob = t.includes("date of birth") || t.includes("birth date") || t.includes("birthday") || t.includes("dob") || t.includes("born");
+  const wantsAge = t.includes("how old") || t.includes("age") || t.includes("years old") || /are you\s+\d{1,3}\b/.test(t);
   const wantsNationality = t.includes("nationality") || t.includes("citizen") || t.includes("from which country");
   const wantsSpell = t.includes("spell") && t.includes("name");
 
   // If the student proposes a wrong value, sometimes correct, sometimes accept (then allow challenge)
-  const correctChance = 0.7;
+  const correctChance = (typeof moodMistakeRate === "function" && state) ? Math.max(0.55, 1 - moodMistakeRate(state)) : 0.7;
 
   if(wantsDob && card && card.id && card.id.dob){
     const correctDob = formatDob(card.id.dob);
