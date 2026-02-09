@@ -324,10 +324,6 @@ html, body{
   color: rgba(255,255,255,.65);
 }
 
-/* On mobile: hide the right panel (ID panel) entirely */
-@media (max-width: 900px){
-  #idPanel{ display:none !important; }
-}
 /* =========================================================
    VEVA FINAL OVERRIDE — WhatsApp style (single source of truth)
    Plak dit HELEMAAL ONDERAAN je styles.css
@@ -466,5 +462,101 @@ body.id-open #idCanvas{
 }
 
 @media (max-width: 900px){
+  body.id-open #idPanel{ inset: 10px !important; }
+}
+/* =========================================================
+   VEVA CSS PATCH — fixes conflicts + makes ID overlay work on mobile
+   Plak dit helemaal ONDERAAN styles.css
+   ========================================================= */
+
+/* 1) Eén bron van waarheid voor avatar size */
+:root{
+  --veva-avatar: 72px;
+}
+
+/* 2) WhatsApp rows (force) */
+.visitorRow{
+  display:flex !important;
+  gap:12px !important;
+  align-items:flex-end !important;
+}
+
+.studentRow{
+  display:flex !important;
+  gap:12px !important;
+  align-items:flex-end !important;
+  justify-content:flex-end !important;
+  flex-direction: row-reverse !important; /* avatar rechts */
+  width:100% !important;
+}
+
+/* 3) Avatars gelijk en groter */
+.visitorAvatar,
+.studentAvatar{
+  width: var(--veva-avatar) !important;
+  height: var(--veva-avatar) !important;
+  border-radius: 50% !important;
+  object-fit: cover !important;
+  flex: 0 0 var(--veva-avatar) !important;
+  border: 1px solid rgba(255,255,255,.18) !important;
+  background: rgba(255,255,255,.06) !important;
+}
+
+/* 4) Bubbles */
+#visitorBubble.bubble{
+  background: rgba(255,255,255,.08) !important;
+  border: 1px solid rgba(255,255,255,.10) !important;
+  color: #d6d9e2 !important; /* visitor text lichtgrijs */
+  min-height: 54px !important;
+}
+
+#studentBubble.bubble.me{
+  background: rgba(25,118,210,.18) !important;
+  border: 1px solid rgba(25,118,210,.55) !important;
+  color: #4aa3ff !important; /* student text blauw */
+  min-height: 54px !important;
+  margin-left: auto !important;
+  max-width: 70% !important;
+}
+
+/* 5) Mood onder visitor bubble */
+#visitorMood{
+  margin-top: 8px !important;
+  font-style: normal !important;
+  font-size: 13px !important;
+  color: rgba(255,255,255,.70) !important;
+  opacity: 1 !important;
+}
+
+/* 6) ID panel: standaard uit (app.js zet 'm aan) */
+#idPanel{ display:none; }
+
+/* 7) BIG ID OVERLAY — werkt ook op mobiel */
+body.id-open #idPanel{
+  display:block !important;
+  position:fixed !important;
+  inset: 14px !important;
+  z-index: 9998 !important;
+  background: rgba(10,14,22,.92) !important;
+  border: 1px solid rgba(255,255,255,.14) !important;
+  border-radius: 18px !important;
+  padding: 14px !important;
+  box-shadow: 0 30px 90px rgba(0,0,0,.55) !important;
+}
+
+body.id-open #idCanvas{
+  width: 100% !important;
+  height: auto !important;
+  border-radius: 14px !important;
+  max-height: calc(100vh - 120px);
+}
+
+/* 8) IMPORTANT: verwijder het 'idPanel hidden on mobile' conflict.
+   Als je deze regel elders hebt: @media(max-width:900px){ #idPanel{ display:none !important; } }
+   dan overschrijven we het hier zodat overlay kan werken.
+*/
+@media (max-width: 900px){
+  /* Alleen verbergen als overlay NIET open is */
+  body:not(.id-open) #idPanel{ display:none !important; }
   body.id-open #idPanel{ inset: 10px !important; }
 }
