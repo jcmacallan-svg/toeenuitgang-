@@ -681,9 +681,15 @@ function setScreen(id){
 }
 
 function showVisitor(text){
+  // Primary UI bubble
+  const bubble = $("#visitorBubble");
+  if(bubble) bubble.textContent = text;
+
   // Legacy area (if present)
   const box = $("#visitorAnswer");
   if(box) box.textContent = text;
+
+  // Optional chat log (if present in future)
   try{ addChatMessage(window.__state || null, "visitor", text); }catch(e){}
 }
 
@@ -1015,15 +1021,6 @@ function processUserLine(state, userText){
   // threat rules completion (simple)
   if(state.stepKey === "threat_rules"){
     const t = norm(userText);
-
-  // Auto-open supervisor popup when the student says they will contact/call the supervisor
-  // Examples: "I'll contact my supervisor", "I will call my supervisor", "Contact supervisor"
-  if(t.includes("contact my supervisor") || t.includes("call my supervisor") || t.includes("contact supervisor") || t.includes("call supervisor") || t.includes("phone my supervisor")){
-    try {
-      setTimeout(() => { try { openSupervisorModal(state); } catch(e) {} }, 900);
-    } catch(e) {}
-  }
-
     if(t.includes("no weapons") || t.includes("no drugs") || t.includes("no alcohol") || t.includes("prohibited") || t.includes("searched") || t.includes("search") || t.includes("pat-down") || t.includes("due to") ){
       state.threatRulesComplete = true;
     }
@@ -1277,6 +1274,9 @@ $("#btnHint").addEventListener("click", () => {
     const inp = $("#studentInput");
     const text = inp.value.trim();
     if(!text) return;
+    // Show student's last message bubble
+    const sb = $("#studentBubble");
+    if(sb){ sb.style.display = "block"; sb.textContent = text; }
     inp.value = "";
     processUserLine(state, text);
   });
@@ -2004,5 +2004,13 @@ function denyEntrance(state){
         // already handled
       }
     });
+  }
+})();
+
+// Ensure student avatar always points to soldier.png (if present)
+(function(){
+  const sa = $("#studentAvatar");
+  if(sa){
+    sa.onerror = () => { sa.style.display = "none"; };
   }
 })();

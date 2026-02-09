@@ -197,3 +197,12 @@ main { min-height: calc(100vh - 120px); }
   font-size: 16px !important;
   padding: 10px 12px !important;
 }
+
+/* Student bubble row (right side) */
+.studentRow{display:flex; gap:10px; align-items:flex-start; justify-content:flex-end; margin-top:10px}
+.studentAvatar{width:64px; height:64px; border-radius:50%; object-fit:cover; border:1px solid rgba(255,255,255,0.16); background:rgba(255,255,255,0.06)}
+.studentCol{max-width: calc(100% - 90px)}
+.bubble.me{background: rgba(120,180,255,0.12); border:1px solid rgba(120,180,255,0.25)}
+/* Visitor avatar bigger */
+.visitorAvatar{width:72px; height:72px}
+.visitorCol{max-width: calc(100% - 90px)}
