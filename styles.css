@@ -335,12 +335,20 @@ body{
 }
 
 
-/* --- v5 patches --- */
+/* --- v7.0.1 patches --- */
 
-/* Avatars align with the TOP of the chat bubble (not the mood line) */
+/* Always respect [hidden] */
+[hidden]{ display:none !important; }
+
+/* Avatars align with TOP of bubble (not mood line) */
 .msg{ align-items:flex-start; }
 
-/* ID card under chat */
+/* ID area under chat */
+.chatDivider{
+  height:1px;
+  background:var(--border);
+  margin: 0 12px 12px 12px;
+}
 .idUnderChat{
   padding: 0 12px 12px 12px;
 }
@@ -349,47 +357,67 @@ body{
   justify-content:flex-start;
 }
 .idUnderChat .idCard{
-  width: 340px;
+  width: 360px;
+  max-width: 100%;
 }
 
-/* Make input + hold-to-talk look aligned */
-.inputBar{ align-items:center; }
-.holdWrap{ flex-direction:column; justify-content:center; }
-.typeWrap{ align-items:center; }
-
-/* Divider between chat and ID */
-.chatDivider{
-  height:1px;
-  background:var(--border);
-  margin: 0 12px 12px 12px;
-}
-
-/* Quick Add panel */
-.quickAdd{
-  border:1px solid var(--border);
-  background:#0b1220;
-  border-radius:12px;
-  padding:10px;
-}
-.quickAdd h3{
-  margin:0 0 8px 0;
-  font-size:13px;
-  color:var(--text);
-}
-.quickAdd .row{
+/* Login screen */
+.loginWrap{
   display:flex;
-  gap:8px;
-  margin-bottom:8px;
+  height:100%;
+  align-items:center;
+  justify-content:center;
+  padding: 24px;
 }
-.quickAdd input, .quickAdd textarea{
+.loginCard{
+  width: min(560px, 100%);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 18px;
+  box-shadow: 0 10px 28px rgba(0,0,0,.35);
+}
+.loginCard h2{
+  margin: 0 0 10px 0;
+  font-size: 18px;
+}
+.loginGrid{
+  display:grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+@media (max-width: 720px){
+  .loginGrid{ grid-template-columns: 1fr; }
+}
+.loginRow label{
+  display:block;
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+.loginRow input, .loginRow select{
   width:100%;
-  background:#0b1220;
-  border:1px solid var(--border);
-  color:var(--text);
-  border-radius:10px;
-  padding:10px;
-  font-size:13px;
-  outline:none;
+  background: var(--field);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 12px;
+  padding: 12px;
+  font-size: 14px;
+  outline: none;
 }
-.quickAdd textarea{ min-height:66px; resize:vertical; }
-.quickAdd .note{ color:var(--muted); font-size:12px; margin-top:6px; }
+.loginActions{
+  display:flex;
+  gap: 10px;
+  margin-top: 14px;
+  justify-content:flex-end;
+}
+.loginError{
+  margin-top: 10px;
+  color: #ff8080;
+  font-size: 13px;
+  display:none;
+}
+
+/* Input bar stability */
+.inputBar{ align-items:center; }
+.typeWrap{ align-items:center; }

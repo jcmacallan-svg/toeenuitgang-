@@ -1,17 +1,17 @@
-VEVA Trainer baseline v5
+VEVA Trainer baseline v7.0.1
 
-Implemented changes:
-- ID card is under the chat bubbles (main panel), not in the sidebar.
-- ID card is hidden at start; shows only after asking for ID / passport / identity card / have you got ID, etc.
-- Visitor avatar is ALWAYS the same file as the ID photo (1:1 sync).
-- Speech-to-text writes into the input bar while talking; it only sends to the green bubble when you release.
-- Added 'what is your name' intent.
-- Added Quick Add rules (sidebar) for fast content iteration; stored in localStorage.
+Added baseline tracking:
+- window.BUILD in config.js
+- v-pill in topbar
+- document.title includes version
+- console banner logs BUILD + CONFIG
+- cache-busting query param ?v=7.0.1 for config.js and app.js
 
-Asset paths used:
-- Soldier: assets/photos/soldier.png
-- Headshots: assets/photos/headshots_01.png .. headshots_10.png
-Fallback supported: assets/photos/headshot_01.png ..
+Assets expected:
+- assets/photos/soldier.png
+- assets/photos/headshot_01.png .. headshot_10.png
 
-Files to drop into repo root:
-- index.html, styles.css, config.js, app.js
+ID behavior:
+- ID card is hidden at start (hidden + display:none + JS hideId on boot)
+- shows only when student asks for ID (ask_id intent)
+- visitor avatar and ID photo use the same image file (1:1)

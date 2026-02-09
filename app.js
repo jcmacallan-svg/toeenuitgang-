@@ -1,36 +1,48 @@
 // app.js
 (() => {
   "use strict";
-
   const $ = (sel) => document.querySelector(sel);
 
-  // UI refs
+  // Screens
+  const screenLogin = $("#screenLogin");
+  const screenTraining = $("#screenTraining");
+  const screenPersonSearch = $("#screenPersonSearch");
+  const screenReturn = $("#screenReturn");
+
+  // Login UI
+  const studentSurnameInput = $("#studentSurname");
+  const studentGroupSel = $("#studentGroup");
+  const studentDifficultySel = $("#studentDifficulty");
+  const btnStartTraining = $("#btnStartTraining");
+  const loginError = $("#loginError");
+
+  // Topbar pills
+  const studentPill = $("#studentPill");
+  const versionPill = $("#versionPill");
+  const voiceStatus = $("#voiceStatus");
+
+  // Chat UI
   const visitorBubble = $("#visitorBubble");
   const studentBubble = $("#studentBubble");
   const moodLine = $("#moodLine");
   const hintBox = $("#hintBox");
-  const difficultySel = $("#difficulty");
-  const voiceStatus = $("#voiceStatus");
 
   const textInput = $("#textInput");
   const btnSend = $("#btnSend");
   const holdToTalk = $("#holdToTalk");
 
+  // Sidebar buttons
   const btnReset = $("#btnReset");
   const btnReturn = $("#btnReturn");
   const btnPersonSearch = $("#btnPersonSearch");
   const btnDeny = $("#btnDeny");
-
-  const screenTraining = $("#screenTraining");
-  const screenPersonSearch = $("#screenPersonSearch");
-  const screenReturn = $("#screenReturn");
   const btnBackToTraining = $("#btnBackToTraining");
   const btnBackReturn = $("#btnBackReturn");
 
   // Avatars
   const visitorAvatar = $("#visitorAvatar");
 
-  // ID UI (now under chat)
+  // ID UI
   const idCardWrap = $("#idCardWrap");
   const idSlotHint = $("#idSlotHint");
   const btnReturnId = $("#btnReturnId");
@@ -40,68 +52,57 @@
   const idNat = $("#idNat");
   const idNo = $("#idNo");
 
-  // Quick add
-  const qaPhrases = $("#qaPhrases");
-  const qaReply = $("#qaReply");
-  const qaAddBtn = $("#qaAddBtn");
-  const qaClearBtn = $("#qaClearBtn");
-
-  // Config
+  // Config + Build
   const CFG = window.CONFIG || {};
+  const BUILD = window.BUILD || { version: "dev", name: "VEVA Trainer", date: "" };
+
   const ASSET_BASE = CFG.assetBase || "assets/photos";
-  const HEADSHOT_PREFIX = CFG.headshotPrefix || "headshots_";
+  const HEADSHOT_PREFIX = CFG.headshotPrefix || "headshot_";
   const HEADSHOT_COUNT = Number(CFG.headshotCount || 10);
   const VOICE_AUTOSEND = CFG.voiceAutoSend !== false;
 
-  // ---------- Helpers ----------
-  function randInt(min, max){
-    return Math.floor(Math.random() * (max - min + 1)) + min;
-  }
+  // Version display + document title + console banner (cache sanity)
+  if (versionPill) versionPill.textContent = `v${BUILD.version}`;
+  document.title = `${BUILD.name} v${BUILD.version}`;
+  console.info(
+    `%c${BUILD.name} v${BUILD.version}`,
+    "background:#161b22;color:#e6edf3;padding:6px 10px;border-radius:8px;font-weight:700;"
+  );
+  console.info("BUILD:", BUILD);
+  console.info("CONFIG:", CFG);
+
+  function randInt(min, max){ return Math.floor(Math.random() * (max - min + 1)) + min; }
   function pad2(n){ return String(n).padStart(2,"0"); }
+  function cap(s){ return (s||"").charAt(0).toUpperCase() + (s||"").slice(1); }
 
-  // ---------- Custom rules (localStorage) ----------
-  const RULES_KEY = "veva.customRules.v1";
-
-  function loadCustomRules(){
-    try {
-      const raw = localStorage.getItem(RULES_KEY);
-      if (!raw) return [];
-      const parsed = JSON.parse(raw);
-      return Array.isArray(parsed) ? parsed : [];
-    } catch { return []; }
+  // Persisted student info (prefill only; still requires Start)
+  const STUDENT_KEY = "veva.student.v1";
+  function loadStudentPrefill(){
+    try{
+      const raw = localStorage.getItem(STUDENT_KEY);
+      if (!raw) return null;
+      const v = JSON.parse(raw);
+      if (!v || typeof v !== "object") return null;
+      return v;
+    } catch { return null; }
+  }
+  function saveStudentPrefill(v){
+    try{ localStorage.setItem(STUDENT_KEY, JSON.stringify(v)); } catch {}
   }
 
-  function saveCustomRules(rules){
-    localStorage.setItem(RULES_KEY, JSON.stringify(rules));
-  }
+  // ---------- Student/session state ----------
+  let session = {
+    surname: "",
+    group: "",
+    difficulty: "standard" // basic | standard | advanced
+  };
 
-  function addCustomRule(phrasesCsv, reply){
-    const phrases = (phrasesCsv || "")
-      .split(",")
-      .map(s => s.trim())
-      .filter(Boolean);
-
-    if (!phrases.length || !reply.trim()) return false;
-
-    const rules = loadCustomRules();
-    rules.push({ phrases, reply: reply.trim() });
-    saveCustomRules(rules);
-    return true;
-  }
-
-  function clearCustomRules(){
-    localStorage.removeItem(RULES_KEY);
-  }
-
-  function matchCustomRule(text){
-    const t = (text || "").toLowerCase();
-    const rules = loadCustomRules();
-    for (const r of rules){
-      for (const p of (r.phrases || [])){
-        if (t.includes(p.toLowerCase())) return r.reply;
-      }
+  function updateStudentPill(){
+    if (!session.surname || !session.group){
+      studentPill.textContent = "Student: —";
+      return;
     }
-    return null;
+    studentPill.textContent = `Student: ${session.surname} | Group: ${session.group} | ${cap(session.difficulty)}`;
   }
 
   // ---------- ID data ----------
@@ -109,10 +110,6 @@
 
   function headshotPath(index){
     return `${ASSET_BASE}/${HEADSHOT_PREFIX}${pad2(index)}.png`;
-  }
-
-  function fallbackHeadshotPath(index){
-    return `${ASSET_BASE}/headshot_${pad2(index)}.png`;
   }
 
   function makeRandomId(){
@@ -127,21 +124,10 @@
     };
   }
 
-  function syncVisitorAvatarToId(){
-    if (!visitorAvatar) return;
-    visitorAvatar.src = ID_DATA.photoSrc;
-    visitorAvatar.onerror = () => {
-      visitorAvatar.onerror = null;
-      visitorAvatar.src = fallbackHeadshotPath(ID_DATA.headshotIndex);
-    };
-  }
-
-  function setIdPhoto(){
-    idPhoto.src = ID_DATA.photoSrc;
-    idPhoto.onerror = () => {
-      idPhoto.onerror = null;
-      idPhoto.src = fallbackHeadshotPath(ID_DATA.headshotIndex);
-    };
+  // Visitor avatar MUST equal ID photo (1:1)
+  function syncAvatarAndIdPhoto(){
+    if (visitorAvatar) visitorAvatar.src = ID_DATA.photoSrc;
+    if (idPhoto) idPhoto.src = ID_DATA.photoSrc;
   }
 
   // ---------- Mood ----------
@@ -153,59 +139,45 @@
   ];
   let currentMood = MOODS[0];
 
-  // ---------- State ----------
+  // ---------- Training State ----------
   let state;
-
-  function resetAll(){
-    currentMood = MOODS[randInt(0, MOODS.length - 1)];
-    moodLine.textContent = currentMood.line;
-
-    state = { stage:"start", misses:0, idVisible:false };
-
-    visitorBubble.textContent = "Hello.";
-    studentBubble.textContent = "Hold-to-talk or type below.";
-    hideHint();
-    hideId();
-    setActiveScreen("training");
-
-    const fresh = makeRandomId();
-    Object.assign(ID_DATA, fresh);
-
-    syncVisitorAvatarToId();
-  }
 
   // ---------- Screens ----------
   function setActiveScreen(name){
-    [screenTraining, screenPersonSearch, screenReturn].forEach(s => s.classList.remove("screen--active"));
+    [screenLogin, screenTraining, screenPersonSearch, screenReturn].forEach(s => s.classList.remove("screen--active"));
+    if (name === "login") screenLogin.classList.add("screen--active");
     if (name === "training") screenTraining.classList.add("screen--active");
     if (name === "personSearch") screenPersonSearch.classList.add("screen--active");
     if (name === "return") screenReturn.classList.add("screen--active");
   }
 
-  // ---------- ID show/hide ----------
+  // ---------- ID show/hide (robust) ----------
   function showId(){
     idName.textContent = ID_DATA.name;
     idDob.textContent  = ID_DATA.dob;
     idNat.textContent  = ID_DATA.nat;
     idNo.textContent   = ID_DATA.idNo;
-    setIdPhoto();
+
+    syncAvatarAndIdPhoto();
 
     idCardWrap.hidden = false;
+    idCardWrap.style.display = "flex";
     idSlotHint.hidden = true;
-    state.idVisible = true;
 
-    syncVisitorAvatarToId();
+    state.idVisible = true;
   }
 
   function hideId(){
     idCardWrap.hidden = true;
+    idCardWrap.style.display = "none";
     idSlotHint.hidden = false;
-    state.idVisible = false;
+
+    if (state) state.idVisible = false;
   }
 
   // ---------- Hints ----------
   function showHint(text){
-    if (difficultySel.value === "advanced") return;
+    if (session.difficulty === "advanced") return;
     hintBox.hidden = false;
     hintBox.textContent = text;
   }
@@ -214,11 +186,10 @@
     hintBox.textContent = "";
   }
   function maybeHint(){
-    const diff = difficultySel.value;
-    if (diff === "advanced") return;
+    if (session.difficulty === "advanced") return;
     const hint = getHintForStage(state.stage);
     if (!hint) return;
-    if (diff === "basic") showHint(hint);
+    if (session.difficulty === "basic") showHint(hint);
     else if (state.misses >= 2) showHint(hint);
   }
   function getHintForStage(stage){
@@ -233,9 +204,7 @@
   }
 
   // ---------- Intents ----------
-  const INTENTS = compileIntents();
-
-  function compileIntents(){
+  const INTENTS = (() => {
     const rx = (s) => new RegExp(s, "i");
     return [
       { key:"greet", rx: rx("\\b(hi|hello|good\\s*(morning|afternoon|evening))\\b") },
@@ -253,7 +222,7 @@
       { key:"return_id", rx: rx("\\b(here\\'?s\\s+your\\s+id\\s+back|return\\s+your\\s+id|you\\s+can\\s+have\\s+your\\s+id\\s+back)\\b") },
       { key:"deny", rx: rx("\\b(deny\\s+entrance|you\\s+cannot\\s+enter|access\\s+denied|you\\s+are\\s+not\\s+allowed\\s+to\\s+enter)\\b") },
     ];
-  }
+  })();
 
   function detectIntent(text){
     for (const it of INTENTS){
@@ -268,15 +237,6 @@
     if (!clean) return;
 
     studentBubble.textContent = clean;
-
-    const customReply = matchCustomRule(clean);
-    if (customReply){
-      visitorBubble.textContent = customReply;
-      state.misses = 0;
-      hideHint();
-      return;
-    }
-
     const intent = detectIntent(clean);
 
     if (intent === "return_id"){ hideId(); visitorBubble.textContent = "Thank you."; return; }
@@ -318,7 +278,9 @@
         if (intent === "about_meeting"){ visitorBubble.textContent = "It is a delivery for the workshop. Tools and spare parts."; state.misses=0; hideHint(); break; }
         if (intent === "ask_id"){
           state.stage = "control_q"; state.misses=0; hideHint();
-          visitorBubble.textContent = "Sure. Here you go."; showId(); break;
+          visitorBubble.textContent = "Sure. Here you go.";
+          showId();
+          break;
         }
         if (intent === "purpose"){ visitorBubble.textContent = "I have an appointment on base."; state.misses=0; hideHint(); break; }
         miss();
@@ -353,6 +315,23 @@
 
   function maybeInconsistent(a, b){
     return Math.random() < currentMood.liarBias ? b : a;
+  }
+
+  // ---------- Reset training (does NOT bypass login) ----------
+  function resetTrainingOnly(){
+    currentMood = MOODS[randInt(0, MOODS.length - 1)];
+    moodLine.textContent = currentMood.line;
+
+    state = { stage:"start", misses:0, idVisible:false };
+
+    visitorBubble.textContent = "Hello.";
+    studentBubble.textContent = "Hold-to-talk or type below.";
+    hideHint();
+    hideId();
+
+    const fresh = makeRandomId();
+    Object.assign(ID_DATA, fresh);
+    syncAvatarAndIdPhoto();
   }
 
   // ---------- Voice: write into input, send on release ----------
@@ -412,22 +391,42 @@
     if (!recognition || isRecognizing) return;
     try { recognition.start(); } catch {}
   }
-
   function stopListen(){
     if (!recognition || !isRecognizing) return;
     try { recognition.stop(); } catch {}
   }
 
+  // ---------- Login ----------
+  function tryStart(){
+    const surname = (studentSurnameInput.value || "").trim();
+    const group = studentGroupSel.value;
+    const difficulty = studentDifficultySel.value || "standard";
+
+    if (!surname || !group){
+      loginError.style.display = "block";
+      return;
+    }
+    loginError.style.display = "none";
+
+    session = { surname, group, difficulty };
+    saveStudentPrefill(session);
+    updateStudentPill();
+
+    resetTrainingOnly();
+    setActiveScreen("training");
+    textInput.focus();
+  }
+
   // ---------- Events ----------
+  btnStartTraining.addEventListener("click", tryStart);
+  studentSurnameInput.addEventListener("keydown", (e) => { if (e.key === "Enter") tryStart(); });
+
   btnSend.addEventListener("click", () => {
     handleStudent(textInput.value);
     textInput.value = "";
     textInput.focus();
   });
-
-  textInput.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") btnSend.click();
-  });
+  textInput.addEventListener("keydown", (e) => { if (e.key === "Enter") btnSend.click(); });
 
   holdToTalk.addEventListener("pointerdown", (e) => { e.preventDefault(); startListen(); });
   holdToTalk.addEventListener("pointerup", (e) => { e.preventDefault(); stopListen(); });
@@ -436,7 +435,12 @@
 
   btnReturnId.addEventListener("click", () => { hideId(); visitorBubble.textContent = "Thank you."; });
 
-  btnReset.addEventListener("click", resetAll);
+  btnReset.addEventListener("click", () => {
+    setActiveScreen("login");
+    hideId();
+    hideHint();
+    updateStudentPill();
+  });
 
   btnPersonSearch.addEventListener("click", () => setActiveScreen("personSearch"));
   btnReturn.addEventListener("click", () => setActiveScreen("return"));
@@ -445,37 +449,17 @@
   btnBackToTraining?.addEventListener("click", () => setActiveScreen("training"));
   btnBackReturn?.addEventListener("click", () => setActiveScreen("training"));
 
-  difficultySel.addEventListener("change", () => {
-    hideHint();
-    state.misses = 0;
-    if (difficultySel.value === "basic"){
-      const h = getHintForStage(state.stage);
-      if (h) showHint(h);
-    }
-  });
-
-  qaAddBtn?.addEventListener("click", () => {
-    const ok = addCustomRule(qaPhrases.value, qaReply.value);
-    if (ok){
-      qaPhrases.value = "";
-      qaReply.value = "";
-      showHint("Custom rule added.");
-      setTimeout(() => hideHint(), 900);
-    } else {
-      showHint("Add rule failed: provide phrases + reply.");
-      setTimeout(() => hideHint(), 1200);
-    }
-  });
-
-  qaClearBtn?.addEventListener("click", () => {
-    clearCustomRules();
-    showHint("Custom rules cleared.");
-    setTimeout(() => hideHint(), 900);
-  });
-
   // ---------- Boot ----------
-  difficultySel.value = CFG.defaultDifficulty || "standard";
+  const pre = loadStudentPrefill();
+  if (pre){
+    if (pre.surname) studentSurnameInput.value = pre.surname;
+    if (pre.group) studentGroupSel.value = pre.group;
+    if (pre.difficulty) studentDifficultySel.value = pre.difficulty;
+  }
+
+  hideId();                // enforce hidden on boot
+  updateStudentPill();
   setupSpeech();
-  syncVisitorAvatarToId();
-  resetAll();
+  syncAvatarAndIdPhoto();
+  setActiveScreen("login");
 })();

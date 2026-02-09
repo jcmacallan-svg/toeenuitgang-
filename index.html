@@ -23,40 +23,15 @@
 
       <div class="divider" role="separator" aria-hidden="true"></div>
 
-      <section class="settings" aria-label="Training Settings">
-        <label class="label" for="difficulty">Difficulty</label>
-        <select class="select" id="difficulty">
-          <option value="basic">Basic (hints)</option>
-          <option value="standard" selected>Standard (hints after misses)</option>
-          <option value="advanced">Advanced (no hints)</option>
-        </select>
-
-        <div class="hintBox" id="hintBox" hidden></div>
-      </section>
-
-      <div class="divider" role="separator" aria-hidden="true"></div>
-
-      <!-- Quick add rules (stored in localStorage) -->
-      <section class="quickAdd" aria-label="Quick Add">
-        <h3>Quick add (dev)</h3>
-        <div class="row">
-          <input id="qaPhrases" type="text" placeholder="Match phrases (comma separated) e.g. what is your name, what's your name" />
-        </div>
-        <div class="row">
-          <textarea id="qaReply" placeholder="Visitor reply e.g. My name is Jordan Miller."></textarea>
-        </div>
-        <div class="row">
-          <button class="btn btn--small" id="qaAddBtn" type="button">Add rule</button>
-          <button class="btn btn--small" id="qaClearBtn" type="button">Clear rules</button>
-        </div>
-        <div class="note">Rules are saved in your browser (localStorage). Refresh keeps them.</div>
-      </section>
+      <div class="hintBox" id="hintBox" hidden></div>
     </aside>
 
     <main class="main">
       <header class="topbar">
         <div class="topbar__left">
           <div class="pill">Last-bubble-only</div>
+          <div class="pill" id="studentPill">Student: —</div>
+          <div class="pill" id="versionPill">v—</div>
           <div class="pill" id="voiceStatus">Voice: ready</div>
         </div>
         <div class="topbar__right">
@@ -64,10 +39,51 @@
         </div>
       </header>
 
-      <section class="screen screen--active" id="screenTraining" aria-label="Training Screen">
+      <!-- Mandatory login screen -->
+      <section class="screen screen--active" id="screenLogin" aria-label="Login Screen">
+        <div class="loginWrap">
+          <div class="loginCard">
+            <h2>Start training</h2>
+            <div class="loginGrid">
+              <div class="loginRow">
+                <label for="studentSurname">Student surname (required)</label>
+                <input id="studentSurname" type="text" placeholder="e.g. Jansen" autocomplete="off" />
+              </div>
+
+              <div class="loginRow">
+                <label for="studentGroup">Group (required)</label>
+                <select id="studentGroup">
+                  <option value="">Choose…</option>
+                  <option value="Alpha">Alpha</option>
+                  <option value="Bravo">Bravo</option>
+                  <option value="Charlie">Charlie</option>
+                  <option value="Delta">Delta</option>
+                </select>
+              </div>
+
+              <div class="loginRow">
+                <label for="studentDifficulty">Difficulty</label>
+                <select id="studentDifficulty">
+                  <option value="basic">Basic</option>
+                  <option value="standard" selected>Standard</option>
+                  <option value="advanced">Advanced</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="loginActions">
+              <button class="btn btn--primary" id="btnStartTraining" type="button">Start</button>
+            </div>
+
+            <div class="loginError" id="loginError">Please enter your surname and select a group.</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen" id="screenTraining" aria-label="Training Screen">
         <div class="chat">
           <div class="msg msg--left">
-            <img class="avatar" id="visitorAvatar" src="assets/photos/headshots_01.png" alt="Visitor avatar" />
+            <img class="avatar" id="visitorAvatar" src="assets/photos/headshot_01.png" alt="Visitor avatar" />
             <div class="bubbleCol">
               <div class="bubble bubble--visitor" id="visitorBubble">Hello.</div>
               <div class="mood" id="moodLine">The visitor looks neutral.</div>
@@ -84,9 +100,10 @@
 
         <div class="chatDivider" aria-hidden="true"></div>
 
-        <!-- ID card under the chat bubbles (hidden until you ask for ID) -->
+        <!-- ID card under the chat bubbles -->
         <div class="idUnderChat" aria-label="Identity card area">
-          <div class="idUnderChatInner" id="idCardWrap" hidden>
+          <!-- Force hidden at start (hidden attr + inline display none) -->
+          <div class="idUnderChatInner" id="idCardWrap" hidden style="display:none;">
             <div class="idCard" role="group" aria-label="ID Card">
               <div class="idCard__top">
                 <div class="idCard__title">IDENTITY CARD</div>
@@ -143,7 +160,8 @@
     </main>
   </div>
 
-  <script src="config.js"></script>
-  <script src="app.js"></script>
+  <!-- Cache busting via version query param -->
+  <script src="config.js?v=7.0.1"></script>
+  <script src="app.js?v=7.0.1"></script>
 </body>
 </html>
