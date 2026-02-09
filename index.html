@@ -3,193 +3,145 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>VEVA – Ingang/Uitgang Trainer</title>
-  <meta name="color-scheme" content="light dark">
+  <title>VEVA Ingang/Uitgang Trainer</title>
   <link rel="stylesheet" href="styles.css" />
-  <link rel="icon" href="data:image/svg+xml;charset=utf-8,<svg xmlns=%27http://www.w3.org/2000/svg%27 width=%2764%27 height=%2764%27><rect width=%27100%%27 height=%27100%%27 fill=%27%231b2a44%27/><circle cx=%2732%27 cy=%2726%27 r=%2714%27 fill=%27%237aa2d6%27/><rect x=%2714%27 y=%2742%27 width=%2736%27 height=%2718%27 rx=%279%27 fill=%27%237aa2d6%27/></svg>">
 </head>
 
 <body>
-<main class="wrap">
-  <header class="topbar">
-    <div class="brand">
-      <div class="logo">VEVA</div>
-      <div>
-        <div class="title">VEVA – Ingang/Uitgang Trainer</div>
-        <div class="subtitle">English checkpoint conversation practice</div>
+  <div class="app" id="app">
+    <!-- Sidebar / Controls -->
+    <aside class="sidebar" aria-label="Controls">
+      <div class="brand">
+        <div class="brand__title">VEVA Checkpoint</div>
+        <div class="brand__sub">Ingang/Uitgang Trainer</div>
       </div>
-    </div>
 
-    <div class="topActions">
-      <div class="meta" id="meta"></div>
-      <button class="btn subtle" id="btnTeacher" title="Teacher mode">Docent</button>
-    </div>
-  </header>
+      <div class="controls">
+        <button class="btn" id="btnReturn" type="button">Return</button>
+        <button class="btn" id="btnPersonSearch" type="button">Go to Person Search</button>
+        <button class="btn btn--danger" id="btnDeny" type="button">Deny entrance</button>
+      </div>
 
-  <!-- Screen 1: Login -->
-  <section class="card" id="screen-login">
-    <h1>Start</h1>
-    <p class="muted">Vul je naam in. Daarna start de oefening.</p>
+      <div class="divider" role="separator" aria-hidden="true"></div>
 
-    <div class="grid2">
-      <label class="field">
-        <span>Naam leerling</span>
-        <input id="studentName" autocomplete="name" placeholder="Vul in je achternaam (bijv. Jansen)" />
-      </label>
+      <!-- ID panel: inline onder de divider, niet fullscreen -->
+      <section class="idSlot" aria-label="ID Slot">
+        <div class="idCardWrap" id="idCardWrap" hidden>
+          <div class="idCard" role="group" aria-label="ID Card">
+            <div class="idCard__top">
+              <div class="idCard__title">IDENTITY CARD</div>
+              <button class="btn btn--small" id="btnReturnId" type="button">Return ID</button>
+            </div>
 
-      <label class="field">
-        <span>Groep</span>
-        <select id="className">
-          <option value="">— kies —</option>
-          <option value="Alpha">Alpha</option>
-          <option value="Bravo">Bravo</option>
-          <option value="Charlie">Charlie</option>
-          <option value="Delta">Delta</option>
+            <div class="idCard__body">
+              <img class="idPhoto" id="idPhoto" alt="ID photo" />
+              <div class="idFields">
+                <div class="idRow"><span class="k">Name</span><span class="v" id="idName"></span></div>
+                <div class="idRow"><span class="k">DOB</span><span class="v" id="idDob"></span></div>
+                <div class="idRow"><span class="k">Nationality</span><span class="v" id="idNat"></span></div>
+                <div class="idRow"><span class="k">ID No.</span><span class="v" id="idNo"></span></div>
+              </div>
+            </div>
+
+            <div class="idCard__note" id="idNote">
+              (The ID is shown here after you ask for it.)
+            </div>
+          </div>
+        </div>
+
+        <div class="idSlotHint" id="idSlotHint">
+          Ask for the visitor’s ID to display it here.
+        </div>
+      </section>
+
+      <div class="divider divider--spacer" role="separator" aria-hidden="true"></div>
+
+      <!-- Difficulty / Hints -->
+      <section class="settings" aria-label="Training Settings">
+        <label class="label" for="difficulty">Difficulty</label>
+        <select class="select" id="difficulty">
+          <option value="basic">Basic (hints)</option>
+          <option value="standard" selected>Standard (hints after misses)</option>
+          <option value="advanced">Advanced (no hints)</option>
         </select>
-      </label>
-    </div>
 
-    <label class="field">
-      <span>Niveau</span>
-      <select id="difficulty">
-        <option value="Basic">Basic</option>
-        <option value="Standard" selected>Standard</option>
-        <option value="Advanced">Advanced</option>
-      </select>
-    </label>
+        <div class="hintBox" id="hintBox" hidden></div>
+      </section>
+    </aside>
 
-    <div class="row">
-      <button class="btn primary" id="btnStart">Start oefening</button>
-      <button class="btn" id="btnResetLocal" title="Verwijdert alleen lokaal opgeslagen data">Reset lokaal</button>
-    </div>
-  </section>
-
-  <!-- Screen 2: Training -->
-  <section class="card hidden" id="screen-train">
-    <div class="trainHead">
-      <div>
-        <div class="stepTitle" id="stepTitle">Intake</div>
-        <div class="muted" id="stepHelp">Start with 5W/5WH (name, purpose, appointment, who, time, where, subject).</div>
-      </div>
-      <div class="trainBtns">
-        <button class="btn" id="btnHint">Hint</button>
-        <button class="btn primary" id="btnDoneStep">I'm done with this step</button>
-      </div>
-    </div>
-
-    <div class="gridTrain" id="trainGrid">
-      <div class="panel">
-        <div class="panelTitle">Visitor answer</div>
-
-        <div class="visitorRow">
-          <img id="visitorAvatar" class="visitorAvatar" alt="visitor" />
-          <div class="visitorCol">
-            <div class="bubble" id="visitorBubble">Ask your first question…</div>
-            <div id="visitorMood" class="visitorMood muted"></div>
-          </div>
+    <!-- Main -->
+    <main class="main">
+      <!-- Top bar -->
+      <header class="topbar">
+        <div class="topbar__left">
+          <div class="pill">Last-bubble-only</div>
+          <div class="pill" id="voiceStatus">Voice: ready</div>
         </div>
-
-        <div class="studentRow">
-          <img id="studentAvatar" class="studentAvatar" alt="student" src="assets/photos/soldier.png" />
-          <div class="studentCol">
-            <div class="bubble me" id="studentBubble" style="display:none;"></div>
-          </div>
+        <div class="topbar__right">
+          <button class="btn btn--small" id="btnReset" type="button">Reset</button>
         </div>
+      </header>
 
-        <div class="panelTitle mt">Your question</div>
-        <div class="row">
-          <input id="studentInput" placeholder="Type your question in English…" />
-          <button class="btn primary" id="btnSend">Send</button>
-          <button class="btn" id="btnMicHold" type="button" title="Hold to talk">🎙 Hold to talk</button>
-          <span class="micStatus" id="micStatus" aria-live="polite"></span>
-        </div>
-
-        <div class="row actionBar">
-          <button class="btn" id="btnContactSupervisor" title="Open supervisor 5W briefing (Step 2)">Contact supervisor</button>
-          <button class="btn" id="btnReturnVisitor" title="Return to visitor after supervisor response">Return</button>
-          <button class="btn" id="btnGoPersonSearch" title="Proceed to person search / pat-down">Go to person search</button>
-          <button class="btn danger" id="btnDenyEntrance" title="Deny entrance at any time">Deny entrance</button>
-        </div>
-
-        <div class="muted small">Tip: schrijf de antwoorden in je eigen boekje.</div>
-
-        <div class="divider"></div>
-
-        <!-- INLINE ID (appears here, under the buttons) -->
-        <div id="idPanel" aria-label="ID panel">
-          <div class="idInner">
-            <div class="row" style="justify-content:space-between; align-items:center;">
-              <div class="panelTitle">ID Card</div>
-              <button class="btn small" id="btnCloseId" type="button">Close ID</button>
-            </div>
-            <canvas id="idCanvas" width="900" height="560" class="idCanvas"></canvas>
-            <div class="muted small" style="margin-top:8px;">
-              Ask control questions about name / nationality / DOB / age.
+      <!-- Screen: Training -->
+      <section class="screen screen--active" id="screenTraining" aria-label="Training Screen">
+        <div class="chat">
+          <!-- Visitor -->
+          <div class="msg msg--left">
+            <!-- Visitor avatar MUST match the ID headshot 1:1 -->
+            <img class="avatar" id="visitorAvatar" src="assets/headshots/headshot_01.png" alt="Visitor avatar" />
+            <div class="bubbleCol">
+              <div class="bubble bubble--visitor" id="visitorBubble">Hello.</div>
+              <div class="mood" id="moodLine">The visitor looks neutral.</div>
             </div>
           </div>
+
+          <!-- Student -->
+          <div class="msg msg--right">
+            <div class="bubbleCol bubbleCol--right">
+              <div class="bubble bubble--student" id="studentBubble">Hold-to-talk or type below.</div>
+            </div>
+            <!-- Student avatar uses soldier.png -->
+            <img class="avatar" id="studentAvatar" src="assets/soldier.png" alt="Student avatar" />
+          </div>
         </div>
 
-        <div class="divider"></div>
-        <div class="row">
-          <button class="btn" id="btnNewScenario">New scenario</button>
-          <button class="btn" id="btnFinishRun">Finish run</button>
+        <!-- Input -->
+        <div class="inputBar">
+          <div class="holdWrap">
+            <button class="btn btn--mic" id="holdToTalk" type="button" aria-label="Hold to talk">
+              Hold to talk
+            </button>
+            <div class="micHint">Release to send (autosend)</div>
+          </div>
+
+          <div class="typeWrap">
+            <input class="input" id="textInput" type="text" placeholder="Type your English sentence…" autocomplete="off" />
+            <button class="btn btn--primary" id="btnSend" type="button">Send</button>
+          </div>
         </div>
-      </div>
-    </div>
-  </section>
+      </section>
 
-  <!-- Screen 3: Feedback -->
-  <section class="card hidden" id="screen-feedback">
-    <h1>Feedback</h1>
-    <p class="muted">Hier staan je grootste 3 missers en wat je volgende keer kunt vragen.</p>
+      <!-- Screen: Person Search (placeholder) -->
+      <section class="screen" id="screenPersonSearch" aria-label="Person Search Screen">
+        <div class="placeholder">
+          <h2>Person Search (later)</h2>
+          <p>Hier komt later je search-flow. Voor nu is dit alleen een placeholder zodat de navigatie “bestaat”.</p>
+          <button class="btn" id="btnBackToTraining" type="button">Back to Training</button>
+        </div>
+      </section>
 
-    <div class="feedbackBox">
-      <h2>Biggest 3 misses</h2>
-      <ul id="top3"></ul>
-    </div>
-
-    <details class="details" open>
-      <summary>All missed items</summary>
-      <div class="detailsBody" id="allMisses"></div>
-    </details>
-
-    <div class="row">
-      <button class="btn" id="btnBackToStart">Back to start</button>
-      <button class="btn primary" id="btnDownloadCsv">Download CSV</button>
-    </div>
-  </section>
-
-  <!-- Supervisor modal -->
-  <div class="modal hidden" id="supervisorModal" role="dialog" aria-modal="true">
-    <div class="modalCard">
-      <div class="modalHead">
-        <div class="modalTitle">Supervisor call (5W briefing)</div>
-        <button class="btn" id="btnCloseModal">Close</button>
-      </div>
-
-      <p class="muted small">Fill in the 5W briefing (can be in Dutch). Then send to supervisor.</p>
-
-      <div class="grid2">
-        <label class="field"><span>Who are you?</span><input id="wWho" placeholder="Naam bezoeker" /></label>
-        <label class="field"><span>What are you doing here?</span><input id="wWhat" placeholder="Doel (delivery/inspection/etc.)" /></label>
-        <label class="field"><span>With whom is the meeting?</span><input id="wWithWhom" placeholder="Host / contactpersoon" /></label>
-        <label class="field"><span>What time is the meeting?</span><input id="wTime" placeholder="Bijv. 10:30" /></label>
-        <label class="field"><span>Why is the meeting?</span><input id="wWhy" placeholder="Onderwerp / reden" /></label>
-      </div>
-
-      <div class="row">
-        <button class="btn primary" id="btnSendSupervisor">Send to supervisor</button>
-        <button class="btn" id="btnBackToVisitor" type="button">Return to visitor</button>
-      </div>
-
-      <div class="divider"></div>
-      <div class="muted small" id="supervisorResponse"></div>
-    </div>
+      <!-- Screen: Return (placeholder) -->
+      <section class="screen" id="screenReturn" aria-label="Return Screen">
+        <div class="placeholder">
+          <h2>Return</h2>
+          <p>Placeholder-screen voor “Return”.</p>
+          <button class="btn" id="btnBackReturn" type="button">Back to Training</button>
+        </div>
+      </section>
+    </main>
   </div>
 
-</main>
-
-<script src="config.js"></script>
-<script src="app.js"></script>
+  <script src="config.js"></script>
+  <script src="app.js"></script>
 </body>
 </html>
