@@ -130,35 +130,218 @@
 
   // ---- Intents ----
   function compilePatterns(extra) {
-    const base = {
-      ask_id: [
-        /\b(can i|could i|may i|let me)\s+(see|check)\s+(your|ur)\s+(id|identification)\b/i,
-        /\bshow\s+me\s+(your|ur)\s+(id|identification)\b/i,
-        /\bdo\s+you\s+have\s+an?\s+id\b/i,
-        /\bid\s+please\b/i,
-      ],
-      ask_name: [/\bwhat\s+is\s+your\s+name\b/i, /\bname\s*,?\s+please\b/i],
-      ask_purpose: [/\bpurpose\s+of\s+your\s+visit\b/i, /\bwhy\s+are\s+you\s+here\b/i],
-      ask_appointment: [/\bdo\s+you\s+have\s+an?\s+appointment\b/i, /\bare\s+you\s+expected\b/i],
-      ask_who: [/\bwho\s+are\s+you\s+(here\s+to\s+see|meeting)\b/i],
-      ask_time: [/\bwhat\s+time\s+is\s+your\s+appointment\b/i, /\bwhen\s+is\s+your\s+appointment\b/i],
-      ask_where: [/\bwhere\s+are\s+you\s+going\b/i],
-      ask_subject: [/\bwhat\s+is\s+the\s+meeting\s+about\b/i, /\bwhat\s+is\s+it\s+about\b/i],
+  // Helper to build common polite prefixes (optional)
+  // We keep regexes readable rather than overly nested.
+  const base = {
+    // =========================
+    // ID / Identification
+    // =========================
+    ask_id: [
+      /\b(can|could|may)\s+i\s+(see|check|verify|inspect|look\s+at)\s+(your|ur)\s+(id|identification|passport|card)\b/i,
+      /\b(show|present)\s+(me\s+)?(your|ur)\s+(id|identification|passport|card)\b/i,
+      /\b(id|identification)\s+(please|pls)\b/i,
+      /\bdo\s+you\s+(have|carry)\s+(an?\s+)?(id|identification|passport)\b/i,
+      /\bcan\s+you\s+provide\s+(an?\s+)?(id|identification)\b/i,
+      /\blet\s+me\s+(see|check)\s+(your|ur)\s+(id|identification)\b/i,
+      /\bwhat\s+is\s+your\s+(id\s+number|identification\s+number)\b/i
+    ],
 
-      ask_age: [/\bhow\s+old\s+are\s+you\b/i, /\bwhat\s+is\s+your\s+age\b/i],
-      ask_dob: [/\bdate\s+of\s+birth\b/i, /\bwhen\s+were\s+you\s+born\b/i],
-      confirm_born_year: [/\bwere\s+you\s+born\s+in\s+(19\d{2}|20\d{2})\b/i],
+    return_id: [
+      /\bhere\s+(is|are)\s+(your|ur)\s+(id|card|identification)\s+back\b/i,
+      /\b(return|give)\s+(it|the\s+(id|card|identification))\s+back\b/i,
+      /\byou\s+can\s+have\s+(your|ur)\s+(id|card)\s+back\b/i,
+      /\breturn\s+to\s+visitor\b/i
+    ],
 
-      ask_nationality: [/\bwhat\s+is\s+your\s+nationality\b/i, /\bwhere\s+are\s+you\s+from\b/i],
+    // =========================
+    // Supervisor / Boss
+    // =========================
+    contact_supervisor: [
+      // "I will contact my supervisor", "I'll contact my boss", "I need to call my manager", etc.
+      /\b(i\s*(will|’ll|'ll|need\s+to|have\s+to|must|may\s+need\s+to)\s+)?(contact|call|ring|phone|speak\s+to|talk\s+to|ask)\s+(my\s+)?(supervisor|boss|manager|team\s*leader|officer)\b/i,
 
-      contact_supervisor: [
-        /\b(i\s+(will|i'll|ill)\s+)?(please\s+)?(contact|call|ring|phone)\s+(my\s+)?(supervisor|boss|team\s*leader|manager)\b/i
-      ],
+      // "I will have to ask my supervisor for approval"
+      /\b(i\s*(will|’ll|'ll)\s+)?(have\s+to|need\s+to|must)\s+ask\s+(my\s+)?(supervisor|boss|manager)\b/i,
 
-      go_person_search: [/\bgo\s+to\s+person\s+search\b/i, /\bpat\s*down\b/i, /\bfrisk\b/i],
-      deny: [/\bdeny\s+(entrance|entry|access)\b/i, /\byou\s+cannot\s+enter\b/i]
+      // "I need approval / I need authorization"
+      /\b(i\s+)?need\s+(approval|authori[sz]ation|permission)\b/i,
+      /\b(for\s+approval|for\s+authori[sz]ation|for\s+permission)\b/i
+    ],
+
+    // =========================
+    // 5W/5WH intake questions
+    // =========================
+    ask_name: [
+      /\bwhat\s*(is|'s)\s+your\s+name\b/i,
+      /\bcan\s+i\s+have\s+your\s+name\b/i,
+      /\bmay\s+i\s+have\s+your\s+name\b/i,
+      /\byour\s+name\s*,?\s+please\b/i,
+      /\bstate\s+your\s+name\b/i,
+      /\bwho\s+are\s+you\b/i
+    ],
+
+    ask_purpose: [
+      /\bwhat\s*(is|'s)\s+the\s+purpose\s+of\s+(your\s+)?visit\b/i,
+      /\bwhat\s+are\s+you\s+here\s+for\b/i,
+      /\bwhy\s+are\s+you\s+here\b/i,
+      /\bwhat\s+brings\s+you\s+here\b/i,
+      /\bstate\s+your\s+purpose\b/i,
+      /\breason\s+for\s+(your\s+)?visit\b/i,
+      /\bwhat\s+is\s+the\s+reason\s+for\s+(your\s+)?visit\b/i
+    ],
+
+    ask_appointment: [
+      /\bdo\s+you\s+have\s+(an?\s+)?appointment\b/i,
+      /\bare\s+you\s+expected\b/i,
+      /\bdo\s+they\s+expect\s+you\b/i,
+      /\bis\s+this\s+pre[-\s]?arranged\b/i,
+      /\bdid\s+you\s+schedule\s+(a\s+)?(meeting|appointment)\b/i
+    ],
+
+    ask_who: [
+      /\bwho\s+are\s+you\s+(here\s+to\s+see|meeting|visiting)\b/i,
+      /\bwho\s+is\s+(your\s+)?(appointment|meeting)\s+with\b/i,
+      /\bwho\s+are\s+you\s+meeting\b/i,
+      /\bwho\s+is\s+your\s+contact\b/i,
+      /\bwho\s+is\s+expecting\s+you\b/i
+    ],
+
+    ask_time: [
+      /\bwhat\s+time\s+is\s+(your\s+)?(appointment|meeting)\b/i,
+      /\bwhen\s+is\s+(your\s+)?(appointment|meeting)\b/i,
+      /\bwhat\s+time\s+are\s+you\s+expected\b/i,
+      /\bwhen\s+are\s+you\s+expected\b/i,
+      /\bwhat\s+time\s+did\s+they\s+tell\s+you\b/i
+    ],
+
+    ask_where: [
+      /\bwhere\s+are\s+you\s+going\b/i,
+      /\bwhat\s+is\s+your\s+destination\b/i,
+      /\bwhich\s+(building|unit|office|department|area)\b/i,
+      /\bwhere\s+is\s+the\s+(meeting|appointment)\b/i,
+      /\bwhere\s+will\s+you\s+go\b/i
+    ],
+
+    ask_subject: [
+      /\bwhat\s+is\s+(this|it|the\s+visit|the\s+meeting)\s+about\b/i,
+      /\bwhat\s+will\s+you\s+discuss\b/i,
+      /\bwhat\s+are\s+you\s+here\s+to\s+discuss\b/i,
+      /\bcan\s+you\s+tell\s+me\s+more\s+about\s+(the\s+)?(meeting|visit)\b/i,
+      /\bwhat\s+is\s+the\s+purpose\s+of\s+the\s+meeting\b/i
+    ],
+
+    // =========================
+    // Control questions
+    // =========================
+    ask_age: [
+      /\bhow\s+old\s+are\s+you\b/i,
+      /\bwhat\s+is\s+your\s+age\b/i,
+      /\bwhat\s+age\s+are\s+you\b/i,
+      /\bmay\s+i\s+ask\s+your\s+age\b/i,
+      /\bcan\s+you\s+confirm\s+your\s+age\b/i
+    ],
+
+    ask_dob: [
+      /\bwhat\s*(is|'s)\s+your\s+(date\s+of\s+birth|dob)\b/i,
+      /\bdate\s+of\s+birth\b/i,
+      /\bdob\b/i,
+      /\bwhen\s+were\s+you\s+born\b/i,
+      /\bcan\s+you\s+confirm\s+your\s+date\s+of\s+birth\b/i
+    ],
+
+    // "Were you born in 1993?" (any year)
+    confirm_born_year: [
+      /\bwere\s+you\s+born\s+in\s+(19\d{2}|20\d{2})\b/i,
+      /\bwere\s+you\s+born\s+around\s+(19\d{2}|20\d{2})\b/i,
+      /\byou\s+were\s+born\s+in\s+(19\d{2}|20\d{2})\s*\?\s*$/i,
+      /\bis\s+your\s+birth\s+year\s+(19\d{2}|20\d{2})\b/i,
+      /\byour\s+birth\s+year\s+is\s+(19\d{2}|20\d{2})\s*\?\s*$/i
+    ],
+
+    ask_nationality: [
+      /\bwhat\s+is\s+your\s+nationality\b/i,
+      /\bwhat\s+nationality\s+are\s+you\b/i,
+      /\bwhere\s+are\s+you\s+from\b/i,
+      /\bwhat\s+country\s+are\s+you\s+from\b/i,
+      /\bwhat\s+is\s+your\s+citizenship\b/i,
+      /\bare\s+you\s+(dutch|german|belgian|french|spanish|italian|polish|romanian|turkish|british|american|canadian)\b/i
+    ],
+
+    // =========================
+    // Person search / pat-down
+    // =========================
+    go_person_search: [
+      /\b(go\s+to|start|begin|proceed\s+to)\s+(the\s+)?(person\s+search|pat[-\s]?down|frisk|search)\b/i,
+      /\b(i\s+will|we\s+will|i\s+am\s+going\s+to|we\s+are\s+going\s+to)\s+(pat\s+you\s+down|search\s+you|do\s+a\s+pat[-\s]?down)\b/i,
+      /\b(person\s+search|pat[-\s]?down)\s+now\b/i
+    ],
+
+    // =========================
+    // Deny / refuse entry
+    // =========================
+    deny: [
+      /\bdeny\s+(entrance|entry|access)\b/i,
+      /\b(refuse|reject)\s+(entry|access)\b/i,
+      /\byou\s+cannot\s+enter\b/i,
+      /\byou\s+may\s+not\s+enter\b/i,
+      /\bnot\s+allowed\s+to\s+enter\b/i,
+      /\bi\s+(am\s+)?(denying|refusing)\s+(entry|access)\b/i
+    ],
+
+    // =========================
+    // Smalltalk / greetings
+    // =========================
+    smalltalk: [
+      /\bhello\b/i,
+      /\bhi\b/i,
+      /\bhey\b/i,
+      /\bgood\s+(morning|afternoon|evening)\b/i,
+      /\bhow\s+are\s+you\b/i,
+      /\bhow\s+are\s+you\s+doing\b/i
+    ]
+  };
+
+  // Merge optional phrasebank patterns if present.
+  // Supported shapes:
+  // - { intents: { ask_id: { patterns: ["..."] } } }
+  // - { ask_id: ["..."] }
+  // Strings are treated as regex sources.
+  const merged = { ...base };
+
+  if (extra) {
+    const intentsObj = extra.intents && typeof extra.intents === "object" ? extra.intents : null;
+
+    const addPatterns = (key, arr) => {
+      if (!arr || !Array.isArray(arr)) return;
+      merged[key] = merged[key] || [];
+      for (const p of arr) {
+        if (!p) continue;
+        if (p instanceof RegExp) merged[key].push(p);
+        else if (typeof p === "string") {
+          try { merged[key].push(new RegExp(p, "i")); } catch { /* ignore invalid */ }
+        }
+      }
     };
 
+    if (intentsObj) {
+      for (const [k, v] of Object.entries(intentsObj)) {
+        if (v && Array.isArray(v.patterns)) addPatterns(k, v.patterns);
+      }
+    } else {
+      for (const [k, v] of Object.entries(extra)) {
+        if (Array.isArray(v)) addPatterns(k, v);
+      }
+    }
+  }
+
+  // Compile to predicate functions
+  const compiled = {};
+  for (const [k, arr] of Object.entries(merged)) {
+    compiled[k] = (text) => arr.some(rx => rx.test(text || ""));
+  }
+  compiled._raw = merged;
+  return compiled;
+}
     const merged = { ...base };
 
     // optional phrasebank merge (same structure as earlier)
