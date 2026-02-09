@@ -783,11 +783,12 @@
 
       await logEvent("start", { runId: state.runId, student: state.student, mood: state.visitor.mood.key });
 
-      // greet
+      // Opening flow (your desired script)
       visitorSays("Hello.", state.visitor.mood.text);
-      setTimeout(() => {
-        visitorSays("Good day. Please state your name and the purpose of your visit.", state.visitor.mood.text);
-      }, 300);
+
+      // We do NOT auto-force a soldier line. Student should type/speak it.
+      // After the student says hello, visitor will ask "Can you help me?" (handled in handleMessage below).
+      setStep("Start", "Say hello to the visitor. Then ask the 5W/5WH questions.");
     });
 
     // Training controls
