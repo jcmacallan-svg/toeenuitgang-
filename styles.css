@@ -148,3 +148,7 @@ button, .btn{
 
 /* Make the training area feel more 'screen-filling' */
 main { min-height: calc(100vh - 120px); }
+
+.micStatus{margin-left:10px; opacity:.9; font-size:0.95em}
+#btnMicHold{user-select:none; -webkit-user-select:none; touch-action:none}
+#btnMicHold.listening{outline:2px solid rgba(120,180,255,.55)}

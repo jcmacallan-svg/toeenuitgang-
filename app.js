@@ -1144,6 +1144,7 @@ function finishRun(state){
 
 (async function init(){
   const state = buildState();
+  initSpeechRecognition(state);
 
   // Preload heavy assets so Start feels instant
   const preloadPhrasebankPromise = (async () => {
@@ -1705,6 +1706,117 @@ function setAvatarSrc(img, src){
   if(!img) return;
   img.onerror = null;
   img.src = src || "data:image/svg+xml;charset=utf-8,<svg xmlns=%27http://www.w3.org/2000/svg%27 width=%2764%27 height=%2764%27> <rect width=%27100%%27 height=%27100%%27 fill=%27%231b2a44%27/> <circle cx=%2732%27 cy=%2726%27 r=%2714%27 fill=%27%237aa2d6%27/> <rect x=%2714%27 y=%2742%27 width=%2736%27 height=%2718%27 rx=%279%27 fill=%27%237aa2d6%27/> </svg>";
+}
+
+
+// --- Push-to-talk speech-to-text (browser) ---
+function initSpeechRecognition(state){
+  const btn = $("#btnMicHold");
+  const status = $("#micStatus");
+  const input = $("#studentInput");
+  if(!btn) return;
+
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if(!SR){
+    btn.disabled = true;
+    if(status) status.textContent = "Speech-to-text not supported in this browser.";
+    return;
+  }
+
+  const rec = new SR();
+  rec.lang = "en-US";
+  rec.continuous = false;
+  rec.interimResults = true;
+  rec.maxAlternatives = 1;
+
+  let isHolding = false;
+  let finalText = "";
+  let interimText = "";
+  let pendingSend = false;
+
+  function setStatus(t){
+    if(status) status.textContent = t || "";
+  }
+
+  function start(){
+    if(isHolding) return;
+    isHolding = true;
+    pendingSend = false;
+    finalText = "";
+    interimText = "";
+    btn.classList.add("listening");
+    setStatus("Listening…");
+    try{
+      rec.start();
+    }catch(e){
+      // Some browsers throw if called too quickly
+    }
+  }
+
+  function stop(){
+    if(!isHolding) return;
+    isHolding = false;
+    pendingSend = true; // auto-send on release
+    btn.classList.remove("listening");
+    setStatus("Processing…");
+    try{
+      rec.stop();
+    }catch(e){}
+  }
+
+  rec.onresult = (e) => {
+    interimText = "";
+    for(let i = e.resultIndex; i < e.results.length; i++){
+      const r = e.results[i];
+      const t = (r[0] && r[0].transcript) ? r[0].transcript : "";
+      if(r.isFinal) finalText += t;
+      else interimText += t;
+    }
+    const display = (finalText + " " + interimText).trim();
+    if(input) input.value = display;
+  };
+
+  rec.onerror = (e) => {
+    btn.classList.remove("listening");
+    setStatus("Mic error: " + (e && e.error ? e.error : "unknown"));
+    pendingSend = false;
+    isHolding = false;
+  };
+
+  rec.onend = () => {
+    btn.classList.remove("listening");
+    const text = (finalText || interimText || "").trim();
+    if(input) input.value = text;
+    setStatus("");
+    if(pendingSend && text){
+      pendingSend = false;
+      // Auto-send the recognized question
+      const sendBtn = $("#btnSend");
+      if(sendBtn) sendBtn.click();
+    }else{
+      pendingSend = false;
+    }
+  };
+
+  // Pointer events for mouse + touch
+  btn.addEventListener("pointerdown", (e) => { e.preventDefault(); start(); });
+  btn.addEventListener("pointerup",   (e) => { e.preventDefault(); stop(); });
+  btn.addEventListener("pointerleave",(e) => { if(isHolding) stop(); });
+  btn.addEventListener("pointercancel",(e)=> { if(isHolding) stop(); });
+
+  // Keyboard accessibility: hold Space/Enter
+  btn.addEventListener("keydown", (e) => {
+    if(e.code === "Space" || e.code === "Enter"){
+      e.preventDefault();
+      start();
+    }
+  });
+  btn.addEventListener("keyup", (e) => {
+    if(e.code === "Space" || e.code === "Enter"){
+      e.preventDefault();
+      stop();
+    }
+  });
 }
 
 function focusQuestion(){
