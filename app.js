@@ -281,17 +281,19 @@ function computeMeetingTime(){
 
 // SUPERVISOR_TRIGGER_V42
 function isSupervisorTrigger(raw){
-  const t = norm(raw || "");
-  // normalize common contractions
-  const tt = t.replace(/i['’]ll/g, "ill").replace(/i['’]d/g, "id");
-  return (
-    /\bill\s+(contact|call)\s+(my\s+)?supervisor\b/.test(tt) ||
-    /\bid\s+like\s+to\s+(contact|call)\s+(my\s+)?supervisor\b/.test(tt) ||
-    /\bi\s+will\s+(contact|call)\s+(my\s+)?supervisor\b/.test(tt) ||
-    /\bi\s+would\s+like\s+to\s+(contact|call)\s+(my\s+)?supervisor\b/.test(tt) ||
-    /\bcontact\s+(my\s+)?supervisor\b/.test(tt) ||
-    /\bcall\s+(my\s+)?supervisor\b/.test(tt)
-  );
+  const t0 = (raw || "").toString();
+  const t = norm(t0).replace(/i['’]ll/g, "ill");
+  // direct phrases
+  if(t.includes("ill contact my supervisor")) return true;
+  if(t.includes("ill call my supervisor")) return true;
+  if(t.includes("i will contact my supervisor")) return true;
+  if(t.includes("i will call my supervisor")) return true;
+  if(t.includes("i would like to contact my supervisor")) return true;
+  if(t.includes("id like to contact my supervisor")) return true;
+  if(t.includes("contact my supervisor")) return true;
+  if(t.includes("call my supervisor")) return true;
+  // regex safety net
+  return /\b(ill|i will|i would like to|id like to)?\s*(contact|call)\s+(my\s+)?supervisor\b/.test(t);
 }
 function triggerSupervisorFlow(state){
   // jump to ID/control step and open the 5W modal
