@@ -560,3 +560,13 @@ body.id-open #idCanvas{
   body:not(.id-open) #idPanel{ display:none !important; }
   body.id-open #idPanel{ inset: 10px !important; }
 }
+/* Align visitor avatar with the bubble (not with mood text) */
+.visitorRow{
+  align-items: flex-start !important;
+}
+#visitorBubble{
+  margin-top: 2px !important;
+}
+#visitorMood{
+  margin-top: 6px !important;
+}
