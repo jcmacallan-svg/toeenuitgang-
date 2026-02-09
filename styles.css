@@ -443,3 +443,28 @@ html, body{
   #idPanel{ display:none !important; }
   .gridTrain{ grid-template-columns: 1fr !important; }
 }
+/* =========================
+   BIG ID OVERLAY (when open)
+   ========================= */
+body.id-open #idPanel{
+  display:block !important;
+  position:fixed !important;
+  inset: 14px !important;
+  z-index: 9998 !important;
+  background: rgba(10,14,22,.92) !important;
+  border: 1px solid rgba(255,255,255,.14) !important;
+  border-radius: 18px !important;
+  padding: 14px !important;
+  box-shadow: 0 30px 90px rgba(0,0,0,.55) !important;
+}
+
+body.id-open #idCanvas{
+  width: 100% !important;
+  height: auto !important;
+  border-radius: 14px !important;
+  max-height: calc(100vh - 120px);
+}
+
+@media (max-width: 900px){
+  body.id-open #idPanel{ inset: 10px !important; }
+}
