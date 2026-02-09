@@ -432,6 +432,45 @@ function computeAgeFromDob(dobStr){
   }catch(e){ return null; }
 }
 
+function getDobISO(card){
+  // Return ISO yyyy-mm-dd if possible, else null.
+  try{
+    if(!card) return null;
+    // common fields
+    let v = card.dob || card.dateOfBirth || (card.id && (card.id.dob || card.id.dateOfBirth));
+    if(!v && card.fields && card.fields.dob) v = card.fields.dob;
+    if(!v) return null;
+    if(typeof v !== "string") v = String(v);
+    v = v.trim();
+    // already ISO
+    if(/^\d{4}-\d{2}-\d{2}$/.test(v)) return v;
+    // formats like "04 Jul 1982"
+    const m = v.match(/^(\d{1,2})\s+([A-Za-z]{3,})\s+(\d{4})$/);
+    if(m){
+      const day = parseInt(m[1],10);
+      const mon = m[2].slice(0,3).toLowerCase();
+      const year = parseInt(m[3],10);
+      const map = {jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12};
+      const mm = map[mon];
+      if(mm){
+        return `${year}-${String(mm).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+      }
+    }
+    // formats like "27 Nov 1978" or "27/11/1978" or "27-11-1978"
+    const m2 = v.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+    if(m2){
+      const day = int(m2[1]); const mm = int(m2[2]); const year = int(m2[3]);
+      if(year && mm && day) return `${year}-${String(mm).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+    }
+  }catch(e){}
+  return null;
+}
+function safeAgeFromCard(card){
+  const iso = getDobISO(card);
+  const a = computeAgeFromDob(iso);
+  return (typeof a === "number" && isFinite(a)) ? a : null;
+}
+
 function moodMistakeRate(state){
   try{
     const mood = (state && state.card && state.card.mood) ? String(state.card.mood).toLowerCase() : "";
@@ -650,8 +689,7 @@ function visitorResponseForIntent(state, intent, userText, card){
       return card.twist==="sharp_object" ? "I already mentioned the pocket knife—nothing else." : "No.";
     case "ask_age":
         {
-          const dob = getDobFromCard(state.card);
-          const realAge = computeAgeFromDob(dob);
+          const realAge = safeAgeFromCard(state.card);
           const rate = moodMistakeRate(state);
           if(realAge !== null){
             if(Math.random() < rate){
@@ -667,18 +705,18 @@ function visitorResponseForIntent(state, intent, userText, card){
         }
       case "ask_dob":
         {
-          const dob = getDobFromCard(state.card);
+          const dobIso = getDobISO(state.card);
           const rate = moodMistakeRate(state);
-          if(dob){
+          if(dobIso){
             if(Math.random() < rate){
-              const d = new Date(dob);
+              const d = new Date(dobIso);
               d.setDate(d.getDate() + (Math.random()<0.5 ? -1 : 1));
               const wrong = d.toISOString().slice(0,10);
               rememberClaim(state, "dob", wrong, false);
               return "My date of birth is " + formatDob(wrong) + ".";
             }
-            rememberClaim(state, "dob", dob, true);
-            return "My date of birth is " + formatDob(dob) + ".";
+            rememberClaim(state, "dob", dobIso, true);
+            return "My date of birth is " + formatDob(dobIso) + ".";
           }
           rememberClaim(state, "dob", "1987-04-18", true);
           return "My date of birth is 18 Apr 1987.";
@@ -1128,6 +1166,15 @@ function processUserLine(state, userText){
   if(state.stepKey === "threat_rules"){
     const t = norm(userText);
 
+  // HAND_BACK_ID_V41: hide ID after handing it back
+  if(t.includes("here is your id back") || t.includes("here's your id back") || t.includes("have your id back") || t.includes("giving you your id back")){
+    state.idVisible = false;
+    showSoldier("Here is your ID back. Everything checks out.");
+    updatePage(state);
+    return;
+  }
+
+
   // AUTOTRIGGERS_V40: supervisor popup + go to person search
   if(t.includes("contact my supervisor") || t.includes("call my supervisor") || t.includes("i'll contact my supervisor") || t.includes("i will contact my supervisor") || t.includes("i'll call my supervisor") || t.includes("i will call my supervisor")){
     showVisitor("Okay, I'll wait.");
@@ -1541,7 +1588,9 @@ $("#btnDoneStep").addEventListener("click", () => {
     const seed = (Math.random()*1e9) >>> 0;
     state.runId = `run_${seed}`;
     state.card = generateVisitorCard(seed);
-    updateVisitorAvatar(state);
+    
+  state.idVisible = false;
+updateVisitorAvatar(state);
     updateIdVisibility(state);
     state.revealed = { id:false };
     state.stepIndex = 0;

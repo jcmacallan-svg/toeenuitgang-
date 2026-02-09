@@ -122,7 +122,9 @@
       "are you 42?",
       "your age?",
       "how old r you",
-      "how old are u"
+      "how old are u",
+      "your age",
+      "age?"
     ],
     "ask_dob": [
       "what is your date of birth",
@@ -135,7 +137,12 @@
       "date of birth?",
       "dob?",
       "when is your birthday?",
-      "when were you born?"
+      "when were you born?",
+      "what's your date of birth?",
+      "what is your dob",
+      "what is your dob?",
+      "what is your birthday",
+      "what is your birthday?"
     ],
     "challenge": [
       "you look tired",
@@ -317,6 +324,15 @@
       "let's go to the person search",
       "go to pat down",
       "proceed to pat down"
+    ],
+    "hand_back_id": [
+      "here is your id back",
+      "here's your id back",
+      "here is your id",
+      "here you go, here is your id back",
+      "you can have your id back",
+      "i am giving you your id back",
+      "i'll give you your id back"
     ]
   }
 }
