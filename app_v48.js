@@ -190,7 +190,13 @@
         /\bwhen\s+were\s+you\s+born\b/i
       ],
       confirm_born_year: [
-        /\bwere\s+you\s+born\s+in\s+(19\d{2}|20\d{2})\b/i
+        // were you born in 1993?
+        /\bwere\s+you\s+born\s+in\s+('?)(\d{2}|\d{4})\1\b/i,
+        // you were born in 1993, right?
+        /\byou\s+were\s+born\s+in\s+('?)(\d{2}|\d{4})\1\b/i,
+        // born in 1993?
+        /\bborn\s+in\s+('?)(\d{2}|\d{4})\1\b/i
+],
       ],
       ask_nationality: [
         /\bwhat\s+is\s+your\s+nationality\b/i,
