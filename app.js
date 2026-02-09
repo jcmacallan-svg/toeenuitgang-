@@ -278,6 +278,32 @@ function computeMeetingTime(){
   return `${hh}:${mm}`;
 }
 
+
+function isSupervisorTrigger  // SUPERVISOR_TRIGGER_V42(raw){
+  const t = norm(raw || "");
+  // normalize common contraction: i'll -> ill
+  const tt = t.replace(/i['’]ll/g, "ill");
+  return (
+    /\bill\s+(contact|call)\s+(my\s+)?supervisor\b/.test(tt) ||
+    /\bi\s+will\s+(contact|call)\s+(my\s+)?supervisor\b/.test(tt) ||
+    /\bcontact\s+(my\s+)?supervisor\b/.test(tt) ||
+    /\bcall\s+(my\s+)?supervisor\b/.test(tt)
+  );
+}
+function triggerSupervisorFlow(state){
+  // jump to ID/control step and open the 5W modal
+  try{ state.idVisible = true; }catch(e){}
+  try{
+    // best-effort: switch to id_check step
+    if(typeof setStepByKey === "function"){
+      setStepByKey(state, "id_check");
+    }
+  }catch(e){}
+  try{ showVisitor("Okay, I'll wait."); }catch(e){}
+  setTimeout(() => { try { openSupervisorModal(state); } catch(e) {} }, 150);
+  try{ updatePage(state); updateActionButtons(state); }catch(e){}
+}
+
 function norm(s){
   return String(s ?? "").toLowerCase().trim().replace(/\s+/g," ");
 }
@@ -1090,7 +1116,7 @@ function updateActionButtons(state){
 
   if(step.key === "id_check"){
     // Show contact supervisor after ID requested + control question done (or anytime, if teacher wants)
-    if(btnContact) btnContact.style.display = "inline-flex";
+    if(btnContact) btnContact.style.display = "none";
     if(state.supervisorApproved && btnReturn){
       btnReturn.style.display = "inline-flex";
     }
@@ -1162,6 +1188,12 @@ function maybeAutoAdvanceAfterThreatRules(state){
 }
 
 function processUserLine(state, userText){
+  // SUPERVISOR_TRIGGER_HOOK_V42
+  if(isSupervisorTrigger(userText)){
+    triggerSupervisorFlow(state);
+    return;
+  }
+
   // threat rules completion (simple)
   if(state.stepKey === "threat_rules"){
     const t = norm(userText);
