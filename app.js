@@ -2,22 +2,24 @@
   "use strict";
 
   /***********************
-   * VEVA app.js — clean rebuild (2026-02-09)
-   * - No supervisor button in UI
-   * - Supervisor modal only via text trigger
-   * - Born-year confirmation uses actual ID year (or claimed/lie)
+   * VEVA app.js — stable rebuild (2026-02-09)
+   * - Start overlay (name + group) so you can start a run reliably
+   * - Hard-hide old UI so legacy buttons cannot leak through
+   * - NO supervisor button in UI (text trigger only)
+   * - Born-year confirmation uses the year asked vs (claimed/ID) year
    * - Deny always works + finish run
    * - Person search always works
-   * - Logging uses no-cors to avoid Apps Script CORS/preflight issues
+   * - Logging uses no-cors (avoids Apps Script CORS/preflight failures)
+   * - assets/photos/ headshots
    ***********************/
 
-  const APP_VERSION = "veva-clean-v1-2026-02-09";
+  const APP_VERSION = "veva-stable-v2-2026-02-09";
   console.log("[VEVA]", APP_VERSION, "loaded");
 
   /***********************
    * CONFIG + UTIL
    ***********************/
-  const CONFIG = (window.APP_CONFIG || {});
+  const CONFIG = window.APP_CONFIG || {};
   const LOG_ENDPOINT = CONFIG.logEndpoint || "";
   const LOG_UNKNOWN = CONFIG.logUnknownQuestions !== false;
 
@@ -46,43 +48,18 @@
     return m ? Number(m[1]) : null;
   }
 
-  function parseDateLike(text) {
-    const t = (text || "").trim();
-
-    // yyyy-mm-dd
-    let m = t.match(/\b(19\d{2}|20\d{2})[-\/.](0?[1-9]|1[0-2])[-\/.](0?[1-9]|[12]\d|3[01])\b/);
-    if (m) return { yyyy: Number(m[1]), mm: Number(m[2]), dd: Number(m[3]) };
-
-    // dd-mm-yyyy or dd/mm/yyyy
-    m = t.match(/\b(0?[1-9]|[12]\d|3[01])[-\/.](0?[1-9]|1[0-2])[-\/.](19\d{2}|20\d{2})\b/);
-    if (m) return { yyyy: Number(m[3]), mm: Number(m[2]), dd: Number(m[1]) };
-
-    // "12 May 1993"
-    m = t.match(/\b(0?[1-9]|[12]\d|3[01])(?:st|nd|rd|th)?\s+(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+(19\d{2}|20\d{2})\b/i);
-    if (m) {
-      const dd = Number(m[1]);
-      const mon = safeLower(m[2]).slice(0, 3);
-      const map = { jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12 };
-      const mm = map[mon] || null;
-      const yyyy = Number(m[3]);
-      if (mm) return { yyyy, mm, dd };
-    }
-
-    return null;
-  }
-
-  function formatDob({ yyyy, mm, dd }) {
+  function formatDob(d) {
     const z2 = (n) => (n < 10 ? "0" + n : "" + n);
-    return `${yyyy}-${z2(mm)}-${z2(dd)}`;
+    return `${d.yyyy}-${z2(d.mm)}-${z2(d.dd)}`;
   }
 
-  function calcAgeFromDob(dobObj) {
+  function calcAgeFromDob(d) {
     const today = new Date();
     const y = today.getFullYear();
-    let age = y - dobObj.yyyy;
+    let age = y - d.yyyy;
     const m = today.getMonth() + 1;
-    const d = today.getDate();
-    if (m < dobObj.mm || (m === dobObj.mm && d < dobObj.dd)) age -= 1;
+    const dd = today.getDate();
+    if (m < d.mm || (m === d.mm && dd < d.dd)) age -= 1;
     return age;
   }
 
@@ -95,7 +72,7 @@
   }
 
   /***********************
-   * STATE
+   * STATE + CHECKPOINTS
    ***********************/
   const STEPS = {
     INTAKE: "intake",
@@ -125,6 +102,23 @@
   ];
 
   /***********************
+   * LOGGING (no-cors)
+   ***********************/
+  function logEvent(type, payload = {}) {
+    if (!LOG_ENDPOINT) return Promise.resolve();
+    const body = JSON.stringify({ ts: nowIso(), type, ...payload });
+    try {
+      return fetch(LOG_ENDPOINT, {
+        method: "POST",
+        mode: "no-cors",
+        body
+      }).catch(() => {});
+    } catch {
+      return Promise.resolve();
+    }
+  }
+
+  /***********************
    * PHRASEBANK (optional)
    ***********************/
   async function loadPhrasebank() {
@@ -138,29 +132,36 @@
   }
 
   function compilePatterns(extra) {
+    // IMPORTANT: ASCII only (no smart quotes) to avoid syntax surprises
     const base = {
       ask_id: [
         /\b(can i|could i|may i|let me)\s+(see|check)\s+(your|ur)\s+(id|identification)\b/i,
-        /\b(show\s+me\s+(your|ur)\s+(id|identification)\b/i,
+        /\bshow\s+me\s+(your|ur)\s+(id|identification)\b/i,
         /\bdo\s+you\s+have\s+an?\s+id\b/i,
         /\bid\s+please\b/i,
         /\bsee\s+your\s+id\b/i
       ],
       return_id: [
-        /\bhere('?s|\s+is)\s+your\s+id\s+back\b/i,
+        /\bhere\s+is\s+your\s+id\s+back\b/i,
+        /\bhere's\s+your\s+id\s+back\b/i,
         /\b(return|give)\s+(it|the\s+id)\s+back\b/i,
         /\breturn\s+to\s+visitor\b/i
       ],
       contact_supervisor: [
-        /\b(i\s+(will|’ll|'ll)\s+)?(please\s+)?(contact|call|ring|phone)\s+(my\s+)?(supervisor|boss|officer|team\s*leader|manager)\b/i
+        /\b(i\s+(will|ll)\s+)?(please\s+)?(contact|call|ring|phone)\s+(my\s+)?(supervisor|boss|officer|team\s*leader|manager)\b/i,
+        /\bi\s+will\s+contact\s+my\s+supervisor\b/i
       ],
       ask_name: [
-        /\bwhat('?s|\s+is)\s+your\s+name\b/i,
+        /\bwhat\s+is\s+your\s+name\b/i,
+        /\bwhat's\s+your\s+name\b/i,
         /\bname\s*,?\s+please\b/i,
         /\bcan\s+i\s+have\s+your\s+name\b/i
       ],
       ask_purpose: [
-        /\b(what('?s|\s+is)\s+the\s+purpose|why\s+are\s+you\s+here|reason\s+for\s+your\s+visit)\b/i,
+        /\bwhat\s+is\s+the\s+purpose\b/i,
+        /\bpurpose\s+of\s+your\s+visit\b/i,
+        /\bwhy\s+are\s+you\s+here\b/i,
+        /\breason\s+for\s+your\s+visit\b/i,
         /\bwhat\s+brings\s+you\s+here\b/i
       ],
       ask_appointment: [
@@ -190,12 +191,13 @@
         /\bwhat\s+is\s+your\s+age\b/i
       ],
       ask_dob: [
-        /\b(what('?s|\s+is)\s+your\s+(date\s+of\s+birth|dob)|date\s+of\s+birth|dob)\b/i,
+        /\bwhat\s+is\s+your\s+(date\s+of\s+birth|dob)\b/i,
+        /\bdate\s+of\s+birth\b/i,
+        /\bdob\b/i,
         /\bwhen\s+were\s+you\s+born\b/i
       ],
       confirm_born_year: [
-        /\bwere\s+you\s+born\s+in\s+(19\d{2}|20\d{2})\b/i,
-        /\byou\s+were\s+born\s+in\s+(19\d{2}|20\d{2})\s*\?\s*$/i
+        /\bwere\s+you\s+born\s+in\s+(19\d{2}|20\d{2})\b/i
       ],
       ask_nationality: [
         /\bwhat\s+is\s+your\s+nationality\b/i,
@@ -219,6 +221,7 @@
 
     const merged = { ...base };
 
+    // Optional extra patterns from phrasebank.json
     if (extra) {
       const intentsObj = extra.intents && typeof extra.intents === "object" ? extra.intents : null;
 
@@ -300,8 +303,12 @@
     const mood = pick(MOODS);
     const dob = randomDob();
     const nat = pick(NATIONALITIES);
-    const name = pick(NAMES) + " " + (["Johnson", "Miller", "Brown", "Davis", "Martinez", "Kowalski", "Nowak", "Schmidt", "Dubois", "Rossi", "Yilmaz"][Math.floor(Math.random() * 11)]);
+    const name = pick(NAMES) + " " + pick([
+      "Johnson","Miller","Brown","Davis","Martinez","Kowalski",
+      "Nowak","Schmidt","Dubois","Rossi","Yilmaz"
+    ]);
     const age = calcAgeFromDob(dob);
+
     const id = { name, nationality: nat, dob, age, idNumber: randomIdNumber(), expiry: randomExpiry() };
 
     const idx = 1 + Math.floor(Math.random() * 12);
@@ -325,11 +332,67 @@
   }
 
   /***********************
-   * UI — inject our own (no old buttons)
+   * APP CORE STATE
+   ***********************/
+  const app = {
+    runId: uid(),
+    student: { name: "", group: "" },
+    visitor: null,
+    step: STEPS.INTAKE,
+    flags: {
+      asked_name: false,
+      asked_purpose: false,
+      asked_appointment: false,
+      asked_who: false,
+      asked_time: false,
+      asked_where: false,
+      asked_subject: false,
+      asked_id: false,
+      asked_age: false,
+      asked_dob: false,
+      asked_nationality: false,
+      supervisor_contacted: false,
+      explained_threat: false,
+      explained_items: false,
+      did_person_search: false
+    },
+    idVisible: false,
+    processing: false,
+    finished: false,
+    intents: null,
+    phrasebank: null,
+    unknowns: 0,
+    messages: []
+  };
+
+  /***********************
+   * HARD KILL SWITCH for legacy supervisor button
+   ***********************/
+  function hideLegacySupervisorButtons() {
+    const rx = /(contact\s+supervisor|contact\s+leidinggevende)/i;
+    const nodes = Array.from(document.querySelectorAll("button, a, [role='button'], input[type='button'], input[type='submit']"));
+    let n = 0;
+    nodes.forEach(el => {
+      const t = (el.textContent || el.value || "").trim();
+      if (rx.test(t)) {
+        el.style.setProperty("display", "none", "important");
+        el.style.setProperty("visibility", "hidden", "important");
+        el.style.setProperty("pointer-events", "none", "important");
+        el.setAttribute("aria-hidden", "true");
+        el.tabIndex = -1;
+        n++;
+      }
+    });
+    return n;
+  }
+
+  /***********************
+   * UI INJECTION (hard-hide old UI)
    ***********************/
   function injectUi() {
-    // Remove previous injected instance if any
-    $("#veva-app")?.remove();
+    // Remove previous injected instance
+    $("#veva-app") && $("#veva-app").remove();
+    $("#veva-root") && $("#veva-root").remove();
 
     const root = document.createElement("div");
     root.id = "veva-app";
@@ -397,6 +460,7 @@
           </aside>
         </div>
 
+        <!-- Supervisor Modal -->
         <div class="veva-modal-backdrop" id="sup-backdrop" style="display:none;">
           <div class="veva-modal" role="dialog" aria-modal="true" aria-label="Supervisor contact">
             <div class="veva-modal-head">
@@ -425,25 +489,53 @@
             </div>
           </div>
         </div>
+
+        <!-- START OVERLAY -->
+        <div class="veva-modal-backdrop" id="start-backdrop" style="display:flex;">
+          <div class="veva-modal" role="dialog" aria-modal="true" aria-label="Start run">
+            <div class="veva-modal-head">
+              <div class="veva-modal-title">Start exercise</div>
+              <div class="veva-small" style="opacity:.9;">Enter your details and start the run.</div>
+            </div>
+            <div class="veva-modal-body">
+              <div class="veva-grid">
+                <label>Your name<input id="start-name" type="text" autocomplete="off" /></label>
+                <label>Group / class<input id="start-group" type="text" autocomplete="off" /></label>
+              </div>
+              <div class="veva-sup-actions">
+                <button class="veva-btn veva-btn-ok" id="start-btn">Start run</button>
+              </div>
+              <div class="veva-small" id="start-status"></div>
+            </div>
+          </div>
+        </div>
       </div>
     `;
 
-    // Mount (prefer #app if exists)
-    const mount = $("#app") || document.body;
-
-    // Hide old UI under it (so old buttons cannot show)
-    if (mount !== document.body) {
-      // if #app exists, clear it first
+    // Mount logic: if #app exists, hard reset it. Otherwise hide all old body UI.
+    const mount = $("#app");
+    if (mount) {
       mount.innerHTML = "";
+      mount.appendChild(root);
     } else {
-      // otherwise, do not destroy whole body; just append on top
+      const wrapper = document.createElement("div");
+      wrapper.id = "veva-root";
+
+      // Hide existing body children (old UI). Do not touch <script> tags.
+      const kids = Array.from(document.body.children);
+      kids.forEach(el => {
+        if (el.tagName === "SCRIPT") return;
+        el.style.display = "none";
+      });
+
+      wrapper.appendChild(root);
+      document.body.appendChild(wrapper);
     }
 
-    mount.appendChild(root);
-
-    // CSS (includes avatar equalize — no external snippet needed)
+    // CSS
     const style = document.createElement("style");
     style.textContent = `
+      body{margin:0;background:radial-gradient(1200px 800px at 30% 10%, rgba(20,60,120,.55), rgba(5,10,20,.95));}
       .veva-shell{height:calc(100vh - 10px);display:flex;flex-direction:column;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;}
       .veva-topbar{display:flex;gap:12px;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid rgba(255,255,255,.08);color:white}
       .veva-title-main{font-weight:900;font-size:16px;line-height:1.1}
@@ -475,7 +567,7 @@
       .bubble .meta{font-size:11px;opacity:.72;margin-top:6px}
       .veva-modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:14px;z-index:9999}
       .veva-modal{width:min(720px,95vw);background:rgba(10,10,10,.92);color:white;border-radius:16px;border:1px solid rgba(255,255,255,.14);overflow:hidden}
-      .veva-modal-head{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border-bottom:1px solid rgba(255,255,255,.12)}
+      .veva-modal-head{display:flex;flex-direction:column;gap:4px;align-items:flex-start;padding:10px 12px;border-bottom:1px solid rgba(255,255,255,.12)}
       .veva-modal-title{font-weight:900}
       .veva-modal-body{padding:12px;display:flex;flex-direction:column;gap:10px}
       .veva-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
@@ -489,75 +581,23 @@
       }
     `;
     document.head.appendChild(style);
-
-    // Make background nice even if old CSS missing
-    document.body.style.margin = "0";
-    document.body.style.background = "radial-gradient(1200px 800px at 30% 10%, rgba(20,60,120,.55), rgba(5,10,20,.95))";
   }
 
   /***********************
-   * LOGGING (no-cors)
+   * UI HELPERS
    ***********************/
-  function logEvent(type, payload = {}) {
-    if (!LOG_ENDPOINT) return Promise.resolve();
-    const body = JSON.stringify({ ts: nowIso(), type, ...payload });
-
-    // no-cors -> no preflight -> Apps Script CORS won’t break the app
-    // NOTE: response is opaque; we can't read it, but that's fine for logging.
-    try {
-      return fetch(LOG_ENDPOINT, {
-        method: "POST",
-        mode: "no-cors",
-        body
-      }).catch(() => {});
-    } catch {
-      return Promise.resolve();
-    }
-  }
-
-  /***********************
-   * APP CORE STATE
-   ***********************/
-  const app = {
-    runId: uid(),
-    visitor: null,
-    step: STEPS.INTAKE,
-    flags: {
-      asked_name: false,
-      asked_purpose: false,
-      asked_appointment: false,
-      asked_who: false,
-      asked_time: false,
-      asked_where: false,
-      asked_subject: false,
-      asked_id: false,
-      asked_age: false,
-      asked_dob: false,
-      asked_nationality: false,
-      supervisor_contacted: false,
-      explained_threat: false,
-      explained_items: false,
-      did_person_search: false
-    },
-    idVisible: false,
-    processing: false,
-    finished: false,
-    intents: null,
-    phrasebank: null,
-    unknowns: 0,
-    messages: []
-  };
-
   function setStep(step) {
     app.step = step;
-    $("#stepname") && ($("#stepname").textContent = step);
+    const el = $("#stepname");
+    if (el) el.textContent = step;
   }
 
   function setHint(text) {
-    $("#hintline") && ($("#hintline").textContent = text || "");
+    const el = $("#hintline");
+    if (el) el.textContent = text || "";
   }
 
-  function addBubble(side, text, meta = "") {
+  function addBubble(side, text, meta) {
     const log = $("#chatlog");
     if (!log) return;
     const div = document.createElement("div");
@@ -572,12 +612,12 @@
 
   function soldierSay(text, meta) {
     app.messages.push({ from: "soldier", text, ts: nowIso() });
-    addBubble("right", text, meta);
+    addBubble("right", text, meta || "");
   }
 
   function visitorSay(text, meta) {
     app.messages.push({ from: "visitor", text, ts: nowIso() });
-    addBubble("left", text, meta);
+    addBubble("left", text, meta || "");
   }
 
   function showIdCard() {
@@ -601,20 +641,21 @@
     card.style.display = "none";
   }
 
-  function openSupervisorModal(prefill = {}) {
+  function openSupervisorModal(prefill) {
     const back = $("#sup-backdrop");
     if (!back) return;
+
     $("#sup-status").textContent = "";
 
     const v = app.visitor;
     const fill = (id, val) => { const el = $(id); if (el) el.value = val || ""; };
 
-    fill("#sup-who", prefill.who ?? v?.id?.name ?? "");
-    fill("#sup-why", prefill.why ?? v?.intake?.purpose ?? "");
-    fill("#sup-what", prefill.what ?? v?.intake?.subject ?? "");
-    fill("#sup-where", prefill.where ?? v?.intake?.goingWhere ?? "");
-    fill("#sup-when", prefill.when ?? v?.intake?.apptTime ?? "");
-    fill("#sup-with", prefill.with ?? v?.intake?.meetingWith ?? "");
+    fill("#sup-who", (prefill && prefill.who) || v.id.name);
+    fill("#sup-why", (prefill && prefill.why) || v.intake.purpose);
+    fill("#sup-what", (prefill && prefill.what) || v.intake.subject);
+    fill("#sup-where", (prefill && prefill.where) || v.intake.goingWhere);
+    fill("#sup-when", (prefill && prefill.when) || (v.intake.apptTime || ""));
+    fill("#sup-with", (prefill && prefill.with) || (v.intake.meetingWith || ""));
 
     back.style.display = "flex";
     const who = $("#sup-who");
@@ -631,18 +672,18 @@
 
   function supervisorPayloadFromModal() {
     return {
-      who: ($("#sup-who")?.value || "").trim(),
-      why: ($("#sup-why")?.value || "").trim(),
-      what: ($("#sup-what")?.value || "").trim(),
-      where: ($("#sup-where")?.value || "").trim(),
-      when: ($("#sup-when")?.value || "").trim(),
-      with: ($("#sup-with")?.value || "").trim()
+      who: ($("#sup-who") && $("#sup-who").value || "").trim(),
+      why: ($("#sup-why") && $("#sup-why").value || "").trim(),
+      what: ($("#sup-what") && $("#sup-what").value || "").trim(),
+      where: ($("#sup-where") && $("#sup-where").value || "").trim(),
+      when: ($("#sup-when") && $("#sup-when").value || "").trim(),
+      with: ($("#sup-with") && $("#sup-with").value || "").trim()
     };
   }
 
   function validateSupervisorFields(p) {
     const missing = [];
-    for (const k of ["who", "why", "what", "where", "when"]) if (!p[k]) missing.push(k);
+    ["who", "why", "what", "where", "when"].forEach(k => { if (!p[k]) missing.push(k); });
     return missing;
   }
 
@@ -658,24 +699,26 @@
       else dob.mm = clamp(dob.mm + pick([-1, 1]), 1, 12);
       return formatDob(dob);
     }
-    if (kind === "nationality") return pick(NATIONALITIES.filter(n => n !== v.id.nationality));
-    if (kind === "name") return pick(NAMES) + " " + pick(["Johnson", "Miller", "Brown", "Davis", "Rossi", "Schmidt"]);
+    if (kind === "nationality") {
+      const others = NATIONALITIES.filter(n => n !== v.id.nationality);
+      return pick(others);
+    }
+    if (kind === "name") {
+      return pick(NAMES) + " " + pick(["Johnson", "Miller", "Brown", "Davis", "Rossi", "Schmidt"]);
+    }
     return "";
   }
 
   function visitorControlAnswer(kind) {
     const v = app.visitor;
-    const mood = v.mood;
-    const lieP = 0.04 + mood.lieBoost;
-    const inconsP = 0.05 + mood.inconsBoost;
+    const lieP = 0.04 + v.mood.lieBoost;
+    const inconsP = 0.05 + v.mood.inconsBoost;
 
-    const truth = (() => {
-      if (kind === "age") return String(v.id.age);
-      if (kind === "dob") return formatDob(v.id.dob);
-      if (kind === "nationality") return v.id.nationality;
-      if (kind === "name") return v.id.name;
-      return "";
-    })();
+    const truth =
+      kind === "age" ? String(v.id.age) :
+      kind === "dob" ? formatDob(v.id.dob) :
+      kind === "nationality" ? v.id.nationality :
+      kind === "name" ? v.id.name : "";
 
     const prev = v.claims[kind];
     if (prev) {
@@ -709,35 +752,35 @@
     const v = app.visitor;
     const a = v.intake;
     if (kind === "name") return `My name is ${v.id.name}.`;
-    if (kind === "purpose") return `I’m here for ${a.purpose}.`;
-    if (kind === "appointment") return a.appointment ? "Yes, I have an appointment." : "No, I don’t have an appointment.";
-    if (kind === "who") return a.meetingWith ? `I’m meeting ${a.meetingWith}.` : "I’m not meeting anyone specific.";
-    if (kind === "time") return a.apptTime ? `It’s at ${a.apptTime}.` : "I don’t have a specific time.";
-    if (kind === "where") return `I’m going to the ${a.goingWhere}.`;
-    if (kind === "subject") return `It’s about ${a.subject}.`;
+    if (kind === "purpose") return `I'm here for ${a.purpose}.`;
+    if (kind === "appointment") return a.appointment ? "Yes, I have an appointment." : "No, I don't have an appointment.";
+    if (kind === "who") return a.meetingWith ? `I'm meeting ${a.meetingWith}.` : "I'm not meeting anyone specific.";
+    if (kind === "time") return a.apptTime ? `It's at ${a.apptTime}.` : "I don't have a specific time.";
+    if (kind === "where") return `I'm going to the ${a.goingWhere}.`;
+    if (kind === "subject") return `It's about ${a.subject}.`;
     return "Okay.";
   }
 
   function handleBornYearConfirm(userText) {
-    const v = app.visitor;
     const yearAsked = parseYear(userText);
     if (!yearAsked) return visitorSay("Sorry, could you repeat the year?");
 
-    const claim = visitorControlAnswer("dob");     // may be truth or lie
+    const v = app.visitor;
+    const claim = visitorControlAnswer("dob"); // may be truth or lie
     const claimYear = parseYear(claim.value) || v.id.dob.yyyy;
     const trueYear = v.id.dob.yyyy;
 
     if (yearAsked === claimYear) {
-      visitorSay("Yes, that’s correct.");
-      if (claim.lied) visitorSay("Sorry… I’m a bit stressed.", "mood");
+      visitorSay("Yes, that's correct.");
+      if (claim.lied) visitorSay("Sorry... I'm a bit stressed.", "mood");
       return;
     }
 
-    visitorSay("No, that’s not correct.");
+    visitorSay("No, that's not correct.");
 
-    // If student guessed the TRUE year but visitor lied, allow correction
+    // If student guessed the TRUE year but visitor lied -> allow correction
     if (yearAsked === trueYear && claim.lied) {
-      visitorSay(`Actually… you’re right. I was born in ${trueYear}. Sorry.`, "correction");
+      visitorSay(`Actually... you're right. I was born in ${trueYear}. Sorry.`, "correction");
       v.claims.dob = formatDob(v.id.dob);
       return;
     }
@@ -748,7 +791,7 @@
   function explainThreatAndItems() {
     app.flags.explained_threat = true;
     app.flags.explained_items = true;
-    soldierSay("Thanks. Due to a higher threat level today, I’ll apply extra security checks.", "threat");
+    soldierSay("Thanks. Due to a higher threat level today, I'll apply extra security checks.", "threat");
     soldierSay("Do you have any weapons, sharp objects, drugs, or other prohibited items with you?", "prohibited items");
     setStep(STEPS.THREAT_ITEMS);
   }
@@ -757,14 +800,14 @@
     if (app.finished) return;
     app.flags.did_person_search = true;
     setStep(STEPS.PERSON_SEARCH);
-    soldierSay("I’m going to do a quick pat-down search (person search). Is that okay?", "person search");
-    visitorSay("Yes, that’s okay.");
+    soldierSay("I'm going to do a quick pat-down search (person search). Is that okay?", "person search");
+    visitorSay("Yes, that's okay.");
     soldierSay("Thank you. Please keep your hands visible and follow my instructions.", "rules");
     soldierSay("You may enter. Follow site rules and stay with your escort if required.", "completion");
     endRun("completed");
   }
 
-  function endRun(reason = "finished") {
+  function endRun(reason) {
     if (app.finished) return;
     app.finished = true;
     setStep(STEPS.FINISHED);
@@ -782,10 +825,12 @@
 
     logEvent("finish", {
       runId: app.runId,
-      reason,
+      reason: reason || "finished",
       step: app.step,
       unknowns: app.unknowns,
-      inconsistencies: app.visitor?.inconsistencies || []
+      studentName: app.student.name,
+      studentGroup: app.student.group,
+      inconsistencies: app.visitor ? app.visitor.inconsistencies : []
     });
 
     const misses = REQUIRED.filter(r => !app.flags[r.key]).slice(0, 3);
@@ -797,10 +842,10 @@
     }
   }
 
-  async function denyEntranceFlow(source = "button") {
+  async function denyEntranceFlow(source) {
     if (app.finished) return;
-    soldierSay("I’m denying entry. You cannot enter the site.", "deny");
-    logEvent("deny", { runId: app.runId, source, step: app.step });
+    soldierSay("I'm denying entry. You cannot enter the site.", "deny");
+    logEvent("deny", { runId: app.runId, source: source || "button", step: app.step });
     await sleep(900);
     endRun("denied");
   }
@@ -829,7 +874,10 @@
       ["smalltalk", "smalltalk"]
     ];
 
-    for (const [key, fn] of map) if (I?.[fn] && I[fn](t)) return key;
+    for (const pair of map) {
+      const key = pair[0], fn = pair[1];
+      if (I && I[fn] && I[fn](t)) return key;
+    }
 
     const low = safeLower(t);
     if (low.includes("date of birth") || low === "dob") return "ask_dob";
@@ -861,10 +909,18 @@
 
     try {
       soldierSay(t);
-      logEvent("message", { runId: app.runId, from: "student", text: t, step: app.step });
+      logEvent("message", {
+        runId: app.runId,
+        from: "student",
+        text: t,
+        step: app.step,
+        studentName: app.student.name,
+        studentGroup: app.student.group
+      });
 
       const intent = matchIntent(t);
 
+      // Always allow deny
       if (intent === "deny") { await denyEntranceFlow("text"); return; }
 
       if (intent === "return_id") {
@@ -883,17 +939,18 @@
         return;
       }
 
+      // Supervisor TEXT TRIGGER ONLY
       if (intent === "contact_supervisor") {
         app.flags.supervisor_contacted = true;
         logEvent("supervisor_trigger", { runId: app.runId, step: app.step, source: "text" });
 
         openSupervisorModal({
-          who: app.visitor?.id?.name || "",
-          why: app.visitor?.intake?.purpose || "",
-          what: app.visitor?.intake?.subject || "",
-          where: app.visitor?.intake?.goingWhere || "",
-          when: app.visitor?.intake?.apptTime || "",
-          with: app.visitor?.intake?.meetingWith || ""
+          who: app.visitor.id.name,
+          why: app.visitor.intake.purpose,
+          what: app.visitor.intake.subject,
+          where: app.visitor.intake.goingWhere,
+          when: app.visitor.intake.apptTime || "",
+          with: app.visitor.intake.meetingWith || ""
         });
 
         visitorSay("Okay. Please contact your supervisor.", "supervisor");
@@ -914,8 +971,8 @@
         app.flags.asked_appointment = true;
         visitorSay(visitorReplyForIntakeQuestion("appointment"));
         if (!app.visitor.intake.appointment) {
-          visitorSay("I don’t have an appointment. Is that a problem?");
-          setHint("Tip: try “I’ll contact my supervisor for approval.”");
+          visitorSay("I don't have an appointment. Is that a problem?");
+          setHint('Tip: try "I will contact my supervisor for approval."');
         }
         return;
       }
@@ -928,8 +985,8 @@
       if (intent === "ask_nationality") {
         app.flags.asked_nationality = true;
         const a = visitorControlAnswer("nationality");
-        visitorSay(`I’m ${a.value}.`);
-        if (a.inconsistent) visitorSay("Sorry… I meant that.", "mood");
+        visitorSay(`I'm ${a.value}.`);
+        if (a.inconsistent) visitorSay("Sorry... I meant that.", "mood");
         logEvent("control_nationality", { runId: app.runId, step: app.step, value: a.value, lied: a.lied });
         return;
       }
@@ -937,8 +994,8 @@
       if (intent === "ask_age") {
         app.flags.asked_age = true;
         const a = visitorControlAnswer("age");
-        visitorSay(`I’m ${a.value} years old.`);
-        if (a.inconsistent) visitorSay("Sorry, I’m tired.", "mood");
+        visitorSay(`I'm ${a.value} years old.`);
+        if (a.inconsistent) visitorSay("Sorry, I'm tired.", "mood");
         logEvent("control_age", { runId: app.runId, step: app.step, value: a.value, lied: a.lied });
         return;
       }
@@ -947,7 +1004,7 @@
         app.flags.asked_dob = true;
         const a = visitorControlAnswer("dob");
         visitorSay(`My date of birth is ${a.value}.`);
-        if (a.inconsistent) visitorSay("Sorry… I’m a bit nervous.", "mood");
+        if (a.inconsistent) visitorSay("Sorry... I'm a bit nervous.", "mood");
         logEvent("control_dob", { runId: app.runId, step: app.step, value: a.value, lied: a.lied });
         return;
       }
@@ -962,7 +1019,7 @@
       // Nudge: after ID + supervisor -> threat/items
       if (app.step === STEPS.ID_CHECK && app.flags.asked_id && app.flags.supervisor_contacted) {
         explainThreatAndItems();
-        setHint("Tip: type “Go to person search” when ready.");
+        setHint('Tip: type "Go to person search" when ready.');
         return;
       }
 
@@ -970,9 +1027,9 @@
 
       // Unknown
       app.unknowns += 1;
-      visitorSay("Sorry, I don’t understand. Can you ask it another way?");
+      visitorSay("Sorry, I don't understand. Can you ask it another way?");
       if (LOG_UNKNOWN) logEvent("unknown_question", { runId: app.runId, step: app.step, text: t });
-      setHint("Try short clear questions (5W/5WH). Example: “What is the purpose of your visit?”");
+      setHint('Try short clear questions (5W/5WH). Example: "What is the purpose of your visit?"');
     } finally {
       clearTimeout(hangGuard);
       app.processing = false;
@@ -990,25 +1047,20 @@
   async function init() {
     injectUi();
 
+    // Keep hiding any legacy supervisor buttons (just in case)
+    hideLegacySupervisorButtons();
+    const mo = new MutationObserver(() => hideLegacySupervisorButtons());
+    mo.observe(document.documentElement, { childList: true, subtree: true });
+
     // Hide ID toggle unless teacher
     const idToggle = $("#btn-toggle-id");
     if (idToggle) idToggle.style.display = teacherModeEnabled() ? "" : "none";
 
-    app.visitor = buildVisitor();
-
-    $("#runid").textContent = app.runId;
-    $("#visitor-mood").textContent = app.visitor.mood.name;
-
-    const img = $("#visitor-img");
-    img.src = app.visitor.headshot;
-    img.onerror = () => { img.src = "assets/photos/headshot_01.png"; }; // fallback
-
-    setStep(STEPS.INTAKE);
-
+    // Load phrasebank + compile patterns
     app.phrasebank = await loadPhrasebank();
     app.intents = compilePatterns(app.phrasebank);
 
-    // Teacher card
+    // Teacher debug
     const tcard = $("#teacher-card");
     if (tcard) tcard.style.display = teacherModeEnabled() ? "" : "none";
     if (teacherModeEnabled()) {
@@ -1019,15 +1071,19 @@
       `;
     }
 
-    // Start messages
-    visitorSay("Hello.");
-    visitorSay(`(Mood: ${app.visitor.mood.name})`, "visitor mood");
-    soldierSay("Good day. Please state your name and the purpose of your visit.", "start");
-    setHint("Start with 5W/5WH (name, purpose, appointment, who, time, where, subject).");
+    // Create visitor now (but start messages only after Start overlay)
+    app.visitor = buildVisitor();
 
-    logEvent("start", { runId: app.runId, mood: app.visitor.mood.name, step: app.step });
+    $("#runid").textContent = app.runId;
+    $("#visitor-mood").textContent = app.visitor.mood.name;
 
-    // Composer
+    const img = $("#visitor-img");
+    img.src = app.visitor.headshot;
+    img.onerror = () => { img.src = "assets/photos/headshot_01.png"; };
+
+    setStep(STEPS.INTAKE);
+
+    // Wire buttons
     const input = $("#chatinput");
     const send = $("#btn-send");
 
@@ -1037,35 +1093,29 @@
       onUserMessage(val);
     }
 
-    send?.addEventListener("click", submit);
-    input?.addEventListener("keydown", (e) => { if (e.key === "Enter") submit(); });
+    send && send.addEventListener("click", submit);
+    input && input.addEventListener("keydown", (e) => { if (e.key === "Enter") submit(); });
 
-    // Autofocus
-    if (input) setTimeout(() => input.focus(), 0);
+    $("#btn-deny") && $("#btn-deny").addEventListener("click", () => denyEntranceFlow("button"));
+    $("#btn-finish") && $("#btn-finish").addEventListener("click", () => endRun("manual_finish"));
 
-    // Deny always
-    $("#btn-deny")?.addEventListener("click", () => denyEntranceFlow("button"));
-
-    // Finish
-    $("#btn-finish")?.addEventListener("click", () => endRun("manual_finish"));
-
-    // ID controls
-    $("#btn-return-id")?.addEventListener("click", () => {
+    $("#btn-return-id") && $("#btn-return-id").addEventListener("click", () => {
       hideIdCard();
       visitorSay("Thank you.");
       logEvent("return_id", { runId: app.runId, step: app.step, source: "button" });
     });
-    $("#btn-toggle-id")?.addEventListener("click", () => {
+
+    idToggle && idToggle.addEventListener("click", () => {
       if (app.idVisible) hideIdCard(); else showIdCard();
     });
 
-    // Supervisor modal
-    $("#sup-close")?.addEventListener("click", closeSupervisorModal);
-    $("#sup-backdrop")?.addEventListener("click", (e) => {
+    // Supervisor modal wiring
+    $("#sup-close") && $("#sup-close").addEventListener("click", closeSupervisorModal);
+    $("#sup-backdrop") && $("#sup-backdrop").addEventListener("click", (e) => {
       if (e.target && e.target.id === "sup-backdrop") closeSupervisorModal();
     });
 
-    $("#sup-request")?.addEventListener("click", async () => {
+    $("#sup-request") && $("#sup-request").addEventListener("click", async () => {
       const p = supervisorPayloadFromModal();
       const missing = validateSupervisorFields(p);
       if (missing.length) {
@@ -1073,33 +1123,96 @@
         logEvent("supervisor_request_invalid", { runId: app.runId, missing, payload: p });
         return;
       }
-      $("#sup-status").textContent = "Request sent. Waiting for supervisor decision…";
+      $("#sup-status").textContent = "Request sent. Waiting for supervisor decision...";
       logEvent("supervisor_request", { runId: app.runId, payload: p });
       setHint("Supervisor decision: (teacher) click Approve/Deny in the popup.");
     });
 
-    $("#sup-approve")?.addEventListener("click", async () => {
+    $("#sup-approve") && $("#sup-approve").addEventListener("click", async () => {
       $("#sup-status").textContent = "Supervisor approves. Proceed with security measures.";
       logEvent("supervisor_approve", { runId: app.runId });
       closeSupervisorModal();
       visitorSay("Okay.", "supervisor");
       explainThreatAndItems();
-      setHint("Next: type “Go to person search” when ready. Deny entrance always available.");
+      setHint('Next: type "Go to person search" when ready. Deny entrance always available.');
     });
 
-    $("#sup-deny")?.addEventListener("click", async () => {
+    $("#sup-deny") && $("#sup-deny").addEventListener("click", async () => {
       $("#sup-status").textContent = "Supervisor denies. Deny entrance.";
       logEvent("supervisor_deny", { runId: app.runId });
       closeSupervisorModal();
       await denyEntranceFlow("supervisor_deny");
     });
 
-    if (!app.visitor.intake.appointment) {
-      setTimeout(() => {
-        soldierSay("If there is no appointment, you may need supervisor approval.", "hint");
-        setHint("Try: “I’ll contact my supervisor for approval.”");
-      }, 800);
+    /***************
+     * START OVERLAY
+     ***************/
+    const startBack = $("#start-backdrop");
+    const startName = $("#start-name");
+    const startGroup = $("#start-group");
+    const startBtn = $("#start-btn");
+    const startStatus = $("#start-status");
+
+    // Prefill from localStorage if available
+    try {
+      const savedName = localStorage.getItem("veva_student_name") || "";
+      const savedGroup = localStorage.getItem("veva_student_group") || "";
+      if (startName) startName.value = savedName;
+      if (startGroup) startGroup.value = savedGroup;
+    } catch {}
+
+    function startRun() {
+      const nameVal = (startName && startName.value || "").trim();
+      const groupVal = (startGroup && startGroup.value || "").trim();
+
+      if (!nameVal || !groupVal) {
+        if (startStatus) startStatus.textContent = "Please fill in both name and group.";
+        return;
+      }
+
+      app.student.name = nameVal;
+      app.student.group = groupVal;
+
+      try {
+        localStorage.setItem("veva_student_name", nameVal);
+        localStorage.setItem("veva_student_group", groupVal);
+      } catch {}
+
+      if (startBack) startBack.style.display = "none";
+      if (startStatus) startStatus.textContent = "";
+
+      // Start messages
+      visitorSay("Hello.");
+      visitorSay(`(Mood: ${app.visitor.mood.name})`, "visitor mood");
+      soldierSay("Good day. Please state your name and the purpose of your visit.", "start");
+      setHint("Start with 5W/5WH (name, purpose, appointment, who, time, where, subject).");
+
+      logEvent("start", {
+        runId: app.runId,
+        mood: app.visitor.mood.name,
+        step: app.step,
+        studentName: app.student.name,
+        studentGroup: app.student.group
+      });
+
+      // Autofocus chat
+      if (input) setTimeout(() => input.focus(), 0);
+
+      // Early coach if no appointment
+      if (!app.visitor.intake.appointment) {
+        setTimeout(() => {
+          soldierSay("If there is no appointment, you may need supervisor approval.", "hint");
+          setHint('Try: "I will contact my supervisor for approval."');
+        }, 700);
+      }
     }
+
+    if (startBtn) startBtn.addEventListener("click", startRun);
+    if (startGroup) startGroup.addEventListener("keydown", (e) => { if (e.key === "Enter") startRun(); });
+    if (startName) startName.addEventListener("keydown", (e) => { if (e.key === "Enter") startRun(); });
+
+    // Focus first field
+    if (startName) setTimeout(() => startName.focus(), 0);
   }
 
   if (document.readyState === "loading") {
