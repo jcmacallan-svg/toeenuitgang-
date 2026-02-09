@@ -2101,16 +2101,6 @@ function denyEntrance(state){
 
   // auto-finish after short delay
   setTimeout(()=>{ try{ finishRun(state); }catch(e){} }, 3000);
-});
-  // disable input
-  const inp = $("#studentInput");
-  const btn = $("#btnSend");
-  const micBtn = $("#btnMicHold");
-  const mic = $("#btnMicHold");
-  if(inp) inp.disabled = true;
-  if(btn) btn.disabled = true;
-  if(micBtn) micBtn.disabled = true;
-  if(mic) mic.disabled = true;
 }
 
 function idCheckComplete(state){
