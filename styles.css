@@ -440,30 +440,7 @@ html, body{
   .gridTrain{ grid-template-columns: 1fr !important; }
 }
 /* =========================
-   BIG ID OVERLAY (when open)
-   ========================= */
-body.id-open #idPanel{
-  display:block !important;
-  position:fixed !important;
-  inset: 14px !important;
-  z-index: 9998 !important;
-  background: rgba(10,14,22,.92) !important;
-  border: 1px solid rgba(255,255,255,.14) !important;
-  border-radius: 18px !important;
-  padding: 14px !important;
-  box-shadow: 0 30px 90px rgba(0,0,0,.55) !important;
-}
-
-body.id-open #idCanvas{
-  width: 100% !important;
-  height: auto !important;
-  border-radius: 14px !important;
-  max-height: calc(100vh - 120px);
-}
-
-@media (max-width: 900px){
-  body.id-open #idPanel{ inset: 10px !important; }
-}
+ 
 /* =========================================================
    VEVA CSS PATCH — fixes conflicts + makes ID overlay work on mobile
    Plak dit helemaal ONDERAAN styles.css
@@ -531,7 +508,7 @@ body.id-open #idCanvas{
 /* 6) ID panel: standaard uit (app.js zet 'm aan) */
 #idPanel{ display:none; }
 
-/* 7) BIG ID OVERLAY — werkt ook op mobiel */
+/* 7)Y — werkt ook op mobiel */
 body.id-open #idPanel{
   display:block !important;
   position:fixed !important;
@@ -569,4 +546,29 @@ body.id-open #idCanvas{
 }
 #visitorMood{
   margin-top: 6px !important;
+}
+/* =========================
+   INLINE ID PANEL (no fullscreen)
+   ========================= */
+
+/* Start hidden until asked */
+#idPanel{ display:none; }
+
+/* When shown: normal panel size, scroll if needed */
+#idPanel{
+  max-height: 520px;
+  overflow: auto;
+}
+
+/* Make canvas responsive and not gigantic */
+#idCanvas{
+  width: 100% !important;
+  height: auto !important;
+  max-height: 420px; /* prevents huge take-over */
+}
+
+/* On mobile: show under chat (single column) */
+@media (max-width: 900px){
+  #idPanel{ display:none; } /* default hidden */
+  .gridTrain{ grid-template-columns: 1fr !important; }
 }
