@@ -328,3 +328,118 @@ html, body{
 @media (max-width: 900px){
   #idPanel{ display:none !important; }
 }
+/* =========================================================
+   VEVA FINAL OVERRIDE — WhatsApp style (single source of truth)
+   Plak dit HELEMAAL ONDERAAN je styles.css
+   ========================================================= */
+
+:root{
+  --veva-bg: #070c16;
+  --veva-panel: rgba(255,255,255,.06);
+  --veva-panelBorder: rgba(255,255,255,.10);
+  --veva-text: rgba(255,255,255,.92);
+  --veva-muted: rgba(255,255,255,.65);
+
+  --veva-visitorBubble: rgba(255,255,255,.08);
+  --veva-visitorText: #d6d9e2;
+
+  --veva-studentBubble: rgba(25,118,210,.18);
+  --veva-studentBorder: rgba(25,118,210,.55);
+  --veva-studentText: #4aa3ff;
+
+  --veva-dangerBg: rgba(255,59,59,.14);
+  --veva-dangerBorder: rgba(255,59,59,.55);
+
+  --veva-avatar: 72px; /* groter + gelijk */
+}
+
+html, body{
+  background: radial-gradient(1200px 800px at 30% 10%, rgba(30,80,160,.40), var(--veva-bg)) !important;
+  color: var(--veva-text) !important;
+}
+
+.card{
+  background: var(--veva-panel) !important;
+  border: 1px solid var(--veva-panelBorder) !important;
+  backdrop-filter: blur(6px);
+}
+
+.muted{ color: var(--veva-muted) !important; }
+
+/* Supervisor knop weg (alleen via teksttrigger) */
+#btnContactSupervisor{ display:none !important; }
+
+/* Deny entrance pops */
+#btnDenyEntrance, .btn.danger{
+  background: var(--veva-dangerBg) !important;
+  border-color: var(--veva-dangerBorder) !important;
+  color: #fff !important;
+}
+#btnDenyEntrance:hover, .btn.danger:hover{ filter: brightness(1.08); }
+
+/* Layout: visitor links, student rechts */
+.visitorRow{
+  display:flex !important;
+  gap:12px !important;
+  align-items:flex-end !important;
+}
+
+.studentRow{
+  display:flex !important;
+  gap:12px !important;
+  align-items:flex-end !important;
+  justify-content:flex-end !important;
+  flex-direction: row-reverse !important; /* avatar rechts */
+  width: 100% !important;
+}
+
+/* Avatars: exact gelijk + groter */
+.visitorAvatar,
+.studentAvatar{
+  width: var(--veva-avatar) !important;
+  height: var(--veva-avatar) !important;
+  border-radius: 50% !important;
+  object-fit: cover !important;
+  flex: 0 0 var(--veva-avatar) !important;
+  border: 1px solid rgba(255,255,255,.18) !important;
+  background: rgba(255,255,255,.06) !important;
+}
+
+/* Col widths (zodat bubble netjes uitlijnt) */
+.visitorCol,
+.studentCol{
+  max-width: calc(100% - (var(--veva-avatar) + 24px)) !important;
+  flex: 1 1 auto !important;
+}
+
+/* Bubbles */
+#visitorBubble.bubble{
+  background: var(--veva-visitorBubble) !important;
+  border: 1px solid rgba(255,255,255,.10) !important;
+  color: var(--veva-visitorText) !important;
+  min-height: 54px !important;
+}
+
+#studentBubble.bubble.me{
+  background: var(--veva-studentBubble) !important;
+  border: 1px solid var(--veva-studentBorder) !important;
+  color: var(--veva-studentText) !important;
+  min-height: 54px !important;
+  margin-left: auto !important; /* bubble rechts */
+  max-width: 70% !important;
+}
+
+/* Mood onder visitor bubble */
+#visitorMood{
+  margin-top: 8px !important;
+  font-style: normal !important;
+  font-size: 13px !important;
+  color: rgba(255,255,255,.70) !important;
+  opacity: 1 !important;
+}
+
+/* ID panel op mobiel weg */
+@media (max-width: 900px){
+  #idPanel{ display:none !important; }
+  .gridTrain{ grid-template-columns: 1fr !important; }
+}
