@@ -82,3 +82,7 @@ body.teacher .teacherOnly{display:block !important}
 #trainGrid.trainGridOneCol{grid-template-columns: 1fr !important;}
 #trainGrid.trainGridOneCol #idPanel{display:none !important;}
 #trainGrid.trainGridOneCol{display:block !important;}
+
+/* ID card layout tweaks */
+.idCard{min-height:260px}
+.idCard .idFooter{font-size:12px;line-height:1.15;margin-top:6px}

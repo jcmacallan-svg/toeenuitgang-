@@ -373,6 +373,7 @@ function generateVisitorCard(seed){
 
   return {
     ...base,
+    headshot: base.photo || base.headshot || "",
     twist,
     id: {
       id_no,
@@ -997,7 +998,7 @@ function processUserLine(state, userText){
   if(matched){
     state.done[matched] = true;
     reveal(matched, state);
-    const answer = visitorResponseForIntent(matched, userText, state.card);
+    const answer = visitorResponseForIntent(state, matched, userText, state.card);
     showVisitor(answer);
     renderIdCard(state);
   } else {
