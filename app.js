@@ -544,6 +544,16 @@
 
     studentSays(t);
     logEvent("message", { runId: state.runId, from: "student", text: t });
+    // If student greets, visitor asks for help (opening script)
+    const low = safeLower(t);
+    const isHello = /\b(hello|hi|good\s+morning|good\s+afternoon|good\s+evening)\b/i.test(t);
+
+    if (isHello) {
+    // Visitor follows up with help request
+    visitorSays("Can you help me?", state.visitor.mood.text);
+    setStep("Intake", "Now ask the 5W/5WH questions (name, purpose, appointment, who, time, where, subject).");
+    return;
+    }
 
     const intent = matchIntent(state.intents, t);
 
