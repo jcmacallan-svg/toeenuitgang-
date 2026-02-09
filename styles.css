@@ -1,197 +1,303 @@
-<!doctype html>
-<html lang="nl">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>VEVA – Ingang/Uitgang Trainer</title>
-  <meta name="color-scheme" content="light dark">
-  <link rel="stylesheet" href="styles.css" />
-  <link rel="icon" href="data:image/svg+xml;charset=utf-8,<svg xmlns=%27http://www.w3.org/2000/svg%27 width=%2764%27 height=%2764%27><rect width=%27100%%27 height=%27100%%27 fill=%27%231b2a44%27/><circle cx=%2732%27 cy=%2726%27 r=%2714%27 fill=%27%237aa2d6%27/><rect x=%2714%27 y=%2742%27 width=%2736%27 height=%2718%27 rx=%279%27 fill=%27%237aa2d6%27/></svg>">
-</head>
+/* =========================
+   VEVA — WhatsApp UI (clean)
+   Replace whole styles.css
+   ========================= */
 
-<body>
-<main class="wrap">
-  <header class="topbar">
-    <div class="brand">
-      <div class="logo">VEVA</div>
-      <div>
-        <div class="title">VEVA – Ingang/Uitgang Trainer</div>
-        <div class="subtitle">English checkpoint conversation practice</div>
-      </div>
-    </div>
+:root{
+  --bg0:#070c16;
+  --bg1:rgba(30,80,160,.35);
 
-    <div class="topActions">
-      <div class="meta" id="meta"></div>
-      <button class="btn subtle" id="btnTeacher" title="Teacher mode">Docent</button>
-    </div>
-  </header>
+  --panel: rgba(255,255,255,.06);
+  --panelBorder: rgba(255,255,255,.10);
 
-  <!-- Screen 1: Login -->
-  <section class="card" id="screen-login">
-    <h1>Start</h1>
-    <p class="muted">Vul je naam en groep in. Daarna start de oefening.</p>
+  --text: rgba(255,255,255,.92);
+  --muted: rgba(255,255,255,.70);
 
-    <div class="grid2">
-      <label class="field">
-        <span>Naam leerling</span>
-        <input id="studentName" autocomplete="name" placeholder="Bijv. Jansen" />
-      </label>
+  --btnBg: rgba(255,255,255,.06);
+  --btnBorder: rgba(255,255,255,.14);
 
-      <label class="field">
-        <span>Groep</span>
-        <select id="className" required>
-          <option value="">— kies —</option>
-          <option value="Alpha">Alpha</option>
-          <option value="Bravo">Bravo</option>
-          <option value="Charlie">Charlie</option>
-          <option value="Delta">Delta</option>
-        </select>
-      </label>
-    </div>
+  --dangerBg: rgba(255,59,59,.14);
+  --dangerBorder: rgba(255,59,59,.60);
 
-    <label class="field">
-      <span>Niveau</span>
-      <select id="difficulty">
-        <option value="Basic">Basic</option>
-        <option value="Standard" selected>Standard</option>
-        <option value="Advanced">Advanced</option>
-      </select>
-      <div class="muted small levelHelp">
-        <div><b>Basic:</b> bij een foute/onbegrepen vraag krijg je meteen een hint.</div>
-        <div><b>Standard:</b> hint pas na 2 missers.</div>
-        <div><b>Advanced:</b> geen hints.</div>
-      </div>
-    </label>
+  --visitorBubble: rgba(255,255,255,.08);
+  --visitorText: #d6d9e2;
 
-    <div class="row">
-      <button class="btn primary" id="btnStart">Start oefening</button>
-      <button class="btn" id="btnResetLocal" title="Verwijdert alleen lokaal opgeslagen data">Reset lokaal</button>
-    </div>
-  </section>
+  --studentBubble: rgba(25,118,210,.18);
+  --studentBorder: rgba(25,118,210,.55);
+  --studentText: #4aa3ff;
 
-  <!-- Screen 2: Training -->
-  <section class="card hidden" id="screen-train">
-    <div class="trainHead">
-      <div>
-        <div class="stepTitle" id="stepTitle">Start</div>
-        <div class="muted" id="stepHelp">Say hello to the visitor. Then continue with your questions in English.</div>
-      </div>
-      <div class="trainBtns">
-        <button class="btn" id="btnHint">Hint</button>
-        <button class="btn primary" id="btnDoneStep">I'm done with this step</button>
-      </div>
-    </div>
+  --radius: 18px;
+  --avatar: 72px;
 
-    <div class="gridTrain" id="trainGrid">
-      <!-- LEFT: conversation -->
-      <div class="panel convoPanel">
-        <div class="panelTitle">Conversation</div>
+  --gap: 12px;
+}
 
-        <div class="visitorRow">
-          <img id="visitorAvatar" class="visitorAvatar" alt="visitor" />
-          <div class="visitorCol">
-            <div class="bubble" id="visitorBubble">Ask your first question…</div>
-            <div id="visitorMood" class="visitorMood muted"></div>
-          </div>
-        </div>
+*{box-sizing:border-box}
+html,body{height:100%}
+html,body{margin:0;padding:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:var(--text)}
+body{
+  background: radial-gradient(1200px 800px at 30% 10%, var(--bg1), var(--bg0));
+}
 
-        <div class="studentRow">
-          <img id="studentAvatar" class="studentAvatar" alt="student" src="assets/photos/soldier.png" />
-          <div class="studentCol">
-            <div class="bubble me" id="studentBubble" style="display:none;"></div>
-          </div>
-        </div>
+/* Ensure selects are readable everywhere */
+select, option{
+  color: var(--text);
+  background: rgba(10,14,22,.92);
+}
 
-        <div class="panelTitle mt">Your question</div>
+/* Layout wrapper */
+.wrap{
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 18px;
+  min-height: 100vh;
+  display:flex;
+  flex-direction:column;
+  gap: 14px;
+}
 
-        <div class="inputBar">
-          <input id="studentInput" placeholder="Type your question in English…" />
-          <button class="btn primary" id="btnSend">Send</button>
-          <button class="btn" id="btnMicHold" type="button" title="Hold to talk">🎙 Hold</button>
-          <span class="micStatus" id="micStatus" aria-live="polite"></span>
-        </div>
+.topbar{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap: 12px;
+}
 
-        <div class="row actionBar">
-          <button class="btn" id="btnReturnVisitor" title="Return to visitor after supervisor response">Return</button>
-          <button class="btn" id="btnGoPersonSearch" title="Proceed to person search / pat-down">Go to person search</button>
-          <button class="btn danger" id="btnDenyEntrance" title="Deny entrance at any time">Deny entrance</button>
-        </div>
+.brand{display:flex; gap:12px; align-items:center}
+.logo{
+  width:44px;height:44px;border-radius:12px;
+  background:rgba(59,130,246,.18);
+  display:flex;align-items:center;justify-content:center;
+  font-weight:800;color:#93c5fd;
+  border:1px solid rgba(59,130,246,.35)
+}
+.title{font-size:18px;font-weight:800}
+.subtitle{font-size:12px;color:rgba(255,255,255,.60)}
+.meta{font-size:12px;color:rgba(255,255,255,.60)}
 
-        <div class="muted small">Tip: schrijf de antwoorden in je eigen boekje.</div>
+.card{
+  background: var(--panel);
+  border: 1px solid var(--panelBorder);
+  border-radius: var(--radius);
+  padding: 18px;
+  box-shadow: 0 18px 48px rgba(0,0,0,.35);
+}
 
-        <div class="divider"></div>
-        <div class="row">
-          <button class="btn" id="btnNewScenario">New scenario</button>
-          <button class="btn" id="btnFinishRun">Finish run</button>
-        </div>
-      </div>
+/* Screens */
+#screen-login{max-width: 900px}
+#screen-train{flex:1; display:flex; flex-direction:column; min-height: 0;}
+#screen-feedback{max-width: 900px}
 
-      <!-- RIGHT: ID card -->
-      <div class="panel" id="idPanel" aria-live="polite">
-        <div class="row" style="justify-content:space-between; align-items:center;">
-          <div class="panelTitle">ID Card</div>
-          <button class="btn small" id="btnCloseId" type="button">Close ID</button>
-        </div>
-        <canvas id="idCanvas" width="980" height="560" class="idCanvas"></canvas>
-        <div class="muted small" style="margin-top:8px;">
-          Ask control questions about name / nationality / DOB / age.
-        </div>
-      </div>
-    </div>
-  </section>
+h1{margin:0 0 10px 0;font-size:24px}
+h2{margin:0 0 10px 0;font-size:18px}
 
-  <!-- Screen 3: Feedback -->
-  <section class="card hidden" id="screen-feedback">
-    <h1>Feedback</h1>
-    <p class="muted">Hier staan je grootste 3 missers en wat je volgende keer kunt vragen.</p>
+.muted{color:var(--muted)}
+.small{font-size:12px}
 
-    <div class="feedbackBox">
-      <h2>Biggest 3 misses</h2>
-      <ul id="top3"></ul>
-    </div>
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.field{display:flex;flex-direction:column;gap:6px;margin:10px 0}
+.field input,.field select{
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,.16);
+  background: rgba(10,14,22,.92);
+  color: var(--text);
+  padding: 12px 14px;
+  outline: none;
+}
+.field input:focus,.field select:focus{border-color:rgba(90,160,255,.6)}
 
-    <details class="details" open>
-      <summary>All missed items</summary>
-      <div class="detailsBody" id="allMisses"></div>
-    </details>
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 
-    <div class="row">
-      <button class="btn" id="btnBackToStart">Back to start</button>
-      <button class="btn primary" id="btnDownloadCsv">Download CSV</button>
-    </div>
-  </section>
+.btn{
+  border-radius: 12px;
+  border: 1px solid var(--btnBorder);
+  background: var(--btnBg);
+  color: var(--text);
+  padding: 10px 12px;
+  cursor:pointer;
+}
+.btn:hover{border-color:rgba(255,255,255,.26)}
+.btn.primary{
+  background: rgba(59,130,246,.20);
+  border-color: rgba(59,130,246,.45);
+}
+.btn.primary:hover{border-color: rgba(59,130,246,.75)}
+.btn.small{padding:6px 10px; font-size:12px}
+.btn.subtle{opacity:.88}
+.btn.subtle:hover{opacity:1}
 
-  <!-- Supervisor modal (kept, but no button in UI; only text trigger) -->
-  <div class="modal hidden" id="supervisorModal" role="dialog" aria-modal="true">
-    <div class="modalCard">
-      <div class="modalHead">
-        <div class="modalTitle">Supervisor call (5W briefing)</div>
-        <button class="btn" id="btnCloseModal">Close</button>
-      </div>
+.btn.danger, #btnDenyEntrance{
+  background: var(--dangerBg);
+  border-color: var(--dangerBorder);
+  color: #fff;
+}
+.btn.danger:hover, #btnDenyEntrance:hover{filter:brightness(1.06)}
 
-      <p class="muted small">Fill in the 5W briefing (can be in Dutch). Then send to supervisor.</p>
+.hidden{display:none !important}
 
-      <div class="grid2">
-        <label class="field"><span>Who?</span><input id="wWho" placeholder="Naam bezoeker" /></label>
-        <label class="field"><span>What?</span><input id="wWhat" placeholder="Doel (delivery/inspection/etc.)" /></label>
-        <label class="field"><span>With whom?</span><input id="wWithWhom" placeholder="Host / contactpersoon" /></label>
-        <label class="field"><span>What time?</span><input id="wTime" placeholder="Bijv. 10:30" /></label>
-        <label class="field"><span>Why?</span><input id="wWhy" placeholder="Onderwerp / reden" /></label>
-      </div>
+.trainHead{
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.stepTitle{font-size:18px;font-weight:800}
+.trainBtns{display:flex;gap:10px}
 
-      <div class="row">
-        <button class="btn primary" id="btnSendSupervisor">Send to supervisor</button>
-        <button class="btn" id="btnBackToVisitor" type="button">Return to visitor</button>
-      </div>
+/* Grid: chat + ID */
+.gridTrain{
+  display:grid;
+  grid-template-columns: 1.25fr .75fr;
+  gap: 12px;
+  flex: 1;
+  min-height: 0; /* allow children to stretch */
+}
 
-      <div class="divider"></div>
-      <div class="muted small" id="supervisorResponse"></div>
-    </div>
-  </div>
+.panel{
+  background: rgba(10,14,22,.55);
+  border: 1px solid rgba(255,255,255,.10);
+  border-radius: var(--radius);
+  padding: 14px;
+  min-height: 0;
+}
+.panelTitle{font-weight:700;color:rgba(255,255,255,.86)}
+.mt{margin-top:12px}
 
-</main>
+.divider{height:1px;background:rgba(255,255,255,.12);margin:14px 0}
+.actionBar{margin-top:10px; gap:10px}
 
-<script src="config.js"></script>
-<script src="app.js"></script>
-</body>
-</html>
+/* FORCE: supervisor button hidden (you do not want it) */
+#btnContactSupervisor{display:none !important;}
+
+/* WhatsApp rows */
+.visitorRow, .studentRow{
+  display:flex;
+  gap: var(--gap);
+}
+
+.visitorRow{
+  align-items:flex-start; /* avatar aligns with bubble top */
+}
+
+.studentRow{
+  align-items:flex-start;
+  justify-content:flex-end;
+  flex-direction: row-reverse; /* avatar on the right */
+  margin-top: 12px;
+}
+
+.visitorAvatar, .studentAvatar{
+  width: var(--avatar);
+  height: var(--avatar);
+  border-radius: 50%;
+  object-fit: cover;
+  flex: 0 0 var(--avatar);
+  border: 1px solid rgba(255,255,255,.18);
+  background: rgba(255,255,255,.06);
+}
+
+.visitorCol, .studentCol{
+  flex:1 1 auto;
+  max-width: calc(100% - (var(--avatar) + 24px));
+}
+
+.bubble{
+  margin-top: 0;
+  border-radius: 14px;
+  padding: 12px 14px;
+  min-height: 54px;
+  display:flex;
+  align-items:center;
+  border: 1px solid rgba(255,255,255,.10);
+  background: rgba(255,255,255,.06);
+  white-space: pre-wrap;
+  line-height: 1.35;
+}
+
+#visitorBubble{
+  background: var(--visitorBubble);
+  color: var(--visitorText);
+}
+
+#studentBubble.bubble.me{
+  background: var(--studentBubble);
+  border-color: var(--studentBorder);
+  color: var(--studentText);
+  margin-left: auto;
+  max-width: 70%;
+}
+
+#visitorMood{
+  margin-top: 8px;
+  font-size: 13px;
+  color: rgba(255,255,255,.70);
+}
+
+/* Make the chat panel fill the screen nicely */
+#screen-train .panel:first-child{
+  display:flex;
+  flex-direction:column;
+  min-height: 0;
+}
+#screen-train .panel:first-child .panelTitle{margin-bottom: 6px}
+#screen-train .panel:first-child .row:last-child{margin-top:auto}
+
+/* Input row: full width */
+#studentInput{
+  flex: 1 1 auto;
+  min-width: 220px;
+}
+
+/* ID panel */
+#idPanel{display:none;} /* hidden until asked */
+body.id-visible #idPanel{display:block;}
+
+.idCanvas{
+  width:100%;
+  height:auto;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,.12);
+  background: #f5f5f5;
+}
+
+/* Keep ID readable but not huge */
+#idCanvas{
+  max-height: 520px;
+}
+
+/* Mobile: stack and show ID under chat when requested */
+@media (max-width: 900px){
+  .grid2{grid-template-columns:1fr}
+  .gridTrain{grid-template-columns: 1fr}
+  body.id-visible #idPanel{display:block;}
+}
+
+/* Modal */
+.modal{
+  position:fixed; inset:0;
+  background: rgba(0,0,0,.55);
+  display:flex; align-items:center; justify-content:center;
+  padding: 18px;
+  z-index: 9999;
+}
+.modal.hidden{display:none !important}
+.modalCard{
+  width:min(900px,100%);
+  background: rgba(10,14,22,.92);
+  border: 1px solid rgba(255,255,255,.14);
+  border-radius: var(--radius);
+  padding: 16px;
+  box-shadow: 0 20px 70px rgba(0,0,0,.55);
+}
+.modalHead{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.modalTitle{font-weight:800;font-size:18px}
+
+/* Feedback */
+.feedbackBox{
+  background: rgba(10,14,22,.55);
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: var(--radius);
+  padding: 14px;
+  margin: 12px 0;
+}
