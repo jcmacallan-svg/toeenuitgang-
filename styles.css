@@ -1,81 +1,48 @@
-/* =========================================================
-   VEVA — WhatsApp style (clean, single source of truth)
-   ========================================================= */
+/* =========================
+   VEVA — CLEAN WhatsApp UI
+   ========================= */
 
 *{box-sizing:border-box}
-html,body{
-  margin:0;
-  padding:0;
-  font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
-  color:rgba(255,255,255,.92);
-  background: radial-gradient(1200px 800px at 30% 10%, rgba(30,80,160,.40), #070c16);
-}
-
+html,body{margin:0;padding:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
 :root{
-  --panel: rgba(255,255,255,.06);
-  --panelBorder: rgba(255,255,255,.10);
-  --muted: rgba(255,255,255,.65);
+  --bg:#070c16;
+  --panel:rgba(255,255,255,.06);
+  --panelBorder:rgba(255,255,255,.10);
+  --text:rgba(255,255,255,.92);
+  --muted:rgba(255,255,255,.65);
 
-  --visitorBubble: rgba(255,255,255,.08);
-  --visitorText: #d6d9e2;
+  --visitorBubble:rgba(255,255,255,.08);
+  --visitorText:#d6d9e2;
 
-  --studentBubble: rgba(25,118,210,.18);
-  --studentBorder: rgba(25,118,210,.55);
-  --studentText: #4aa3ff;
+  --studentBubble:rgba(25,118,210,.18);
+  --studentBorder:rgba(25,118,210,.55);
+  --studentText:#4aa3ff;
 
-  --dangerBg: rgba(255,59,59,.14);
-  --dangerBorder: rgba(255,59,59,.55);
+  --dangerBg:rgba(255,59,59,.14);
+  --dangerBorder:rgba(255,59,59,.55);
 
-  --avatar: 72px;
-  --radius: 16px;
+  --avatar:72px;
 }
 
-/* Layout shell */
+html,body{
+  background: radial-gradient(1200px 800px at 30% 10%, rgba(30,80,160,.40), var(--bg));
+  color:var(--text);
+}
+
 .wrap{max-width:1100px;margin:0 auto;padding:18px}
-.topbar{
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-  gap:12px;
-  margin-bottom:16px;
-}
-.brand{display:flex;gap:12px;align-items:center}
-.logo{
-  width:44px;height:44px;border-radius:12px;
-  background:rgba(59,130,246,.2);
-  display:flex;align-items:center;justify-content:center;
-  font-weight:800;color:#93c5fd;border:1px solid rgba(59,130,246,.35)
-}
-.title{font-size:18px;font-weight:800}
-.meta{font-size:12px;color:rgba(255,255,255,.65)}
-.btn{
-  border-radius:12px;
-  border:1px solid rgba(255,255,255,.14);
-  background:rgba(0,0,0,.18);
-  color:rgba(255,255,255,.92);
-  padding:10px 12px;
-  cursor:pointer;
-}
-.btn:hover{border-color:rgba(255,255,255,.22)}
-.btn.primary{
-  background:rgba(59,130,246,.20);
-  border-color:rgba(59,130,246,.45)
-}
-.btn.primary:hover{border-color:rgba(59,130,246,.70)}
-.btn.danger{
-  background:var(--dangerBg);
-  border-color:var(--dangerBorder);
-  color:#fff;
-}
-.btn.danger:hover{filter:brightness(1.08)}
-.btn.small{padding:6px 10px;font-size:12px}
-.btn.subtle{opacity:.85}
-.btn.subtle:hover{opacity:1}
 
+/* Topbar */
+.topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+.brand{display:flex;gap:12px;align-items:center}
+.logo{width:44px;height:44px;border-radius:12px;background:rgba(59,130,246,.2);display:flex;align-items:center;justify-content:center;font-weight:800;color:#93c5fd;border:1px solid rgba(59,130,246,.35)}
+.title{font-size:18px;font-weight:800}
+.meta{font-size:12px;color:var(--muted)}
+
+/* Cards */
 .card{
   background:var(--panel);
   border:1px solid var(--panelBorder);
-  border-radius:var(--radius);
+  border-radius:16px;
   padding:18px;
   box-shadow:0 10px 30px rgba(0,0,0,.25);
   margin-bottom:16px;
@@ -84,60 +51,76 @@ html,body{
 
 h1{margin:0 0 10px 0;font-size:22px}
 h2{margin:0 0 10px 0;font-size:18px}
+
 .muted{color:var(--muted)}
 .small{font-size:12px}
-.hidden{display:none}
 
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:900px){.grid2{grid-template-columns:1fr}}
+
 .field{display:flex;flex-direction:column;gap:6px;margin:10px 0}
 .field input,.field select{
-  border-radius:12px;border:1px solid rgba(255,255,255,.14);
-  background:rgba(0,0,0,.18);
-  color:rgba(255,255,255,.92);
-  padding:10px 12px;outline:none
+  border-radius:12px;
+  border:1px solid rgba(148,163,184,.25);
+  background:rgba(0,0,0,.20);
+  color:var(--text);
+  padding:10px 12px;
+  outline:none;
 }
 .field input:focus,.field select:focus{border-color:rgba(59,130,246,.7)}
+
 .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 
-.details{margin-top:12px}
-.details summary{cursor:pointer;color:rgba(255,255,255,.78)}
-.detailsBody{margin-top:10px;color:rgba(255,255,255,.78)}
+/* Buttons */
+.btn{
+  border-radius:12px;
+  border:1px solid rgba(148,163,184,.25);
+  background:rgba(0,0,0,.20);
+  color:var(--text);
+  padding:10px 12px;
+  cursor:pointer
+}
+.btn:hover{border-color:rgba(148,163,184,.5)}
+.btn.primary{background:rgba(59,130,246,.2);border-color:rgba(59,130,246,.45)}
+.btn.primary:hover{border-color:rgba(59,130,246,.8)}
 
+.btn.danger, #btnDenyEntrance{
+  background:var(--dangerBg) !important;
+  border-color:var(--dangerBorder) !important;
+  color:#fff !important;
+}
+.btn.danger:hover, #btnDenyEntrance:hover{filter:brightness(1.08)}
+
+.hidden{display:none}
+
+/* Training layout */
 .trainHead{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
 .stepTitle{font-size:18px;font-weight:800}
-.trainBtns{display:flex;gap:10px;flex-wrap:wrap}
+.trainBtns{display:flex;gap:10px}
 
-/* Training grid: chat + ID panel */
 .gridTrain{
   display:grid;
-  grid-template-columns: 1.25fr .75fr;
+  grid-template-columns:1.2fr .8fr;
   gap:12px;
   margin-top:12px;
 }
+@media(max-width:900px){
+  .gridTrain{grid-template-columns:1fr}
+}
+
 .panel{
   background:rgba(0,0,0,.18);
-  border:1px solid rgba(255,255,255,.10);
-  border-radius:var(--radius);
+  border:1px solid rgba(148,163,184,.2);
+  border-radius:16px;
   padding:14px;
 }
-.panelTitle{font-weight:700;color:rgba(255,255,255,.85)}
-.mt{margin-top:12px}
-.divider{height:1px;background:rgba(255,255,255,.10);margin:14px 0}
-.actionBar{margin-top:10px;gap:10px}
+.panelTitle{font-weight:700;color:rgba(255,255,255,.80)}
 
-/* WhatsApp rows: visitor left, student right */
-.visitorRow{
+/* WhatsApp rows */
+.visitorRow, .studentRow{
   display:flex;
   gap:12px;
-  align-items:flex-start; /* align avatar with bubble top */
-}
-.studentRow{
-  display:flex;
-  gap:12px;
-  align-items:flex-end;
-  justify-content:flex-end;
-  flex-direction: row-reverse; /* avatar right */
-  width:100%;
+  align-items:flex-start; /* important: align avatar with bubble, not mood line */
 }
 
 .visitorAvatar, .studentAvatar{
@@ -152,27 +135,35 @@ h2{margin:0 0 10px 0;font-size:18px}
 
 .visitorCol, .studentCol{
   flex:1 1 auto;
-  max-width: calc(100% - (var(--avatar) + 24px));
+  max-width:calc(100% - (var(--avatar) + 24px));
 }
 
-/* Bubbles (single bubble, overwritten each time) */
+/* Student row: avatar right */
+.studentRow{
+  justify-content:flex-end;
+  flex-direction:row-reverse;
+  width:100%;
+}
+.studentCol{display:flex;justify-content:flex-end;width:100%}
+
+/* Bubbles */
 .bubble{
-  margin-top:2px;
+  margin-top:0;
   border-radius:14px;
   padding:12px;
   min-height:54px;
   display:flex;
   align-items:center;
   line-height:1.35;
-  white-space:pre-wrap;
   border:1px solid rgba(255,255,255,.10);
 }
 
-#visitorBubble{
+#visitorBubble.bubble{
   background:var(--visitorBubble);
   color:var(--visitorText);
 }
-#studentBubble{
+
+#studentBubble.bubble.me{
   background:var(--studentBubble);
   border-color:var(--studentBorder);
   color:var(--studentText);
@@ -180,49 +171,34 @@ h2{margin:0 0 10px 0;font-size:18px}
   max-width:70%;
 }
 
+/* Mood text under visitor bubble */
 #visitorMood{
   margin-top:6px;
   font-size:13px;
   color:rgba(255,255,255,.70);
 }
 
-/* Input row */
-#studentInput{
-  width:100%;
-  min-height:44px;
-  font-size:16px;
-  padding:10px 12px;
-}
-
-/* Mic */
+/* Mic button */
 .micStatus{margin-left:10px; opacity:.9; font-size:0.95em}
 #btnMicHold{user-select:none; -webkit-user-select:none; touch-action:none}
 #btnMicHold.listening{outline:2px solid rgba(120,180,255,.55)}
 
-/* ID panel: inline, hidden until asked */
-#idPanel{ display:none; }
-#idCanvas{
+/* Action bar */
+.actionBar{margin-top:10px; gap:10px}
+
+/* SUPER IMPORTANT: supervisor button never visible */
+#btnContactSupervisor{display:none !important}
+
+/* ID panel (INLINE, not fullscreen) */
+#idPanel{display:none;} /* app.js shows it only when needed */
+
+.idCanvas{
   width:100%;
   height:auto;
   border-radius:14px;
-  border:1px solid rgba(255,255,255,.12);
+  border:1px solid rgba(148,163,184,.18);
   background:#f5f5f5;
-  max-height: 420px;
+  max-height:420px; /* prevent huge take-over */
 }
 
-/* Footer */
 .footer{display:flex;justify-content:center;padding:10px 0}
-
-/* Modal */
-.modal{position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:18px;z-index:9999}
-.modalCard{width:min(900px,100%);background:rgba(0,0,0,.30);border:1px solid rgba(255,255,255,.14);border-radius:16px;padding:16px;box-shadow:0 20px 60px rgba(0,0,0,.45)}
-.modalHead{display:flex;justify-content:space-between;align-items:center;gap:10px}
-.modalTitle{font-weight:800;font-size:18px}
-.modal.hidden{display:none !important}
-
-/* Mobile: single column; ID goes under chat when shown */
-@media(max-width:900px){
-  .grid2{grid-template-columns:1fr}
-  .gridTrain{grid-template-columns:1fr}
-  #idCanvas{max-height:300px}
-}
