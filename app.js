@@ -25,10 +25,8 @@
     return m ? Number(m[1]) : null;
   }
 
-  function formatDob({ yyyy, mm, dd }) {
-    const z2 = (n) => (n < 10 ? "0" + n : "" + n);
-    return `${yyyy}-${z2(mm)}-${z2(dd)}`;
-  }
+  function z2(n) { return n < 10 ? "0" + n : "" + n; }
+  function formatDob({ yyyy, mm, dd }) { return `${yyyy}-${z2(mm)}-${z2(dd)}`; }
 
   function calcAgeFromDob(dobObj) {
     const today = new Date();
@@ -43,12 +41,14 @@
   async function logEvent(type, payload = {}) {
     if (!LOG_ENDPOINT) return;
     const body = JSON.stringify({ ts: nowIso(), type, ...payload });
-    try { await fetch(LOG_ENDPOINT, { method: "POST", mode: "no-cors", body }); } catch {}
+    try {
+      await fetch(LOG_ENDPOINT, { method: "POST", mode: "no-cors", body });
+    } catch {}
   }
 
-  // =========================
+  // -----------------------------
   // Visitor generation
-  // =========================
+  // -----------------------------
   const MOODS = [
     { key: "relaxed", text: "The visitor looks relaxed and confident.", lieBoost: 0.02, inconsBoost: 0.02 },
     { key: "tired", text: "The visitor looks tired but cooperative.", lieBoost: 0.05, inconsBoost: 0.05 },
@@ -62,9 +62,14 @@
     "Polish", "Romanian", "Turkish", "British", "American", "Canadian"
   ];
 
-  const NAMES = [
+  const FIRST_NAMES = [
     "David", "Michael", "James", "Robert", "Daniel", "Thomas",
     "Mark", "Lucas", "Noah", "Adam", "Omar", "Yusuf", "Mateusz", "Julien", "Marco"
+  ];
+
+  const LAST_NAMES = [
+    "Johnson", "Miller", "Brown", "Davis", "Martinez",
+    "Kowalski", "Nowak", "Schmidt", "Dubois", "Rossi", "Yilmaz"
   ];
 
   function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
@@ -91,12 +96,122 @@
     return { yyyy: y, mm, dd };
   }
 
+  function buildIntakeStory(purpose, appointment, meetingWith, apptTime) {
+    const withLine = meetingWith ? ` with ${meetingWith}` : "";
+    const timeLine = apptTime ? ` at ${apptTime}` : "";
+    const appointmentLine = appointment
+      ? `It was arranged in advance${withLine}${timeLine}.`
+      : "I don’t have an appointment. I was told to come to the gate and ask for approval.";
+
+    if (purpose === "delivery") {
+      const items = pick([
+        "replacement radio batteries",
+        "IT equipment and sealed documentation",
+        "vehicle parts that were ordered last week",
+        "a locked case with tools for the workshop",
+        "medical supplies that are time-sensitive"
+      ]);
+      const reason = pick([
+        "there was a shortage reported last week",
+        "an inspection is scheduled and they need the parts today",
+        "the unit requested a fast replacement",
+        "the workshop reported a malfunction and needs the spare parts",
+        "the logistics office asked for urgent resupply"
+      ]);
+      return {
+        purposeLine: "I’m here for a delivery.",
+        subjectLong: `I’m delivering ${items}. ${appointmentLine} The reason is: ${reason}.`,
+        whereLine: pick(["Logistics office", "Workshop", "HQ building", "Barracks admin"])
+      };
+    }
+
+    if (purpose === "maintenance") {
+      const job = pick([
+        "a scheduled maintenance check on network cabinets",
+        "a safety inspection of fire extinguishers",
+        "a calibration check on security sensors",
+        "a repair on a gate camera system",
+        "a routine check on the alarm panel"
+      ]);
+      const reason = pick([
+        "it’s part of the monthly safety routine",
+        "there were faults reported yesterday",
+        "the last inspection flagged an issue to be resolved",
+        "a contractor ticket was created and I’m assigned to it",
+        "the system gave repeated error messages"
+      ]);
+      return {
+        purposeLine: "I’m here for maintenance.",
+        subjectLong: `I’m here to do ${job}. ${appointmentLine} The reason is: ${reason}.`,
+        whereLine: pick(["Security office", "Technical building", "HQ building", "Workshop"])
+      };
+    }
+
+    if (purpose === "meeting") {
+      const topic = pick([
+        "a contract discussion",
+        "a security briefing",
+        "paperwork and access arrangements",
+        "a project update and planning",
+        "an onboarding check for a new contractor pass"
+      ]);
+      const reason = pick([
+        "it was scheduled to confirm details and signatures",
+        "they asked me to go through the next steps in person",
+        "we need approval before work can start",
+        "there were changes and we need to align on the plan",
+        "we need to clarify access rules for the coming weeks"
+      ]);
+      return {
+        purposeLine: "I’m here for a meeting.",
+        subjectLong: `The meeting is about ${topic}. ${appointmentLine} The reason is: ${reason}.`,
+        whereLine: pick(["HQ building", "Administration office", "Security office"])
+      };
+    }
+
+    if (purpose === "visit") {
+      const who = pick(["a friend who works here", "a relative on duty", "someone I’m checking in with"]);
+      const reason = pick([
+        "they asked me to bring some personal items",
+        "we arranged it earlier and I’m following the instructions",
+        "I was told to report to the desk first",
+        "it’s a short visit and I’ll leave straight after",
+        "I was asked to come today specifically"
+      ]);
+      return {
+        purposeLine: "I’m here for a visit.",
+        subjectLong: `I’m here to visit ${who}. ${appointmentLine} The reason is: ${reason}.`,
+        whereLine: pick(["Barracks admin", "Reception", "HQ building"])
+      };
+    }
+
+    // contract work fallback
+    const job = pick([
+      "contract work for the technical team",
+      "a short task for logistics",
+      "a scheduled support job",
+      "a delivery + handover",
+      "site work that needs approval"
+    ]);
+    const reason = pick([
+      "I was assigned to the task order",
+      "they called my office to come in",
+      "the work can’t be postponed",
+      "it’s required for operational readiness",
+      "they need it done today"
+    ]);
+    return {
+      purposeLine: "I’m here for contract work.",
+      subjectLong: `I’m here for ${job}. ${appointmentLine} The reason is: ${reason}.`,
+      whereLine: pick(["HQ building", "Logistics office", "Workshop"])
+    };
+  }
+
   function buildVisitor() {
     const mood = pick(MOODS);
     const dob = randomDob();
     const nat = pick(NATIONALITIES);
-    const last = pick(["Johnson", "Miller", "Brown", "Davis", "Martinez", "Kowalski", "Nowak", "Schmidt", "Dubois", "Rossi", "Yilmaz"]);
-    const name = pick(NAMES) + " " + last;
+    const name = pick(FIRST_NAMES) + " " + pick(LAST_NAMES);
     const age = calcAgeFromDob(dob);
 
     const idx = 1 + Math.floor(Math.random() * 12);
@@ -107,69 +222,55 @@
     const meetingWith = appointment ? pick(["Captain Lewis", "Sgt. van Dijk", "Mr. Peters", "Lt. Schmidt"]) : null;
 
     const purpose = pick(["delivery", "maintenance", "meeting", "visit", "contract work"]);
-    const goingWhere = pick(["HQ building", "Logistics office", "Barracks admin", "Workshop"]);
-    const subject = pick(["paperwork", "equipment handover", "maintenance report", "security briefing", "contract discussion"]);
+    const story = buildIntakeStory(purpose, appointment, meetingWith, apptTime);
 
     return {
       mood,
       headshot,
       id: { name, nationality: nat, dob, age, idNumber: randomIdNumber(), expiry: randomExpiry() },
-      intake: { purpose, appointment, apptTime, meetingWith, goingWhere, subject },
+      intake: {
+        purpose,
+        purposeLine: story.purposeLine,
+        appointment,
+        apptTime,
+        meetingWith,
+        goingWhere: story.whereLine,
+        subjectLong: story.subjectLong
+      },
       claims: { age: null, dob: null, nationality: null, name: null },
       inconsistencies: [],
-      idShown: false
+      idShown: false,
+      opening: {
+        askedHelp: false,
+        explainedNeed: false
+      }
     };
   }
 
-  // =========================
-  // Intents (ruimer)
-  // =========================
-  function compilePatterns(extra) {
+  // -----------------------------
+  // Intents (wider patterns)
+  // -----------------------------
+  function compilePatterns(extraPhrasebank) {
     const base = {
-      // Opening / help offer
+      // Greetings / smalltalk
+      greet: [
+        /\b(hello|hi|hey|good\s+morning|good\s+afternoon|good\s+evening)\b/i
+      ],
       offer_help: [
-        /\b(sure|of\s+course|yes)\b.*\b(help|assist)\b/i,
+        /\b(sure|of\s+course|okay)\b.*\b(help|assist)\b/i,
         /\bhow\s+can\s+i\s+help\s+you\b/i,
-        /\bwhat\s+can\s+i\s+help\s+you\s+with\b/i,
         /\bwhat\s+can\s+i\s+do\s+for\s+you\b/i,
-        /\bcan\s+i\s+help\s+you\b/i,
-        /\bhow\s+may\s+i\s+help\b/i,
-        /\bwhat\s+do\s+you\s+need\b/i
+        /\bwhat\s+do\s+you\s+need\b/i,
+        /\bhow\s+may\s+i\s+help\b/i
       ],
 
-      // ID
-      ask_id: [
-        /\b(can|could|may)\s+i\s+(see|check|verify|inspect|look\s+at)\s+(your|ur)\s+(id|identification|passport|card)\b/i,
-        /\b(show|present)\s+(me\s+)?(your|ur)\s+(id|identification|passport|card)\b/i,
-        /\b(id|identification|passport)\s+(please|pls)\b/i,
-        /\bdo\s+you\s+(have|carry)\s+(an?\s+)?(id|identification|passport)\b/i,
-        /\bcan\s+you\s+provide\s+(an?\s+)?(id|identification)\b/i,
-        /\blet\s+me\s+(see|check)\s+(your|ur)\s+(id|identification)\b/i
-      ],
-
-      return_id: [
-        /\bhere\s+(is|are)\s+(your|ur)\s+(id|card|identification|passport)\s+back\b/i,
-        /\b(return|give)\s+(it|the\s+(id|card|identification|passport))\s+back\b/i,
-        /\byou\s+can\s+have\s+(your|ur)\s+(id|card|passport)\s+back\b/i
-      ],
-
-      // Supervisor / boss
-      contact_supervisor: [
-        /\b(i\s*(will|’ll|'ll|need\s+to|have\s+to|must|may\s+need\s+to)\s+)?(contact|call|ring|phone|speak\s+to|talk\s+to|ask)\s+(my\s+)?(supervisor|boss|manager|team\s*leader|officer)\b/i,
-        /\b(i\s*(will|’ll|'ll)\s+)?(have\s+to|need\s+to|must)\s+ask\s+(my\s+)?(supervisor|boss|manager)\b/i,
-        /\b(i\s+)?need\s+(approval|authori[sz]ation|permission)\b/i,
-        /\bfor\s+(approval|authori[sz]ation|permission)\b/i
-      ],
-
-      // 5W/5WH
       ask_name: [
         /\bwhat\s*(is|'s)\s+your\s+name\b/i,
         /\bcan\s+i\s+have\s+your\s+name\b/i,
         /\bmay\s+i\s+have\s+your\s+name\b/i,
         /\byour\s+name\s*,?\s+please\b/i,
         /\bstate\s+your\s+name\b/i,
-        /\bwho\s+are\s+you\b/i,
-        /\bwhat\s+should\s+i\s+call\s+you\b/i
+        /\bwho\s+are\s+you\b/i
       ],
 
       ask_purpose: [
@@ -177,7 +278,6 @@
         /\bwhat\s+are\s+you\s+here\s+for\b/i,
         /\bwhy\s+are\s+you\s+here\b/i,
         /\bwhat\s+brings\s+you\s+here\b/i,
-        /\bstate\s+your\s+purpose\b/i,
         /\breason\s+for\s+(your\s+)?visit\b/i
       ],
 
@@ -194,7 +294,6 @@
         /\bwho\s+is\s+(your\s+)?(appointment|meeting)\s+with\b/i,
         /\bwho\s+are\s+you\s+meeting\b/i,
         /\bwho\s+is\s+your\s+contact\b/i,
-        /\bwho\s+is\s+expecting\s+you\b/i,
         /\bwith\s+whom\s+is\s+your\s+(meeting|appointment)\b/i,
         /\bwith\s+who\s+is\s+your\s+(meeting|appointment)\b/i
       ],
@@ -203,49 +302,59 @@
         /\bwhat\s+time\s+is\s+(your\s+)?(appointment|meeting)\b/i,
         /\bwhen\s+is\s+(your\s+)?(appointment|meeting)\b/i,
         /\bwhat\s+time\s+are\s+you\s+expected\b/i,
-        /\bwhen\s+are\s+you\s+expected\b/i,
-        /\bwhat\s+time\s+did\s+they\s+tell\s+you\b/i
+        /\bwhen\s+are\s+you\s+expected\b/i
       ],
 
       ask_where: [
         /\bwhere\s+are\s+you\s+going\b/i,
         /\bwhat\s+is\s+your\s+destination\b/i,
         /\bwhich\s+(building|unit|office|department|area)\b/i,
-        /\bwhere\s+is\s+the\s+(meeting|appointment)\b/i,
-        /\bwhere\s+will\s+you\s+go\b/i
+        /\bwhere\s+is\s+the\s+(meeting|appointment)\b/i
       ],
 
       ask_subject: [
         /\bwhat\s+is\s+(this|it|the\s+visit|the\s+meeting)\s+about\b/i,
         /\bwhat\s+will\s+you\s+discuss\b/i,
-        /\bwhat\s+are\s+you\s+here\s+to\s+discuss\b/i,
-        /\bcan\s+you\s+tell\s+me\s+more\s+about\s+(the\s+)?(meeting|visit|delivery|work)\b/i,
-        /\bwhat\s+is\s+the\s+reason\s+for\s+(the\s+)?(meeting|visit|delivery)\b/i,
-        /\bwhy\s+is\s+(the\s+)?(meeting|visit|delivery)\b/i
+        /\bcan\s+you\s+tell\s+me\s+more\s+about\s+(the\s+)?(meeting|visit)\b/i,
+        /\bwhat\s+is\s+your\s+meeting\s+about\b/i,
+        /\bwhy\s+is\s+the\s+meeting\b/i
       ],
 
-      // Control
+      ask_id: [
+        /\b(can|could|may)\s+i\s+(see|check|verify|inspect|look\s+at)\s+(your|ur)\s+(id|identification|passport|card)\b/i,
+        /\b(show|present)\s+(me\s+)?(your|ur)\s+(id|identification|passport|card)\b/i,
+        /\b(id|identification)\s+(please|pls)\b/i,
+        /\bdo\s+you\s+(have|carry)\s+(an?\s+)?(id|identification|passport)\b/i
+      ],
+
+      return_id: [
+        /\bhere\s+(is|are)\s+(your|ur)\s+(id|card|identification|passport)\s+back\b/i,
+        /\byou\s+can\s+have\s+(your|ur)\s+(id|card|passport)\s+back\b/i,
+        /\b(return|give)\s+(it|the\s+(id|card|passport|identification))\s+back\b/i
+      ],
+
+      contact_supervisor: [
+        /\b(i\s*(will|’ll|'ll|need\s+to|have\s+to|must)\s+)?(contact|call|ring|phone|speak\s+to|talk\s+to|ask)\s+(my\s+)?(supervisor|boss|manager|team\s*leader|officer)\b/i,
+        /\b(i\s+)?need\s+(approval|authori[sz]ation|permission)\b/i,
+        /\bfor\s+(approval|authori[sz]ation|permission)\b/i
+      ],
+
       ask_age: [
         /\bhow\s+old\s+are\s+you\b/i,
         /\bwhat\s+is\s+your\s+age\b/i,
-        /\bwhat\s+age\s+are\s+you\b/i,
-        /\bmay\s+i\s+ask\s+your\s+age\b/i,
-        /\bcan\s+you\s+confirm\s+your\s+age\b/i
+        /\bwhat\s+age\s+are\s+you\b/i
       ],
 
       ask_dob: [
         /\bwhat\s*(is|'s)\s+your\s+(date\s+of\s+birth|dob)\b/i,
         /\bdate\s+of\s+birth\b/i,
         /\bdob\b/i,
-        /\bwhen\s+were\s+you\s+born\b/i,
-        /\bcan\s+you\s+confirm\s+your\s+date\s+of\s+birth\b/i
+        /\bwhen\s+were\s+you\s+born\b/i
       ],
 
       confirm_born_year: [
         /\bwere\s+you\s+born\s+in\s+(19\d{2}|20\d{2})\b/i,
-        /\bwere\s+you\s+born\s+around\s+(19\d{2}|20\d{2})\b/i,
-        /\bis\s+your\s+birth\s+year\s+(19\d{2}|20\d{2})\b/i,
-        /\byour\s+birth\s+year\s+is\s+(19\d{2}|20\d{2})\s*\?\s*$/i
+        /\bis\s+your\s+birth\s+year\s+(19\d{2}|20\d{2})\b/i
       ],
 
       ask_nationality: [
@@ -256,35 +365,27 @@
         /\bwhat\s+is\s+your\s+citizenship\b/i
       ],
 
-      // Person search / pat-down
       go_person_search: [
         /\b(go\s+to|start|begin|proceed\s+to)\s+(the\s+)?(person\s+search|pat[-\s]?down|frisk|search)\b/i,
-        /\b(i\s+will|we\s+will|i\s+am\s+going\s+to|we\s+are\s+going\s+to)\s+(pat\s+you\s+down|search\s+you|do\s+a\s+pat[-\s]?down)\b/i,
-        /\b(person\s+search|pat[-\s]?down)\s+now\b/i
+        /\b(i\s+will|we\s+will|i\s+am\s+going\s+to|we\s+are\s+going\s+to)\s+(pat\s+you\s+down|search\s+you|do\s+a\s+pat[-\s]?down)\b/i
       ],
 
-      // Deny
       deny: [
         /\bdeny\s+(entrance|entry|access)\b/i,
         /\b(refuse|reject)\s+(entry|access)\b/i,
         /\byou\s+cannot\s+enter\b/i,
         /\byou\s+may\s+not\s+enter\b/i,
-        /\bnot\s+allowed\s+to\s+enter\b/i,
-        /\bi\s+(am\s+)?(denying|refusing)\s+(entry|access)\b/i
-      ],
-
-      // Smalltalk / greetings
-      smalltalk: [
-        /\bhello\b/i, /\bhi\b/i, /\bhey\b/i,
-        /\bgood\s+(morning|afternoon|evening)\b/i
+        /\bnot\s+allowed\s+to\s+enter\b/i
       ]
     };
 
+    // Merge optional phrasebank patterns (strings => RegExp)
     const merged = { ...base };
+    if (extraPhrasebank && typeof extraPhrasebank === "object") {
+      const intentsObj = extraPhrasebank.intents && typeof extraPhrasebank.intents === "object"
+        ? extraPhrasebank.intents
+        : null;
 
-    // phrasebank merge (optioneel)
-    if (extra) {
-      const intentsObj = extra.intents && typeof extra.intents === "object" ? extra.intents : null;
       const addPatterns = (key, arr) => {
         if (!arr || !Array.isArray(arr)) return;
         merged[key] = merged[key] || [];
@@ -302,12 +403,13 @@
           if (v && Array.isArray(v.patterns)) addPatterns(k, v.patterns);
         }
       } else {
-        for (const [k, v] of Object.entries(extra)) {
+        for (const [k, v] of Object.entries(extraPhrasebank)) {
           if (Array.isArray(v)) addPatterns(k, v);
         }
       }
     }
 
+    // Compile
     const compiled = {};
     for (const [k, arr] of Object.entries(merged)) {
       compiled[k] = (text) => arr.some(rx => rx.test(text || ""));
@@ -326,35 +428,37 @@
     }
   }
 
+  const INTENT_ORDER = [
+    "deny",
+    "ask_id",
+    "return_id",
+    "contact_supervisor",
+    "go_person_search",
+    "ask_age",
+    "ask_dob",
+    "confirm_born_year",
+    "ask_nationality",
+    "ask_name",
+    "ask_purpose",
+    "ask_appointment",
+    "ask_who",
+    "ask_time",
+    "ask_where",
+    "ask_subject",
+    "offer_help",
+    "greet"
+  ];
+
   function matchIntent(intents, text) {
-    const t = text || "";
-    const order = [
-      "deny",
-      "return_id",
-      "ask_id",
-      "contact_supervisor",
-      "go_person_search",
-      "offer_help",
-      "ask_name",
-      "ask_purpose",
-      "ask_appointment",
-      "ask_who",
-      "ask_time",
-      "ask_where",
-      "ask_subject",
-      "ask_age",
-      "ask_dob",
-      "confirm_born_year",
-      "ask_nationality",
-      "smalltalk"
-    ];
-    for (const k of order) if (intents?.[k] && intents[k](t)) return k;
+    for (const k of INTENT_ORDER) {
+      if (intents[k] && intents[k](text)) return k;
+    }
     return "unknown";
   }
 
-  // =========================
-  // UI helpers: ONLY LAST BUBBLES
-  // =========================
+  // -----------------------------
+  // UI helpers (single-bubble)
+  // -----------------------------
   function setVisitorBubble(text) {
     const bubble = $id("visitorBubble");
     if (bubble) bubble.textContent = text || "";
@@ -370,37 +474,50 @@
     bubble.style.display = text ? "" : "none";
   }
 
-  // =========================
-  // ID overlay helpers
-  // =========================
-  function openIdOverlay() {
-    document.body.classList.add("id-open");
+  function showIdPanel() {
     const panel = $id("idPanel");
     if (panel) panel.style.display = "block";
   }
-
-  function closeIdOverlay() {
-    document.body.classList.remove("id-open");
+  function hideIdPanel() {
     const panel = $id("idPanel");
     if (panel) panel.style.display = "none";
   }
 
-  // =========================
+  function ensureCloseIdButton() {
+    const panel = $id("idPanel");
+    if (!panel) return;
+    if ($id("btnCloseId")) return;
+
+    const btn = document.createElement("button");
+    btn.className = "btn small";
+    btn.type = "button";
+    btn.id = "btnCloseId";
+    btn.textContent = "Close ID";
+    btn.style.marginBottom = "10px";
+    panel.insertBefore(btn, panel.firstChild);
+    btn.addEventListener("click", hideIdPanel);
+  }
+
+  // -----------------------------
   // ID Canvas
-  // =========================
+  // -----------------------------
   function drawIdCard(visitor) {
+    ensureCloseIdButton();
+    showIdPanel();
+
     const canvas = $id("idCanvas");
     if (!canvas) return;
-
-    openIdOverlay();
 
     const ctx = canvas.getContext("2d");
     const W = canvas.width, H = canvas.height;
 
     ctx.clearRect(0, 0, W, H);
+
+    // Card background
     ctx.fillStyle = "#f4f6fb";
     ctx.fillRect(0, 0, W, H);
 
+    // Header bar
     ctx.fillStyle = "#163a66";
     ctx.fillRect(0, 0, W, 92);
 
@@ -412,11 +529,13 @@
     ctx.fillStyle = "rgba(255,255,255,0.85)";
     ctx.fillText("Checkpoint Access Card", 34, 80);
 
+    // Photo box
     ctx.fillStyle = "#e8ecf5";
     ctx.fillRect(34, 128, 190, 240);
     ctx.strokeStyle = "rgba(0,0,0,0.12)";
     ctx.strokeRect(34, 128, 190, 240);
 
+    // Text fields
     const v = visitor.id;
     const rows = [
       ["Name", v.name],
@@ -437,6 +556,7 @@
       y += 44;
     }
 
+    // Barcode-ish footer
     ctx.fillStyle = "#111827";
     for (let i = 0; i < 140; i++) {
       const x = 34 + i * 5;
@@ -449,6 +569,7 @@
     ctx.font = "14px system-ui, -apple-system, Segoe UI, Roboto, Arial";
     ctx.fillText("Valid only for stated purpose. Subject to search and denial.", 34, H - 22);
 
+    // Face image
     const img = new Image();
     img.onload = () => {
       ctx.save();
@@ -457,15 +578,17 @@
       ctx.clip();
       ctx.drawImage(img, 0, 0, img.width, img.height, 34, 128, 190, 240);
       ctx.restore();
+
       ctx.strokeStyle = "rgba(0,0,0,0.12)";
       ctx.strokeRect(34, 128, 190, 240);
     };
+    img.onerror = () => {};
     img.src = visitor.headshot;
   }
 
-  // =========================
-  // Control answers (lie/inconsistency)
-  // =========================
+  // -----------------------------
+  // Control answers (lies/inconsistency)
+  // -----------------------------
   function makeFakeControl(visitor, kind) {
     if (kind === "age") {
       const delta = pick([-2, -1, 1, 2, 3]);
@@ -478,7 +601,7 @@
       return formatDob(dob);
     }
     if (kind === "nationality") return pick(NATIONALITIES.filter(n => n !== visitor.id.nationality));
-    if (kind === "name") return pick(NAMES) + " " + pick(["Johnson", "Miller", "Brown", "Davis", "Rossi", "Schmidt"]);
+    if (kind === "name") return pick(FIRST_NAMES) + " " + pick(LAST_NAMES);
     return "";
   }
 
@@ -518,14 +641,14 @@
     return { value: truth, lied: false, inconsistent: false };
   }
 
-  // =========================
+  // -----------------------------
   // Required checkpoints for feedback
-  // =========================
+  // -----------------------------
   const REQUIRED = [
     { key: "asked_name", label: "You didn’t ask the visitor’s name.", example: "What is your name, please?" },
     { key: "asked_purpose", label: "You didn’t ask the purpose of the visit.", example: "What is the purpose of your visit today?" },
     { key: "asked_appointment", label: "You didn’t confirm the appointment.", example: "Do you have an appointment?" },
-    { key: "asked_who", label: "You didn’t ask who they are meeting.", example: "Who are you meeting?" },
+    { key: "asked_who", label: "You didn’t ask who they are meeting.", example: "Who are you here to see?" },
     { key: "asked_time", label: "You didn’t confirm the time.", example: "What time is your appointment?" },
     { key: "asked_where", label: "You didn’t confirm where they are going.", example: "Where are you going on base?" },
     { key: "asked_subject", label: "You didn’t ask what the meeting is about.", example: "What is your meeting about?" },
@@ -537,9 +660,9 @@
     { key: "did_person_search", label: "You didn’t complete the person search step.", example: "I’m going to do a quick pat-down search. Is that okay?" }
   ];
 
-  // =========================
+  // -----------------------------
   // App State
-  // =========================
+  // -----------------------------
   const state = {
     runId: uid(),
     student: { name: "", className: "", difficulty: "" },
@@ -561,10 +684,7 @@
       did_person_search: false
     },
     finished: false,
-    unknowns: 0,
-    opening: {
-      visitorAskedHelp: false
-    }
+    unknowns: 0
   };
 
   function showScreen(which) {
@@ -572,7 +692,6 @@
     const b = $id("screen-train");
     const c = $id("screen-feedback");
     if (!a || !b || !c) return;
-
     a.classList.toggle("hidden", which !== "login");
     b.classList.toggle("hidden", which !== "train");
     c.classList.toggle("hidden", which !== "feedback");
@@ -586,35 +705,11 @@
   }
 
   function resetBubbles() {
-    setVisitorBubble("Ask your first question…");
+    setVisitorBubble("…");
     setStudentBubble("");
     setVisitorMood(state.visitor?.mood?.text || "");
   }
 
-  // Supervisor modal
-  function openSupervisorModal() {
-    const modal = $id("supervisorModal");
-    if (!modal) return;
-    modal.classList.remove("hidden");
-
-    const v = state.visitor;
-    $id("wWho").value = v?.id?.name || "";
-    $id("wWhat").value = v?.intake?.purpose || "";
-    $id("wWithWhom").value = v?.intake?.meetingWith || "";
-    $id("wTime").value = v?.intake?.apptTime || "";
-    $id("wWhy").value = v?.intake?.subject || "";
-
-    const resp = $id("supervisorResponse");
-    if (resp) resp.textContent = "";
-  }
-
-  function closeSupervisorModal() {
-    const modal = $id("supervisorModal");
-    if (!modal) return;
-    modal.classList.add("hidden");
-  }
-
-  // Conversation (last bubble only)
   function visitorSays(text, moodLine = null) {
     setVisitorBubble(text);
     if (moodLine !== null) setVisitorMood(moodLine);
@@ -622,134 +717,6 @@
 
   function studentSays(text) {
     setStudentBubble(text);
-  }
-
-  function handleBornYearConfirm(userText) {
-    const yearAsked = parseYear(userText);
-    if (!yearAsked) {
-      visitorSays("Sorry, could you repeat the year?");
-      return;
-    }
-
-    const v = state.visitor;
-    const claim = visitorControlAnswer(v, "dob");
-    const claimYear = parseYear(claim.value) || v.id.dob.yyyy;
-    const trueYear = v.id.dob.yyyy;
-
-    if (yearAsked === claimYear) {
-      visitorSays("Yes, that’s correct.");
-      if (claim.lied) setVisitorMood("The visitor looks a bit stressed.");
-      return;
-    }
-
-    visitorSays("No, that’s not correct.");
-
-    if (yearAsked === trueYear && claim.lied) {
-      visitorSays(`Actually… you’re right. I was born in ${trueYear}. Sorry.`);
-      v.claims.dob = formatDob(v.id.dob);
-      return;
-    }
-
-    visitorSays(`I was born in ${claimYear}.`);
-  }
-
-  // Richer answers
-  function intakeAnswer(kind) {
-    const v = state.visitor;
-    const a = v.intake;
-
-    if (kind === "name") return `My name is ${v.id.name}.`;
-
-    if (kind === "purpose") {
-      const map = {
-        delivery: [
-          "I’m here to deliver equipment for your unit.",
-          "I’m delivering a package for Logistics.",
-          "I’m here for a scheduled delivery to the base."
-        ],
-        maintenance: [
-          "I’m here for maintenance work.",
-          "I’m here to repair and service equipment on site.",
-          "I’m here to carry out maintenance in the Workshop."
-        ],
-        meeting: [
-          "I’m here for a meeting on base.",
-          "I’m here to attend a meeting with staff.",
-          "I’m here for a scheduled meeting."
-        ],
-        visit: [
-          "I’m here to visit someone on the base.",
-          "I’m here as a visitor.",
-          "I’m here for a visit."
-        ],
-        "contract work": [
-          "I’m here for contract work.",
-          "I’m here as a contractor to do some work on site.",
-          "I’m here for contract-related tasks."
-        ]
-      };
-      return pick(map[a.purpose] || ["I’m here for official business."]);
-    }
-
-    if (kind === "appointment") {
-      if (a.appointment) return "Yes, I have an appointment.";
-      return "No, I don’t have an appointment. It was short notice and I was told to come anyway.";
-    }
-
-    if (kind === "who") {
-      if (a.meetingWith) return `I’m meeting ${a.meetingWith}.`;
-      // no appointment: make it plausible
-      return "I don’t have a named contact, I was told to report to the duty desk / reception.";
-    }
-
-    if (kind === "time") {
-      if (a.apptTime) return `It’s at ${a.apptTime}.`;
-      return "I don’t have an exact time. I was told to come as soon as possible today.";
-    }
-
-    if (kind === "where") {
-      return `I’m going to the ${a.goingWhere}.`;
-    }
-
-    // MEETING ABOUT / WHY (richer story)
-    if (kind === "subject") {
-      const who = a.meetingWith ? `with ${a.meetingWith}` : "with your staff";
-      const place = a.goingWhere ? `at the ${a.goingWhere}` : "on site";
-
-      const stories = {
-        delivery: [
-          `It’s about a delivery that was requested last week. There was a shortage reported, so I’m bringing the replacement parts and the paperwork. I need to hand it over ${who} ${place}.`,
-          `I’m delivering equipment that was pre-arranged earlier this month. The unit needed it for an inspection and asked us to bring it urgently. I also have documents to sign when I arrive ${place}.`,
-          `It’s a scheduled logistics handover. The base requested these items after a previous delivery was incomplete, so I’m bringing the missing items and confirmation documents.`
-        ],
-        maintenance: [
-          `It’s about maintenance work. There was an issue reported and I’m here to inspect it, fix it, and write a maintenance report afterwards. I was told to check in ${place} first.`,
-          `It’s about servicing equipment that failed during routine checks. I need to inspect the system, replace a component, and confirm it’s operational again before I leave.`,
-          `It’s a follow-up on an earlier problem. The issue wasn’t fully resolved last time, so I’m here to finish the job and document the work.`
-        ],
-        meeting: [
-          `It’s a scheduled meeting ${who}. We need to discuss ${a.subject} and confirm next steps. After that, I will leave the site.`,
-          `It’s about ${a.subject}. It was arranged in advance so we can review the situation and agree on the plan.`,
-          `It’s a short briefing and paperwork. I’m here to clarify details and make sure everything is approved.`
-        ],
-        visit: [
-          `I’m visiting someone stationed here. I was told to check in first and then I’ll go ${place}. I’m not here for any work.`,
-          `It’s a personal visit. I’ll stay with my host and follow the base rules, then I’ll leave again.`,
-          `I’m here to visit a friend/colleague. I don’t have any equipment with me—just personal items.`
-        ],
-        "contract work": [
-          `It’s about contract work. My company is supporting your unit, and I’m here to do the agreed tasks and report back. I was told to sign in and then go ${place}.`,
-          `It’s about a scheduled contract job. We’re here because something needs to be inspected and documented for compliance.`,
-          `It’s contract work that was arranged earlier. I need to complete the work, get a signature, and then I’ll leave the base.`
-        ]
-      };
-
-      return pick(stories[a.purpose] || [
-        `It’s about official business ${place}. I was told to check in first and then continue to my destination.`
-      ]);
-    }
-
-    return "Okay.";
   }
 
   function showFeedback() {
@@ -783,6 +750,51 @@
     finishRun("denied");
   }
 
+  function intakeAnswer(kind) {
+    const v = state.visitor;
+    const a = v.intake;
+
+    if (kind === "name") return `My name is ${v.id.name}.`;
+    if (kind === "purpose") return a.purposeLine || `I’m here for ${a.purpose}.`;
+    if (kind === "appointment") return a.appointment ? "Yes, I have an appointment." : "No, I don’t have an appointment.";
+    if (kind === "who") return a.meetingWith ? `I’m meeting ${a.meetingWith}.` : "I’m not meeting anyone specific.";
+    if (kind === "time") return a.apptTime ? `It’s at ${a.apptTime}.` : "I don’t have a specific time.";
+    if (kind === "where") return `I’m going to the ${a.goingWhere}.`;
+    if (kind === "subject") return a.subjectLong || "It’s about some paperwork.";
+    return "Okay.";
+  }
+
+  function handleBornYearConfirm(userText) {
+    const yearAsked = parseYear(userText);
+    if (!yearAsked) {
+      visitorSays("Sorry, could you repeat the year?");
+      return;
+    }
+
+    const v = state.visitor;
+    const claim = visitorControlAnswer(v, "dob");
+    const claimYear = parseYear(claim.value) || v.id.dob.yyyy;
+    const trueYear = v.id.dob.yyyy;
+
+    if (yearAsked === claimYear) {
+      visitorSays("Yes, that’s correct.");
+      return;
+    }
+
+    visitorSays("No, that’s not correct.");
+
+    if (yearAsked === trueYear && claim.lied) {
+      visitorSays(`Actually… you’re right. I was born in ${trueYear}. Sorry.`);
+      v.claims.dob = formatDob(v.id.dob);
+      return;
+    }
+
+    visitorSays(`I was born in ${claimYear}.`);
+  }
+
+  // -----------------------------
+  // Core conversation
+  // -----------------------------
   function handleMessage(text) {
     if (state.finished) return;
     const t = (text || "").trim();
@@ -791,31 +803,33 @@
     studentSays(t);
     logEvent("message", { runId: state.runId, from: "student", text: t });
 
-    // Greeting logic
-    const isHello = /\b(hello|hi|hey|good\s+morning|good\s+afternoon|good\s+evening)\b/i.test(t);
-    if (isHello) {
-      visitorSays("Can you help me?", state.visitor.mood.text);
-      state.opening.visitorAskedHelp = true;
-      setStep("Start", "Answer the visitor and then ask the 5W/5WH questions.");
-      return;
-    }
-
     const intent = matchIntent(state.intents, t);
 
-    if (intent === "deny") { denyEntrance(); return; }
-
-    // Return ID hides overlay
-    if (intent === "return_id") {
-      closeIdOverlay();
-      visitorSays("Thank you.", state.visitor.mood.text);
+    // Deny always
+    if (intent === "deny") {
+      denyEntrance();
       return;
     }
 
-    // Offer help (your missing piece)
+    // Greeting flow:
+    // Visitor starts with "Hello."
+    // If student greets => visitor "Can you help me?"
+    if (intent === "greet") {
+      if (!state.visitor.opening.askedHelp) {
+        state.visitor.opening.askedHelp = true;
+        visitorSays("Can you help me?", state.visitor.mood.text);
+        setStep("Intake", "You can respond and then ask 5W/5WH (name, purpose, appointment, who, time, where, meeting about).");
+      } else {
+        visitorSays("Hello.", state.visitor.mood.text);
+      }
+      return;
+    }
+
+    // If student offers help / asks how to help => visitor explains need
     if (intent === "offer_help") {
-      // visitor requested help earlier, but we also allow it anytime
+      state.visitor.opening.explainedNeed = true;
       visitorSays("I need to get onto the base.", state.visitor.mood.text);
-      setStep("Intake", "Now ask the 5W/5WH questions (name, purpose, appointment, who, time, where, subject).");
+      setStep("Intake", "Ask the 5W/5WH questions (name, purpose, appointment, who, time, where, meeting about).");
       return;
     }
 
@@ -825,16 +839,25 @@
       state.visitor.idShown = true;
       visitorSays("Yes. Here you go.", state.visitor.mood.text);
       drawIdCard(state.visitor);
-      setStep("ID check", "Check the ID details and ask control questions (DOB, age, nationality).");
+      setStep("ID check", "Check ID details. Ask control questions (DOB, age, nationality).");
       logEvent("show_id", { runId: state.runId });
       return;
     }
 
-    // Supervisor via TEXT
+    // Return ID
+    if (intent === "return_id") {
+      hideIdPanel();
+      visitorSays("Thank you.", state.visitor.mood.text);
+      return;
+    }
+
+    // Supervisor via text
     if (intent === "contact_supervisor") {
       state.flags.supervisor_contacted = true;
       visitorSays("Okay. Please contact your supervisor.", state.visitor.mood.text);
-      openSupervisorModal();
+      // keep your existing modal flow if present
+      const modal = $id("supervisorModal");
+      if (modal) modal.classList.remove("hidden");
       setStep("Supervisor", "Fill the 5W briefing. Then continue.");
       logEvent("supervisor_trigger", { runId: state.runId, source: "text" });
       return;
@@ -847,20 +870,17 @@
       visitorSays(`I’m ${a.value} years old.`, state.visitor.mood.text);
       return;
     }
-
     if (intent === "ask_dob") {
       state.flags.asked_dob = true;
       const a = visitorControlAnswer(state.visitor, "dob");
       visitorSays(`My date of birth is ${a.value}.`, state.visitor.mood.text);
       return;
     }
-
     if (intent === "confirm_born_year") {
       state.flags.asked_dob = true;
       handleBornYearConfirm(t);
       return;
     }
-
     if (intent === "ask_nationality") {
       state.flags.asked_nationality = true;
       const a = visitorControlAnswer(state.visitor, "nationality");
@@ -889,6 +909,7 @@
       return;
     }
 
+    // Person search
     if (intent === "go_person_search") {
       state.flags.did_person_search = true;
       visitorSays("Yes, that’s okay.", state.visitor.mood.text);
@@ -902,9 +923,9 @@
     if (LOG_UNKNOWN) logEvent("unknown_question", { runId: state.runId, text: t });
   }
 
-  // =========================
+  // -----------------------------
   // Voice (hold-to-talk)
-  // =========================
+  // -----------------------------
   function setupVoice() {
     const btn = $id("btnMicHold");
     const status = $id("micStatus");
@@ -928,6 +949,7 @@
     function startRec() {
       if (listening) return;
       finalText = "";
+
       rec = new SpeechRecognition();
       rec.lang = VOICE_LANG;
       rec.interimResults = true;
@@ -940,7 +962,8 @@
           if (e.results[i].isFinal) finalText += txt;
           else interim += txt;
         }
-        input.value = (finalText + " " + interim).trim();
+        const combined = (finalText + " " + interim).trim();
+        input.value = combined;
       };
 
       rec.onerror = () => setStatus("Mic error.");
@@ -978,52 +1001,51 @@
     btn.addEventListener("touchend", (e) => { e.preventDefault(); stopRec(); }, { passive: false });
   }
 
-  // =========================
-  // Init
-  // =========================
+  // -----------------------------
+  // Init / wiring
+  // -----------------------------
   async function init() {
+    // Teacher button can be hidden (optional)
     const teacherBtn = $id("btnTeacher");
     if (teacherBtn) teacherBtn.style.display = (CONFIG.showTeacherButton === false) ? "none" : "";
 
-    const supBtn = $id("btnContactSupervisor");
-    if (supBtn) supBtn.style.display = "none";
-
+    // Load phrasebank patterns (optional)
     const pb = await loadPhrasebank();
     state.intents = compilePatterns(pb);
 
+    // Ensure ID close button exists if ID panel exists
+    ensureCloseIdButton();
+    hideIdPanel();
+
+    // Start at login
     showScreen("login");
 
-    const btnStart = $id("btnStart");
-    const btnReset = $id("btnResetLocal");
-
-    btnReset?.addEventListener("click", () => {
+    // Login buttons
+    $id("btnResetLocal")?.addEventListener("click", () => {
       localStorage.removeItem("veva_runs");
       alert("Lokaal gereset.");
     });
 
-    btnStart?.addEventListener("click", async () => {
+    $id("btnStart")?.addEventListener("click", async () => {
       const name = ($id("studentName")?.value || "").trim();
       const cls = ($id("className")?.value || "").trim();
       const diff = ($id("difficulty")?.value || "Standard").trim();
 
-      if (!name) { alert("Vul je naam in."); return; }
+      if (!name) {
+        alert("Vul je naam in.");
+        return;
+      }
 
       state.student = { name, className: cls, difficulty: diff };
       state.runId = uid();
       state.finished = false;
       state.unknowns = 0;
-      state.opening.visitorAskedHelp = false;
-
-      state.flags = {
-        asked_name: false, asked_purpose: false, asked_appointment: false, asked_who: false,
-        asked_time: false, asked_where: false, asked_subject: false, asked_id: false,
-        asked_age: false, asked_dob: false, asked_nationality: false,
-        supervisor_contacted: false, did_person_search: false
-      };
+      state.flags = Object.fromEntries(Object.keys(state.flags).map(k => [k, false]));
 
       state.visitor = buildVisitor();
+      hideIdPanel();
 
-      // avatars
+      // Avatars
       const vA = $id("visitorAvatar");
       if (vA) {
         vA.src = state.visitor.headshot;
@@ -1032,24 +1054,20 @@
       const sA = $id("studentAvatar");
       if (sA) sA.src = "assets/photos/soldier.png";
 
-      // mood line
-      setVisitorMood(state.visitor.mood.text);
-
-      // hide ID overlay at start
-      closeIdOverlay();
-
-      // meta header
+      // Meta
       const meta = $id("meta");
       if (meta) meta.textContent = `${name}${cls ? " · " + cls : ""} · ${diff} · Run ${state.runId.slice(0, 6)}`;
 
+      // Go to training
       showScreen("train");
       resetBubbles();
 
-      await logEvent("start", { runId: state.runId, student: state.student, mood: state.visitor.mood.key });
-
-      // Opening: visitor says Hello only (you wanted that)
+      // Opening
+      setVisitorMood(state.visitor.mood.text);
       visitorSays("Hello.", state.visitor.mood.text);
-      setStep("Start", "Say hello to the visitor. Then respond and ask the 5W/5WH questions.");
+      setStep("Start", "Say hello. Then respond and ask 5W/5WH. (English only)");
+
+      await logEvent("start", { runId: state.runId, student: state.student, mood: state.visitor.mood.key });
     });
 
     // Training controls
@@ -1070,19 +1088,18 @@
       }
     });
 
-    $id("btnDenyEntrance")?.addEventListener("click", () => denyEntrance());
+    $id("btnDenyEntrance")?.addEventListener("click", denyEntrance);
 
     $id("btnNewScenario")?.addEventListener("click", () => {
       showScreen("login");
       state.finished = false;
-      closeIdOverlay();
     });
 
     $id("btnFinishRun")?.addEventListener("click", () => finishRun("manual_finish"));
 
     $id("btnHint")?.addEventListener("click", () => {
       visitorSays(
-        "Try: Hello. / How can I help you? / What is your name? / What is the purpose of your visit? / Do you have an appointment?",
+        "Try: What is your name? / What is the purpose of your visit? / Do you have an appointment? / What is your meeting about?",
         state.visitor?.mood?.text || ""
       );
     });
@@ -1105,21 +1122,13 @@
       finishRun("completed");
     });
 
-    $id("btnReturnVisitor")?.addEventListener("click", () => {
-      visitorSays("Okay.", state.visitor?.mood?.text || "");
-    });
-
-    // Supervisor modal
-    $id("btnCloseModal")?.addEventListener("click", closeSupervisorModal);
-    $id("btnBackToVisitor")?.addEventListener("click", () => {
-      closeSupervisorModal();
-      visitorSays("Okay.", state.visitor?.mood?.text || "");
-    });
-
+    // Supervisor modal (if present)
+    $id("btnCloseModal")?.addEventListener("click", () => $id("supervisorModal")?.classList.add("hidden"));
+    $id("btnBackToVisitor")?.addEventListener("click", () => $id("supervisorModal")?.classList.add("hidden"));
     $id("btnSendSupervisor")?.addEventListener("click", () => {
       const resp = $id("supervisorResponse");
       if (resp) resp.textContent = "Supervisor response: Approved. Proceed with additional checks.";
-      closeSupervisorModal();
+      $id("supervisorModal")?.classList.add("hidden");
       visitorSays("Understood.", state.visitor?.mood?.text || "");
     });
 
