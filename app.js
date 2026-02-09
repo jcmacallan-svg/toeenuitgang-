@@ -282,11 +282,13 @@ function computeMeetingTime(){
 // SUPERVISOR_TRIGGER_V42
 function isSupervisorTrigger(raw){
   const t = norm(raw || "");
-  // normalize common contraction: i'll -> ill
-  const tt = t.replace(/i['’]ll/g, "ill");
+  // normalize common contractions
+  const tt = t.replace(/i['’]ll/g, "ill").replace(/i['’]d/g, "id");
   return (
     /\bill\s+(contact|call)\s+(my\s+)?supervisor\b/.test(tt) ||
+    /\bid\s+like\s+to\s+(contact|call)\s+(my\s+)?supervisor\b/.test(tt) ||
     /\bi\s+will\s+(contact|call)\s+(my\s+)?supervisor\b/.test(tt) ||
+    /\bi\s+would\s+like\s+to\s+(contact|call)\s+(my\s+)?supervisor\b/.test(tt) ||
     /\bcontact\s+(my\s+)?supervisor\b/.test(tt) ||
     /\bcall\s+(my\s+)?supervisor\b/.test(tt)
   );
@@ -486,7 +488,7 @@ function getDobISO(card){
     // formats like "27 Nov 1978" or "27/11/1978" or "27-11-1978"
     const m2 = v.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
     if(m2){
-      const day = int(m2[1]); const mm = int(m2[2]); const year = int(m2[3]);
+      const day = parseInt(m2[1],10); const mm = parseInt(m2[2],10); const year = parseInt(m2[3],10);
       if(year && mm && day) return `${year}-${String(mm).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
     }
   }catch(e){}
@@ -599,37 +601,42 @@ function responseForControlQuestion(userText, card, state){
   // If the student proposes a wrong value, sometimes correct, sometimes accept (then allow challenge)
   const correctChance = (typeof moodMistakeRate === "function" && state) ? Math.max(0.55, 1 - moodMistakeRate(state)) : 0.7;
 
-  if(wantsDob && card && card.id && card.id.dob){
-    const correctDob = formatDob(card.id.dob);
-    const hasYear = /\b(19|20)\d{2}\b/.test(t);
-    const year = (card.id.dob || "").slice(0,4);
-    // If they mention a year and it's not the correct year -> mismatch
-    if(hasYear && year && !t.includes(year)){
-      if(Math.random() < correctChance){
-        return `No, my date of birth is ${correctDob}.`;
+  if(wantsDob && card){
+    const dobIso = (typeof getDobISO === "function") ? getDobISO(card) : (card.id && card.id.dob ? card.id.dob : null);
+    if(dobIso){
+      const correctDob = formatDob(dobIso);
+      const hasYear = /\b(19|20)\d{2}\b/.test(t);
+      const year = (dobIso || "").slice(0,4);
+      if(hasYear && year && !t.includes(year)){
+        if(Math.random() < correctChance){
+          return `No, my date of birth is ${correctDob}.`;
+        }
+        if(state){
+          state.lastWrongAccepted = { type:"dob", correct: correctDob };
+        }
+        return "Yes, that's right.";
       }
-      if(state){
-        state.lastWrongAccepted = { type:"dob", correct: correctDob };
-      }
-      return "Yes, that's right.";
+      return `My date of birth is ${correctDob}.`;
     }
-    // otherwise answer normally
-    return `My date of birth is ${correctDob}.`;
   }
 
-  if(wantsAge && card && card.id && String(card.id.age)){
-    const correctAge = String(card.id.age);
-    const n = (t.match(/\b(\d{2})\b/)||[])[1];
-    if(n && n !== correctAge){
-      if(Math.random() < correctChance){
-        return `No, I'm actually ${correctAge}.`;
+  if(wantsAge && card){
+    const dobIso = (typeof getDobISO === "function") ? getDobISO(card) : null;
+    const computed = (typeof safeAgeFromCard === "function") ? safeAgeFromCard(card) : null;
+    const correctAge = (card.id && card.id.age != null && String(card.id.age).trim() !== "") ? String(card.id.age).trim() : (computed != null ? String(computed) : null);
+    if(correctAge){
+      const n = (t.match(/\b(\d{2,3})\b/)||[])[1];
+      if(n && n !== correctAge){
+        if(Math.random() < correctChance){
+          return `No, I'm actually ${correctAge}.`;
+        }
+        if(state){
+          state.lastWrongAccepted = { type:"age", correct: correctAge };
+        }
+        return "Yes, that's right.";
       }
-      if(state){
-        state.lastWrongAccepted = { type:"age", correct: correctAge };
-      }
-      return "Yes, that's right.";
+      return `I'm ${correctAge} years old.`;
     }
-    return `I'm ${correctAge} years old.`;
   }
 
   if(wantsNationality && card && card.id && card.id.nationality){
@@ -2099,10 +2106,21 @@ function initSpeechRecognition(state){
     setStatus("Processing…");
     try{
       rec.stop();
-    }catch(e){}
+    }catch(e){
+      // Some browsers throw if stop is called too quickly; fall back to abort.
+      try{ rec.abort(); }catch(_e){}
+    }
+    // Safety: clear "Processing…" even if onend doesn't fire (browser quirks)
+    setTimeout(() => {
+      try{
+        if(status && status.textContent && status.textContent.toLowerCase().includes("processing")){
+          setStatus("");
+        }
+      }catch(e){}
+    }, 1600);
   }
 
-  rec.onresult = (e) => {
+rec.onresult = (e) => {
     interimText = "";
     for(let i = e.resultIndex; i < e.results.length; i++){
       const r = e.results[i];
@@ -2279,4 +2297,22 @@ function denyEntrance(state){
   if(sa){
     sa.onerror = () => { sa.style.display = "none"; };
   }
+})()
+
+// Equalize avatar sizes (visitor + soldier) for consistent chat look
+(function(){
+  try{
+    const va = $("#visitorAvatar");
+    const sa = $("#studentAvatar");
+    const size = "44px";
+    [va, sa].forEach(img => {
+      if(img){
+        img.style.width = size;
+        img.style.height = size;
+        img.style.borderRadius = "50%";
+        img.style.objectFit = "cover";
+      }
+    });
+  }catch(e){}
 })();
+;
