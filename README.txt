@@ -1,12 +1,9 @@
-VEVA Trainer baseline v2
+VEVA Trainer baseline v4
 
-Changes:
-- Visitor avatar is ALWAYS the same file as the ID headshot (1:1 sync).
-- Student avatar uses assets/soldier.png (your existing file).
+Asset paths:
+- Student avatar: assets/photos/soldier.png
+- Headshots: assets/photos/headshot_01.png .. headshot_10.png
 
-Required assets in your repo:
-- assets/soldier.png
-- assets/headshots/headshot_01.png ... headshot_10.png
-
-Notes:
-- The visitor avatar automatically switches to the currently generated headshot.
+Visitor avatar is ALWAYS the same file as the ID headshot (1:1 sync).
+Drop these files into your repo root:
+- index.html, styles.css, config.js, app.js

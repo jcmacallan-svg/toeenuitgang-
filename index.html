@@ -9,7 +9,6 @@
 
 <body>
   <div class="app" id="app">
-    <!-- Sidebar / Controls -->
     <aside class="sidebar" aria-label="Controls">
       <div class="brand">
         <div class="brand__title">VEVA Checkpoint</div>
@@ -24,7 +23,6 @@
 
       <div class="divider" role="separator" aria-hidden="true"></div>
 
-      <!-- ID panel: inline onder de divider, niet fullscreen -->
       <section class="idSlot" aria-label="ID Slot">
         <div class="idCardWrap" id="idCardWrap" hidden>
           <div class="idCard" role="group" aria-label="ID Card">
@@ -56,7 +54,6 @@
 
       <div class="divider divider--spacer" role="separator" aria-hidden="true"></div>
 
-      <!-- Difficulty / Hints -->
       <section class="settings" aria-label="Training Settings">
         <label class="label" for="difficulty">Difficulty</label>
         <select class="select" id="difficulty">
@@ -69,9 +66,7 @@
       </section>
     </aside>
 
-    <!-- Main -->
     <main class="main">
-      <!-- Top bar -->
       <header class="topbar">
         <div class="topbar__left">
           <div class="pill">Last-bubble-only</div>
@@ -82,30 +77,24 @@
         </div>
       </header>
 
-      <!-- Screen: Training -->
       <section class="screen screen--active" id="screenTraining" aria-label="Training Screen">
         <div class="chat">
-          <!-- Visitor -->
           <div class="msg msg--left">
-            <!-- Visitor avatar MUST match the ID headshot 1:1 -->
-            <img class="avatar" id="visitorAvatar" src="assets/headshots/headshot_01.png" alt="Visitor avatar" />
+            <img class="avatar" id="visitorAvatar" src="assets/photos/headshot_01.png" alt="Visitor avatar" />
             <div class="bubbleCol">
               <div class="bubble bubble--visitor" id="visitorBubble">Hello.</div>
               <div class="mood" id="moodLine">The visitor looks neutral.</div>
             </div>
           </div>
 
-          <!-- Student -->
           <div class="msg msg--right">
             <div class="bubbleCol bubbleCol--right">
               <div class="bubble bubble--student" id="studentBubble">Hold-to-talk or type below.</div>
             </div>
-            <!-- Student avatar uses soldier.png -->
-            <img class="avatar" id="studentAvatar" src="assets/soldier.png" alt="Student avatar" />
+            <img class="avatar" id="studentAvatar" src="assets/photos/soldier.png" alt="Student avatar" />
           </div>
         </div>
 
-        <!-- Input -->
         <div class="inputBar">
           <div class="holdWrap">
             <button class="btn btn--mic" id="holdToTalk" type="button" aria-label="Hold to talk">
@@ -121,7 +110,6 @@
         </div>
       </section>
 
-      <!-- Screen: Person Search (placeholder) -->
       <section class="screen" id="screenPersonSearch" aria-label="Person Search Screen">
         <div class="placeholder">
           <h2>Person Search (later)</h2>
@@ -130,7 +118,6 @@
         </div>
       </section>
 
-      <!-- Screen: Return (placeholder) -->
       <section class="screen" id="screenReturn" aria-label="Return Screen">
         <div class="placeholder">
           <h2>Return</h2>
