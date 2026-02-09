@@ -280,3 +280,55 @@ select option{ color: var(--text); background:#0b1220; }
   .gridTrain{ grid-template-columns: 1fr; }
   #idCanvas{ max-height: 360px; }
 }
+/* ============================
+   FIX: full-height chat + ID panel visibility
+   Plak ONDERAAN styles.css
+   ============================ */
+
+/* 1) Laat de training grid de hele viewport gebruiken */
+.gridTrain{
+  min-height: calc(100vh - 140px) !important; /* header + padding marge */
+  align-items: stretch !important;
+}
+
+/* 2) Maak de LINKER panel (waar chat in zit) een flex-kolom die kan groeien
+   (werkt zonder extra IDs in HTML) */
+.gridTrain > .panel:first-child{
+  display: flex !important;
+  flex-direction: column !important;
+  min-height: 0 !important;
+}
+
+/* 3) Chatbox neemt nu de beschikbare ruimte */
+.chatWrap{
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  max-height: none !important;       /* BELANGRIJK: weg met 360px limiet */
+  overflow: auto !important;
+}
+
+/* 4) Zet je input/knoppen onderaan (als ze in dezelfde panel zitten) */
+.actionBar,
+.row.actionBar,
+#actionBar{
+  margin-top: 12px !important;
+}
+
+/* 5) ID panel: standaard verborgen, maar toonbaar via body.show-id */
+#idPanel{ display: none; }
+
+/* Als JS body class zet, MOET het zichtbaar worden (geen !important conflicts) */
+body.show-id #idPanel{
+  display: block !important;
+}
+
+/* ID canvas wat groter/leesbaarder maar niet fullscreen */
+#idCanvas{
+  width: 100% !important;
+  height: auto !important;
+  max-height: 520px !important;
+}
+
+/* Op mobiel: ID panel onder de chat in 1 kolom */
+@media (max-width: 900px){
+  .gridTrain{ grid-template-columns: 1fr !
