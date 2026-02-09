@@ -1,22 +1,18 @@
-/* app.js — VEVA Ingang/Uitgang Trainer (static, GitHub Pages)
-   v2026-02-09c
-
-   Fixes:
-   - No TDZ crash (STEPS defined before app state)
-   - Supervisor "Contact supervisor" UI element is hard-hidden everywhere (incl. quick replies/legacy UI)
-   - Reliable text trigger: "I will contact my supervisor" (and variants) opens supervisor modal
-   - Born-year questions dynamic: "Were you born in <ID-year>?" + "born in 93?" supported
-   - Deny always works (ends run after short delay)
-   - Person search navigation reliable
-   - Prevents ASI/IIFE concatenation errors ("intermediate value is not a function")
-   - Avatar equalizer included (safe) for both legacy IDs and new UI
-
-   Notes:
-   - Fully static; logging via window.APP_CONFIG.logEndpoint
-*/
-
 ;(() => {
   "use strict";
+
+  /***********************
+   * VEVA app.js — clean rebuild (2026-02-09)
+   * - No supervisor button in UI
+   * - Supervisor modal only via text trigger
+   * - Born-year confirmation uses actual ID year (or claimed/lie)
+   * - Deny always works + finish run
+   * - Person search always works
+   * - Logging uses no-cors to avoid Apps Script CORS/preflight issues
+   ***********************/
+
+  const APP_VERSION = "veva-clean-v1-2026-02-09";
+  console.log("[VEVA]", APP_VERSION, "loaded");
 
   /***********************
    * CONFIG + UTIL
@@ -27,9 +23,6 @@
 
   const $ = (sel, root = document) => root.querySelector(sel);
   const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
-
-  // Optional: expose minimal selector helper so legacy snippets won't crash
-  if (!window.$) window.$ = $;
 
   const nowIso = () => new Date().toISOString();
   const uid = () => Math.random().toString(16).slice(2) + "-" + Date.now().toString(16);
@@ -47,33 +40,10 @@
   }
 
   function sleep(ms) { return new Promise(res => setTimeout(res, ms)); }
-  function chance(p) { return Math.random() < clamp(p, 0, 1); }
 
   function parseYear(text) {
     const m = (text || "").match(/\b(19\d{2}|20\d{2})\b/);
     return m ? Number(m[1]) : null;
-  }
-
-  // NEW: supports "born in 93" + prefers 4-digit
-  function parseBornYearFlexible(text) {
-    const t = (text || "").toLowerCase();
-
-    const y4 = t.match(/\b(19\d{2}|20\d{2})\b/);
-    if (y4) return Number(y4[1]);
-
-    const ctx =
-      /\bborn\s+in\b/.test(t) ||
-      /\bwere\s+you\s+born\s+in\b/.test(t) ||
-      /\byou\s+were\s+born\s+in\b/.test(t);
-
-    if (!ctx) return null;
-
-    const y2 = t.match(/\b(\d{2})\b/);
-    if (!y2) return null;
-
-    const yy = Number(y2[1]);
-    // Pivot: 00-25 => 2000-2025 else 1900-1999
-    return (yy <= 25) ? (2000 + yy) : (1900 + yy);
   }
 
   function parseDateLike(text) {
@@ -97,6 +67,7 @@
       const yyyy = Number(m[3]);
       if (mm) return { yyyy, mm, dd };
     }
+
     return null;
   }
 
@@ -115,6 +86,8 @@
     return age;
   }
 
+  function chance(p) { return Math.random() < clamp(p, 0, 1); }
+
   function teacherModeEnabled() {
     const qp = new URLSearchParams(location.search);
     if (qp.get("teacher") === "1") return true;
@@ -122,7 +95,7 @@
   }
 
   /***********************
-   * STATE MACHINE (DEFINED EARLY: NO TDZ)
+   * STATE
    ***********************/
   const STEPS = {
     INTAKE: "intake",
@@ -168,9 +141,10 @@
     const base = {
       ask_id: [
         /\b(can i|could i|may i|let me)\s+(see|check)\s+(your|ur)\s+(id|identification)\b/i,
-        /\bshow\s+me\s+(your|ur)\s+(id|identification)\b/i,
+        /\b(show\s+me\s+(your|ur)\s+(id|identification)\b/i,
         /\bdo\s+you\s+have\s+an?\s+id\b/i,
-        /\bid\s+please\b/i
+        /\bid\s+please\b/i,
+        /\bsee\s+your\s+id\b/i
       ],
       return_id: [
         /\bhere('?s|\s+is)\s+your\s+id\s+back\b/i,
@@ -178,12 +152,12 @@
         /\breturn\s+to\s+visitor\b/i
       ],
       contact_supervisor: [
-        /\b(i\s+(will|’ll|'ll)\s+)?(contact|call|ring|phone)\s+(my\s+)?(supervisor|boss|officer|team\s*leader|manager)\b/i,
-        /\blet\s+me\s+(contact|call)\s+(my\s+)?(supervisor|boss|team\s*leader|manager)\b/i
+        /\b(i\s+(will|’ll|'ll)\s+)?(please\s+)?(contact|call|ring|phone)\s+(my\s+)?(supervisor|boss|officer|team\s*leader|manager)\b/i
       ],
       ask_name: [
         /\bwhat('?s|\s+is)\s+your\s+name\b/i,
-        /\bname\s*,?\s+please\b/i
+        /\bname\s*,?\s+please\b/i,
+        /\bcan\s+i\s+have\s+your\s+name\b/i
       ],
       ask_purpose: [
         /\b(what('?s|\s+is)\s+the\s+purpose|why\s+are\s+you\s+here|reason\s+for\s+your\s+visit)\b/i,
@@ -191,7 +165,8 @@
       ],
       ask_appointment: [
         /\bdo\s+you\s+have\s+an?\s+appointment\b/i,
-        /\bare\s+you\s+expected\b/i
+        /\bare\s+you\s+expected\b/i,
+        /\bappointment\s+time\b/i
       ],
       ask_who: [
         /\bwho\s+are\s+you\s+(here\s+to\s+see|meeting|visiting)\b/i,
@@ -207,6 +182,7 @@
       ],
       ask_subject: [
         /\bwhat\s+is\s+it\s+about\b/i,
+        /\bwhat\s+will\s+you\s+discuss\b/i,
         /\bwhat\s+is\s+the\s+meeting\s+about\b/i
       ],
       ask_age: [
@@ -217,15 +193,14 @@
         /\b(what('?s|\s+is)\s+your\s+(date\s+of\s+birth|dob)|date\s+of\s+birth|dob)\b/i,
         /\bwhen\s+were\s+you\s+born\b/i
       ],
-      // NEW: more tolerant born-year confirmation (2-digit or 4-digit)
       confirm_born_year: [
-        /\bwere\s+you\s+born\s+in\s+('?)(\d{2}|\d{4})\1\b/i,
-        /\byou\s+were\s+born\s+in\s+('?)(\d{2}|\d{4})\1\b/i,
-        /\bborn\s+in\s+('?)(\d{2}|\d{4})\1\b/i
+        /\bwere\s+you\s+born\s+in\s+(19\d{2}|20\d{2})\b/i,
+        /\byou\s+were\s+born\s+in\s+(19\d{2}|20\d{2})\s*\?\s*$/i
       ],
       ask_nationality: [
         /\bwhat\s+is\s+your\s+nationality\b/i,
-        /\bwhere\s+are\s+you\s+from\b/i
+        /\bwhere\s+are\s+you\s+from\b/i,
+        /\byour\s+citizenship\b/i
       ],
       go_person_search: [
         /\b(go\s+to|start|begin)\s+(the\s+)?(person\s+search|pat\s*down|frisk)\b/i,
@@ -244,20 +219,21 @@
 
     const merged = { ...base };
 
-    const addPatterns = (key, arr) => {
-      if (!arr || !Array.isArray(arr)) return;
-      merged[key] = merged[key] || [];
-      for (const p of arr) {
-        if (!p) continue;
-        if (p instanceof RegExp) merged[key].push(p);
-        else if (typeof p === "string") {
-          try { merged[key].push(new RegExp(p, "i")); } catch { /* ignore */ }
-        }
-      }
-    };
-
     if (extra) {
       const intentsObj = extra.intents && typeof extra.intents === "object" ? extra.intents : null;
+
+      const addPatterns = (key, arr) => {
+        if (!arr || !Array.isArray(arr)) return;
+        merged[key] = merged[key] || [];
+        for (const p of arr) {
+          if (!p) continue;
+          if (p instanceof RegExp) merged[key].push(p);
+          else if (typeof p === "string") {
+            try { merged[key].push(new RegExp(p, "i")); } catch {}
+          }
+        }
+      };
+
       if (intentsObj) {
         for (const [k, v] of Object.entries(intentsObj)) {
           if (v && Array.isArray(v.patterns)) addPatterns(k, v.patterns);
@@ -326,18 +302,10 @@
     const nat = pick(NATIONALITIES);
     const name = pick(NAMES) + " " + (["Johnson", "Miller", "Brown", "Davis", "Martinez", "Kowalski", "Nowak", "Schmidt", "Dubois", "Rossi", "Yilmaz"][Math.floor(Math.random() * 11)]);
     const age = calcAgeFromDob(dob);
-
-    const id = {
-      name,
-      nationality: nat,
-      dob,
-      age,
-      idNumber: randomIdNumber(),
-      expiry: randomExpiry()
-    };
+    const id = { name, nationality: nat, dob, age, idNumber: randomIdNumber(), expiry: randomExpiry() };
 
     const idx = 1 + Math.floor(Math.random() * 12);
-    const headshot = `assets/fotos/headshot_${String(idx).padStart(2, "0")}.png`;
+    const headshot = `assets/photos/headshot_${String(idx).padStart(2, "0")}.png`;
 
     const purpose = pick(["delivery", "maintenance", "meeting", "visit", "contract work"]);
     const appointment = chance(0.7);
@@ -357,140 +325,11 @@
   }
 
   /***********************
-   * LOGGING
+   * UI — inject our own (no old buttons)
    ***********************/
-  async function logEvent(type, payload = {}) {
-    if (!LOG_ENDPOINT) return;
-    const body = { ts: nowIso(), type, ...payload };
-    try {
-      await fetch(LOG_ENDPOINT, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-        keepalive: true
-      });
-    } catch { /* ignore */ }
-  }
-
-  /***********************
-   * APP STATE
-   ***********************/
-  const app = {
-    runId: uid(),
-    visitor: null,
-    step: STEPS.INTAKE,
-    flags: {
-      asked_name: false,
-      asked_purpose: false,
-      asked_appointment: false,
-      asked_who: false,
-      asked_time: false,
-      asked_where: false,
-      asked_subject: false,
-      asked_id: false,
-      asked_age: false,
-      asked_dob: false,
-      asked_nationality: false,
-      supervisor_contacted: false,
-      explained_threat: false,
-      explained_items: false,
-      did_person_search: false
-    },
-    idVisible: false,
-    processing: false,
-    finished: false,
-    intents: null,
-    phrasebank: null,
-    unknowns: 0,
-    messages: []
-  };
-
-  /***********************
-   * AVATAR EQUALIZER (safe)
-   ***********************/
-  function equalizeAvatarSizes() {
-    try {
-      const size = "44px";
-      const candidates = [
-        "#visitorAvatar", "#studentAvatar",     // legacy
-        "#visitor-img"                          // new UI visitor img
-      ];
-      for (const sel of candidates) {
-        const el = $(sel);
-        if (!el) continue;
-        el.style.width = size;
-        el.style.height = size;
-        el.style.borderRadius = "50%";
-        el.style.objectFit = "cover";
-      }
-    } catch { /* ignore */ }
-  }
-
-  /***********************
-   * HARD HIDE: "Contact supervisor"
-   ***********************/
-  function startSupervisorHardHide() {
-    const RX = /(contact\s+supervisor|contact\s+leidinggevende)/i;
-
-    let scheduled = false;
-    const run = () => {
-      scheduled = false;
-
-      // Hide any element whose visible text equals/contains label.
-      // We target button-ish elements + "quick reply" chips + anything with pointer cursor.
-      const all = Array.from(document.querySelectorAll("*"));
-      for (const el of all) {
-        if (!el || !el.textContent) continue;
-        const txt = el.textContent.trim();
-        if (!txt) continue;
-
-        // Keep strict-ish: either exact match, or short label-like string
-        const labelLike = txt.length <= 40;
-        if (!labelLike) continue;
-
-        if (RX.test(txt)) {
-          const tag = (el.tagName || "").toLowerCase();
-          const role = (el.getAttribute?.("role") || "").toLowerCase();
-          const clickable =
-            tag === "button" ||
-            tag === "a" ||
-            role === "button" ||
-            el.onclick ||
-            (getComputedStyle(el).cursor === "pointer");
-
-          // Also hide if it looks like a chip / quick-reply
-          const className = (el.className || "").toString().toLowerCase();
-          const chipLike = className.includes("chip") || className.includes("quick") || className.includes("reply") || className.includes("button");
-
-          if (clickable || chipLike) {
-            el.dataset.vevaHiddenSupervisor = "1";
-            el.style.setProperty("display", "none", "important");
-            el.style.setProperty("visibility", "hidden", "important");
-            el.style.setProperty("pointer-events", "none", "important");
-            el.setAttribute("aria-hidden", "true");
-            el.tabIndex = -1;
-          }
-        }
-      }
-    };
-
-    const schedule = () => {
-      if (scheduled) return;
-      scheduled = true;
-      requestAnimationFrame(run);
-    };
-
-    schedule();
-
-    const mo = new MutationObserver(schedule);
-    mo.observe(document.documentElement, { childList: true, subtree: true });
-  }
-
-  /***********************
-   * UI (Injected Chat UI)
-   ***********************/
-  function injectBaseUiIfMissing() {
-    if ($("#veva-app")) return;
+  function injectUi() {
+    // Remove previous injected instance if any
+    $("#veva-app")?.remove();
 
     const root = document.createElement("div");
     root.id = "veva-app";
@@ -502,7 +341,7 @@
             <div class="veva-title-sub">English checkpoint conversation practice</div>
           </div>
           <div class="veva-actions">
-            <button class="veva-btn veva-btn-ghost" id="btn-toggle-id" title="(Hidden) Toggle ID card">ID</button>
+            <button class="veva-btn veva-btn-ghost" id="btn-toggle-id" title="(Teacher) Toggle ID card">ID</button>
             <button class="veva-btn veva-btn-danger" id="btn-deny">Deny entrance</button>
             <button class="veva-btn" id="btn-finish" style="display:none;">Finish run</button>
           </div>
@@ -551,14 +390,13 @@
             <div class="veva-card" id="teacher-card" style="display:none;">
               <div class="veva-card-title">Teacher</div>
               <div class="veva-small">
-                Hidden mode. Toggle via <code>?teacher=1</code> or set <code>localStorage.veva_teacher_mode=1</code>.
+                Hidden mode. Toggle via <code>?teacher=1</code> or <code>localStorage.veva_teacher_mode=1</code>.
               </div>
               <div class="veva-small" id="teacher-debug"></div>
             </div>
           </aside>
         </div>
 
-        <!-- Supervisor Modal -->
         <div class="veva-modal-backdrop" id="sup-backdrop" style="display:none;">
           <div class="veva-modal" role="dialog" aria-modal="true" aria-label="Supervisor contact">
             <div class="veva-modal-head">
@@ -590,63 +428,133 @@
       </div>
     `;
 
+    // Mount (prefer #app if exists)
     const mount = $("#app") || document.body;
+
+    // Hide old UI under it (so old buttons cannot show)
+    if (mount !== document.body) {
+      // if #app exists, clear it first
+      mount.innerHTML = "";
+    } else {
+      // otherwise, do not destroy whole body; just append on top
+    }
+
     mount.appendChild(root);
 
+    // CSS (includes avatar equalize — no external snippet needed)
     const style = document.createElement("style");
     style.textContent = `
       .veva-shell{height:calc(100vh - 10px);display:flex;flex-direction:column;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;}
-      .veva-topbar{display:flex;gap:12px;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid rgba(0,0,0,.08);}
-      .veva-title-main{font-weight:800;font-size:16px;line-height:1.1}
-      .veva-title-sub{opacity:.7;font-size:12px}
+      .veva-topbar{display:flex;gap:12px;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid rgba(255,255,255,.08);color:white}
+      .veva-title-main{font-weight:900;font-size:16px;line-height:1.1}
+      .veva-title-sub{opacity:.75;font-size:12px}
       .veva-actions{display:flex;gap:8px;align-items:center}
       .veva-main{flex:1;display:grid;grid-template-columns:1fr 320px;gap:10px;padding:10px;min-height:0;}
-      .veva-chat{display:flex;flex-direction:column;min-height:0;border:1px solid rgba(0,0,0,.08);border-radius:14px;overflow:hidden}
-      .veva-chatlog{flex:1;overflow:auto;padding:12px;background:rgba(0,0,0,.02)}
-      .veva-composer{display:flex;gap:8px;padding:10px;border-top:1px solid rgba(0,0,0,.08);background:white}
-      #chatinput{flex:1;padding:10px 12px;border-radius:12px;border:1px solid rgba(0,0,0,.16);font-size:14px}
-      .veva-btn{padding:9px 12px;border-radius:12px;border:1px solid rgba(0,0,0,.14);background:white;cursor:pointer;font-weight:650}
-      .veva-btn:hover{filter:brightness(.98)}
-      .veva-btn-ghost{opacity:.8}
-      .veva-btn-danger{border-color:rgba(200,0,0,.25);background:rgba(255,0,0,.06)}
-      .veva-btn-ok{border-color:rgba(0,160,80,.35);background:rgba(0,160,80,.08)}
-      .veva-hint{font-size:12px;opacity:.75;padding:8px 12px;border-top:1px dashed rgba(0,0,0,.12);background:white}
+      .veva-chat{display:flex;flex-direction:column;min-height:0;border:1px solid rgba(255,255,255,.10);border-radius:14px;overflow:hidden;background:rgba(0,0,0,.15)}
+      .veva-chatlog{flex:1;overflow:auto;padding:12px}
+      .veva-composer{display:flex;gap:8px;padding:10px;border-top:1px solid rgba(255,255,255,.10);background:rgba(0,0,0,.15)}
+      #chatinput{flex:1;padding:10px 12px;border-radius:12px;border:1px solid rgba(255,255,255,.18);font-size:14px;background:rgba(0,0,0,.25);color:white}
+      #chatinput::placeholder{color:rgba(255,255,255,.6)}
+      .veva-btn{padding:9px 12px;border-radius:12px;border:1px solid rgba(255,255,255,.18);background:rgba(0,0,0,.18);color:white;cursor:pointer;font-weight:700}
+      .veva-btn:hover{filter:brightness(1.05)}
+      .veva-btn-ghost{opacity:.85}
+      .veva-btn-danger{border-color:rgba(255,80,80,.40);background:rgba(255,0,0,.10)}
+      .veva-btn-ok{border-color:rgba(0,200,110,.40);background:rgba(0,200,110,.12)}
+      .veva-hint{font-size:12px;opacity:.8;padding:8px 12px;border-top:1px dashed rgba(255,255,255,.12);color:white;background:rgba(0,0,0,.10)}
       .veva-side{min-height:0;overflow:auto;display:flex;flex-direction:column;gap:10px}
-      .veva-card{border:1px solid rgba(0,0,0,.08);border-radius:14px;padding:10px;background:white}
-      .veva-card-title{font-weight:800;margin-bottom:8px}
+      .veva-card{border:1px solid rgba(255,255,255,.10);border-radius:14px;padding:10px;background:rgba(0,0,0,.18);color:white}
+      .veva-card-title{font-weight:900;margin-bottom:8px}
       .veva-visitor{display:flex;gap:10px;align-items:center}
-      #visitor-img{width:64px;height:64px;border-radius:14px;object-fit:cover;border:1px solid rgba(0,0,0,.12);background:rgba(0,0,0,.04)}
-      .veva-visitor-meta{font-size:12px;opacity:.9}
+      #visitor-img{width:44px;height:44px;border-radius:50%;object-fit:cover;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.06)}
+      .veva-visitor-meta{font-size:12px;opacity:.95}
       .veva-idcard{font-size:12px;display:flex;flex-direction:column;gap:4px}
       .veva-id-actions{margin-top:8px}
-      .bubble{max-width:min(78%,560px);padding:10px 12px;border-radius:16px;margin:8px 0;line-height:1.35;font-size:14px;box-shadow:0 1px 0 rgba(0,0,0,.05)}
-      .bubble.left{background:white;border:1px solid rgba(0,0,0,.08);margin-right:auto}
-      .bubble.right{background:rgba(0,0,0,.88);color:white;margin-left:auto}
+      .bubble{max-width:min(78%,560px);padding:10px 12px;border-radius:16px;margin:8px 0;line-height:1.35;font-size:14px;box-shadow:0 1px 0 rgba(0,0,0,.12)}
+      .bubble.left{background:rgba(255,255,255,.92);color:#111;border:1px solid rgba(0,0,0,.08);margin-right:auto}
+      .bubble.right{background:rgba(0,0,0,.78);color:white;border:1px solid rgba(255,255,255,.10);margin-left:auto}
       .bubble .meta{font-size:11px;opacity:.72;margin-top:6px}
-      .veva-modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:14px;z-index:9999}
-      .veva-modal{width:min(720px,95vw);background:white;border-radius:16px;border:1px solid rgba(0,0,0,.12);overflow:hidden}
-      .veva-modal-head{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border-bottom:1px solid rgba(0,0,0,.08)}
+      .veva-modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:14px;z-index:9999}
+      .veva-modal{width:min(720px,95vw);background:rgba(10,10,10,.92);color:white;border-radius:16px;border:1px solid rgba(255,255,255,.14);overflow:hidden}
+      .veva-modal-head{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border-bottom:1px solid rgba(255,255,255,.12)}
       .veva-modal-title{font-weight:900}
       .veva-modal-body{padding:12px;display:flex;flex-direction:column;gap:10px}
       .veva-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-      .veva-grid label{font-size:12px;opacity:.9;display:flex;flex-direction:column;gap:6px}
-      .veva-grid input{padding:9px 10px;border-radius:12px;border:1px solid rgba(0,0,0,.16)}
+      .veva-grid label{font-size:12px;opacity:.95;display:flex;flex-direction:column;gap:6px}
+      .veva-grid input{padding:9px 10px;border-radius:12px;border:1px solid rgba(255,255,255,.16);background:rgba(0,0,0,.25);color:white}
       .veva-sup-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
-      .veva-small{font-size:12px;opacity:.8}
-      @media (max-width: 980px){ .veva-main{grid-template-columns:1fr} .veva-side{display:none} }
+      .veva-small{font-size:12px;opacity:.85}
+      @media (max-width: 980px){
+        .veva-main{grid-template-columns:1fr}
+        .veva-side{display:none}
+      }
     `;
     document.head.appendChild(style);
+
+    // Make background nice even if old CSS missing
+    document.body.style.margin = "0";
+    document.body.style.background = "radial-gradient(1200px 800px at 30% 10%, rgba(20,60,120,.55), rgba(5,10,20,.95))";
   }
+
+  /***********************
+   * LOGGING (no-cors)
+   ***********************/
+  function logEvent(type, payload = {}) {
+    if (!LOG_ENDPOINT) return Promise.resolve();
+    const body = JSON.stringify({ ts: nowIso(), type, ...payload });
+
+    // no-cors -> no preflight -> Apps Script CORS won’t break the app
+    // NOTE: response is opaque; we can't read it, but that's fine for logging.
+    try {
+      return fetch(LOG_ENDPOINT, {
+        method: "POST",
+        mode: "no-cors",
+        body
+      }).catch(() => {});
+    } catch {
+      return Promise.resolve();
+    }
+  }
+
+  /***********************
+   * APP CORE STATE
+   ***********************/
+  const app = {
+    runId: uid(),
+    visitor: null,
+    step: STEPS.INTAKE,
+    flags: {
+      asked_name: false,
+      asked_purpose: false,
+      asked_appointment: false,
+      asked_who: false,
+      asked_time: false,
+      asked_where: false,
+      asked_subject: false,
+      asked_id: false,
+      asked_age: false,
+      asked_dob: false,
+      asked_nationality: false,
+      supervisor_contacted: false,
+      explained_threat: false,
+      explained_items: false,
+      did_person_search: false
+    },
+    idVisible: false,
+    processing: false,
+    finished: false,
+    intents: null,
+    phrasebank: null,
+    unknowns: 0,
+    messages: []
+  };
 
   function setStep(step) {
     app.step = step;
-    const stepEl = $("#stepname");
-    if (stepEl) stepEl.textContent = step;
+    $("#stepname") && ($("#stepname").textContent = step);
   }
 
   function setHint(text) {
-    const el = $("#hintline");
-    if (el) el.textContent = text || "";
+    $("#hintline") && ($("#hintline").textContent = text || "");
   }
 
   function addBubble(side, text, meta = "") {
@@ -738,6 +646,23 @@
     return missing;
   }
 
+  function makeFakeControl(kind) {
+    const v = app.visitor;
+    if (kind === "age") {
+      const delta = pick([-2, -1, 1, 2, 3]);
+      return String(clamp(v.id.age + delta, 18, 70));
+    }
+    if (kind === "dob") {
+      const dob = { ...v.id.dob };
+      if (chance(0.5)) dob.dd = clamp(dob.dd + pick([-2, -1, 1, 2]), 1, 28);
+      else dob.mm = clamp(dob.mm + pick([-1, 1]), 1, 12);
+      return formatDob(dob);
+    }
+    if (kind === "nationality") return pick(NATIONALITIES.filter(n => n !== v.id.nationality));
+    if (kind === "name") return pick(NAMES) + " " + pick(["Johnson", "Miller", "Brown", "Davis", "Rossi", "Schmidt"]);
+    return "";
+  }
+
   function visitorControlAnswer(kind) {
     const v = app.visitor;
     const mood = v.mood;
@@ -775,66 +700,6 @@
     return { value: truth, lied: false, inconsistent: false };
   }
 
-  function makeFakeControl(kind) {
-    const v = app.visitor;
-    if (kind === "age") {
-      const delta = pick([-2, -1, 1, 2, 3]);
-      return String(clamp(v.id.age + delta, 18, 70));
-    }
-    if (kind === "dob") {
-      const dob = { ...v.id.dob };
-      if (chance(0.5)) dob.dd = clamp(dob.dd + pick([-2, -1, 1, 2]), 1, 28);
-      else dob.mm = clamp(dob.mm + pick([-1, 1]), 1, 12);
-      return formatDob(dob);
-    }
-    if (kind === "nationality") return pick(NATIONALITIES.filter(n => n !== v.id.nationality));
-    if (kind === "name") return pick(NAMES) + " " + pick(["Johnson", "Miller", "Brown", "Davis", "Rossi", "Schmidt"]);
-    return "";
-  }
-
-  function endRun(reason = "finished") {
-    if (app.finished) return;
-    app.finished = true;
-    setStep(STEPS.FINISHED);
-
-    const input = $("#chatinput");
-    const send = $("#btn-send");
-    if (input) input.disabled = true;
-    if (send) send.disabled = true;
-
-    const deny = $("#btn-deny");
-    if (deny) deny.disabled = true;
-
-    hideIdCard();
-
-    const fin = $("#btn-finish");
-    if (fin) fin.style.display = "";
-
-    logEvent("finish", {
-      runId: app.runId,
-      reason,
-      step: app.step,
-      unknowns: app.unknowns,
-      inconsistencies: app.visitor?.inconsistencies || []
-    });
-
-    const misses = REQUIRED.filter(r => !app.flags[r.key]).slice(0, 3);
-    if (misses.length) {
-      soldierSay("Run finished. Here are your top 3 improvements:", "feedback");
-      misses.forEach((m, i) => soldierSay(`${i + 1}) ${m.label}`, `Example: ${m.example}`));
-    } else {
-      soldierSay("Run finished. Nice work — you covered all key checkpoints.", "feedback");
-    }
-  }
-
-  async function denyEntranceFlow(source = "button") {
-    if (app.finished) return;
-    soldierSay("I’m denying entry. You cannot enter the site.", "deny");
-    await logEvent("deny", { runId: app.runId, source, step: app.step });
-    await sleep(900);
-    endRun("denied");
-  }
-
   function ensureStepProgression() {
     if (app.step === STEPS.INTAKE && app.flags.asked_id) setStep(STEPS.ID_CHECK);
     if (app.step === STEPS.ID_CHECK && app.flags.supervisor_contacted) setStep(STEPS.THREAT_ITEMS);
@@ -855,13 +720,13 @@
 
   function handleBornYearConfirm(userText) {
     const v = app.visitor;
-    const yearAsked = parseBornYearFlexible(userText);
+    const yearAsked = parseYear(userText);
+    if (!yearAsked) return visitorSay("Sorry, could you repeat the year?");
+
+    const claim = visitorControlAnswer("dob");     // may be truth or lie
+    const claimYear = parseYear(claim.value) || v.id.dob.yyyy;
     const trueYear = v.id.dob.yyyy;
 
-    const claim = visitorControlAnswer("dob");
-    const claimYear = parseYear(claim.value) || trueYear;
-
-    if (!yearAsked) return visitorSay("Sorry, could you repeat the year?");
     if (yearAsked === claimYear) {
       visitorSay("Yes, that’s correct.");
       if (claim.lied) visitorSay("Sorry… I’m a bit stressed.", "mood");
@@ -870,6 +735,7 @@
 
     visitorSay("No, that’s not correct.");
 
+    // If student guessed the TRUE year but visitor lied, allow correction
     if (yearAsked === trueYear && claim.lied) {
       visitorSay(`Actually… you’re right. I was born in ${trueYear}. Sorry.`, "correction");
       v.claims.dob = formatDob(v.id.dob);
@@ -898,11 +764,52 @@
     endRun("completed");
   }
 
+  function endRun(reason = "finished") {
+    if (app.finished) return;
+    app.finished = true;
+    setStep(STEPS.FINISHED);
+
+    const input = $("#chatinput");
+    const send = $("#btn-send");
+    if (input) input.disabled = true;
+    if (send) send.disabled = true;
+
+    $("#btn-deny") && ($("#btn-deny").disabled = true);
+
+    hideIdCard();
+    const fin = $("#btn-finish");
+    if (fin) fin.style.display = "";
+
+    logEvent("finish", {
+      runId: app.runId,
+      reason,
+      step: app.step,
+      unknowns: app.unknowns,
+      inconsistencies: app.visitor?.inconsistencies || []
+    });
+
+    const misses = REQUIRED.filter(r => !app.flags[r.key]).slice(0, 3);
+    if (misses.length) {
+      soldierSay("Run finished. Here are your top 3 improvements:", "feedback");
+      misses.forEach((m, i) => soldierSay(`${i + 1}) ${m.label}`, `Example: ${m.example}`));
+    } else {
+      soldierSay("Run finished. Nice work — you covered all key checkpoints.", "feedback");
+    }
+  }
+
+  async function denyEntranceFlow(source = "button") {
+    if (app.finished) return;
+    soldierSay("I’m denying entry. You cannot enter the site.", "deny");
+    logEvent("deny", { runId: app.runId, source, step: app.step });
+    await sleep(900);
+    endRun("denied");
+  }
+
   function matchIntent(text) {
     const t = text || "";
     const I = app.intents;
 
-    const order = [
+    const map = [
       ["deny", "deny"],
       ["ask_id", "ask_id"],
       ["return_id", "return_id"],
@@ -922,13 +829,11 @@
       ["smalltalk", "smalltalk"]
     ];
 
-    for (const [key, fn] of order) if (I?.[fn] && I[fn](t)) return key;
+    for (const [key, fn] of map) if (I?.[fn] && I[fn](t)) return key;
 
     const low = safeLower(t);
     if (low.includes("date of birth") || low === "dob") return "ask_dob";
     if (low.includes("how old")) return "ask_age";
-    if (/\bborn\s+in\b/.test(low) && parseBornYearFlexible(low)) return "confirm_born_year";
-
     return "unknown";
   }
 
@@ -956,7 +861,7 @@
 
     try {
       soldierSay(t);
-      await logEvent("message", { runId: app.runId, from: "student", text: t, step: app.step });
+      logEvent("message", { runId: app.runId, from: "student", text: t, step: app.step });
 
       const intent = matchIntent(t);
 
@@ -965,7 +870,7 @@
       if (intent === "return_id") {
         hideIdCard();
         visitorSay("Thank you.");
-        await logEvent("return_id", { runId: app.runId, step: app.step });
+        logEvent("return_id", { runId: app.runId, step: app.step });
         return;
       }
 
@@ -973,28 +878,38 @@
         app.flags.asked_id = true;
         visitorSay("Yes. Here you go.");
         showIdCard();
-        await logEvent("show_id", { runId: app.runId, step: app.step });
+        logEvent("show_id", { runId: app.runId, step: app.step });
         ensureStepProgression();
         return;
       }
 
       if (intent === "contact_supervisor") {
         app.flags.supervisor_contacted = true;
-        await logEvent("supervisor_trigger", { runId: app.runId, step: app.step, source: "text" });
-        openSupervisorModal();
+        logEvent("supervisor_trigger", { runId: app.runId, step: app.step, source: "text" });
+
+        openSupervisorModal({
+          who: app.visitor?.id?.name || "",
+          why: app.visitor?.intake?.purpose || "",
+          what: app.visitor?.intake?.subject || "",
+          where: app.visitor?.intake?.goingWhere || "",
+          when: app.visitor?.intake?.apptTime || "",
+          with: app.visitor?.intake?.meetingWith || ""
+        });
+
         visitorSay("Okay. Please contact your supervisor.", "supervisor");
         ensureStepProgression();
         return;
       }
 
       if (intent === "go_person_search") {
-        await logEvent("go_person_search", { runId: app.runId, step: app.step, source: "text" });
+        logEvent("go_person_search", { runId: app.runId, step: app.step, source: "text" });
         beginPersonSearch();
         return;
       }
 
       if (intent === "ask_name") { app.flags.asked_name = true; visitorSay(visitorReplyForIntakeQuestion("name")); return; }
       if (intent === "ask_purpose") { app.flags.asked_purpose = true; visitorSay(visitorReplyForIntakeQuestion("purpose")); return; }
+
       if (intent === "ask_appointment") {
         app.flags.asked_appointment = true;
         visitorSay(visitorReplyForIntakeQuestion("appointment"));
@@ -1004,6 +919,7 @@
         }
         return;
       }
+
       if (intent === "ask_who") { app.flags.asked_who = true; visitorSay(visitorReplyForIntakeQuestion("who")); return; }
       if (intent === "ask_time") { app.flags.asked_time = true; visitorSay(visitorReplyForIntakeQuestion("time")); return; }
       if (intent === "ask_where") { app.flags.asked_where = true; visitorSay(visitorReplyForIntakeQuestion("where")); return; }
@@ -1014,7 +930,7 @@
         const a = visitorControlAnswer("nationality");
         visitorSay(`I’m ${a.value}.`);
         if (a.inconsistent) visitorSay("Sorry… I meant that.", "mood");
-        await logEvent("control_nationality", { runId: app.runId, step: app.step, value: a.value, lied: a.lied });
+        logEvent("control_nationality", { runId: app.runId, step: app.step, value: a.value, lied: a.lied });
         return;
       }
 
@@ -1023,7 +939,7 @@
         const a = visitorControlAnswer("age");
         visitorSay(`I’m ${a.value} years old.`);
         if (a.inconsistent) visitorSay("Sorry, I’m tired.", "mood");
-        await logEvent("control_age", { runId: app.runId, step: app.step, value: a.value, lied: a.lied });
+        logEvent("control_age", { runId: app.runId, step: app.step, value: a.value, lied: a.lied });
         return;
       }
 
@@ -1032,17 +948,18 @@
         const a = visitorControlAnswer("dob");
         visitorSay(`My date of birth is ${a.value}.`);
         if (a.inconsistent) visitorSay("Sorry… I’m a bit nervous.", "mood");
-        await logEvent("control_dob", { runId: app.runId, step: app.step, value: a.value, lied: a.lied });
+        logEvent("control_dob", { runId: app.runId, step: app.step, value: a.value, lied: a.lied });
         return;
       }
 
       if (intent === "confirm_born_year") {
         app.flags.asked_dob = true;
         handleBornYearConfirm(t);
-        await logEvent("control_born_year", { runId: app.runId, step: app.step, userText: t });
+        logEvent("control_born_year", { runId: app.runId, step: app.step, userText: t });
         return;
       }
 
+      // Nudge: after ID + supervisor -> threat/items
       if (app.step === STEPS.ID_CHECK && app.flags.asked_id && app.flags.supervisor_contacted) {
         explainThreatAndItems();
         setHint("Tip: type “Go to person search” when ready.");
@@ -1051,9 +968,10 @@
 
       if (intent === "smalltalk") { visitorSay("Hello."); return; }
 
+      // Unknown
       app.unknowns += 1;
       visitorSay("Sorry, I don’t understand. Can you ask it another way?");
-      if (LOG_UNKNOWN) await logEvent("unknown_question", { runId: app.runId, step: app.step, text: t });
+      if (LOG_UNKNOWN) logEvent("unknown_question", { runId: app.runId, step: app.step, text: t });
       setHint("Try short clear questions (5W/5WH). Example: “What is the purpose of your visit?”");
     } finally {
       clearTimeout(hangGuard);
@@ -1066,30 +984,27 @@
     }
   }
 
+  /***********************
+   * INIT
+   ***********************/
   async function init() {
-    // 1) Hide supervisor UI everywhere (including legacy quick reply chips)
-    startSupervisorHardHide();
+    injectUi();
 
-    // 2) Inject our UI if needed
-    injectBaseUiIfMissing();
-
-    // 3) Equalize avatars (and keep doing it after renders)
-    equalizeAvatarSizes();
-    const avatarMo = new MutationObserver(() => equalizeAvatarSizes());
-    avatarMo.observe(document.documentElement, { childList: true, subtree: true });
-
-    // Hide dev-only ID toggle for students
+    // Hide ID toggle unless teacher
     const idToggle = $("#btn-toggle-id");
     if (idToggle) idToggle.style.display = teacherModeEnabled() ? "" : "none";
 
-    // Setup run
     app.visitor = buildVisitor();
+
     $("#runid").textContent = app.runId;
     $("#visitor-mood").textContent = app.visitor.mood.name;
-    $("#visitor-img").src = app.visitor.headshot;
+
+    const img = $("#visitor-img");
+    img.src = app.visitor.headshot;
+    img.onerror = () => { img.src = "assets/photos/headshot_01.png"; }; // fallback
+
     setStep(STEPS.INTAKE);
 
-    // Patterns
     app.phrasebank = await loadPhrasebank();
     app.intents = compilePatterns(app.phrasebank);
 
@@ -1098,6 +1013,7 @@
     if (tcard) tcard.style.display = teacherModeEnabled() ? "" : "none";
     if (teacherModeEnabled()) {
       $("#teacher-debug").innerHTML = `
+        <div><b>App:</b> ${escapeHtml(APP_VERSION)}</div>
         <div><b>Patterns loaded:</b> ${Object.keys(app.intents._raw || {}).length}</div>
         <div><b>logEndpoint:</b> ${escapeHtml(LOG_ENDPOINT ? "set" : "missing")}</div>
       `;
@@ -1111,34 +1027,39 @@
 
     logEvent("start", { runId: app.runId, mood: app.visitor.mood.name, step: app.step });
 
-    // Composer wiring
+    // Composer
     const input = $("#chatinput");
     const send = $("#btn-send");
 
     function submit() {
-      const v = input.value;
+      const val = input.value;
       input.value = "";
-      onUserMessage(v);
+      onUserMessage(val);
     }
 
     send?.addEventListener("click", submit);
     input?.addEventListener("keydown", (e) => { if (e.key === "Enter") submit(); });
 
+    // Autofocus
     if (input) setTimeout(() => input.focus(), 0);
 
+    // Deny always
     $("#btn-deny")?.addEventListener("click", () => denyEntranceFlow("button"));
+
+    // Finish
     $("#btn-finish")?.addEventListener("click", () => endRun("manual_finish"));
 
+    // ID controls
     $("#btn-return-id")?.addEventListener("click", () => {
       hideIdCard();
       visitorSay("Thank you.");
       logEvent("return_id", { runId: app.runId, step: app.step, source: "button" });
     });
-
     $("#btn-toggle-id")?.addEventListener("click", () => {
       if (app.idVisible) hideIdCard(); else showIdCard();
     });
 
+    // Supervisor modal
     $("#sup-close")?.addEventListener("click", closeSupervisorModal);
     $("#sup-backdrop")?.addEventListener("click", (e) => {
       if (e.target && e.target.id === "sup-backdrop") closeSupervisorModal();
@@ -1149,17 +1070,17 @@
       const missing = validateSupervisorFields(p);
       if (missing.length) {
         $("#sup-status").textContent = `Missing: ${missing.join(", ")}. Please fill them in.`;
-        await logEvent("supervisor_request_invalid", { runId: app.runId, missing, payload: p });
+        logEvent("supervisor_request_invalid", { runId: app.runId, missing, payload: p });
         return;
       }
       $("#sup-status").textContent = "Request sent. Waiting for supervisor decision…";
-      await logEvent("supervisor_request", { runId: app.runId, payload: p });
-      setHint("Supervisor decision: click Approve/Deny in the popup (teacher) or proceed when instructed.");
+      logEvent("supervisor_request", { runId: app.runId, payload: p });
+      setHint("Supervisor decision: (teacher) click Approve/Deny in the popup.");
     });
 
     $("#sup-approve")?.addEventListener("click", async () => {
       $("#sup-status").textContent = "Supervisor approves. Proceed with security measures.";
-      await logEvent("supervisor_approve", { runId: app.runId });
+      logEvent("supervisor_approve", { runId: app.runId });
       closeSupervisorModal();
       visitorSay("Okay.", "supervisor");
       explainThreatAndItems();
@@ -1168,7 +1089,7 @@
 
     $("#sup-deny")?.addEventListener("click", async () => {
       $("#sup-status").textContent = "Supervisor denies. Deny entrance.";
-      await logEvent("supervisor_deny", { runId: app.runId });
+      logEvent("supervisor_deny", { runId: app.runId });
       closeSupervisorModal();
       await denyEntranceFlow("supervisor_deny");
     });
@@ -1181,5 +1102,9 @@
     }
   }
 
-  document.addEventListener("DOMContentLoaded", init);
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", init);
+  } else {
+    init();
+  }
 })();
