@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "veva-whatsapp-v3-2026-02-09";
+  const APP_VERSION = "veva-whatsapp-v4-2026-02-09";
   console.log("[VEVA]", APP_VERSION, "loaded");
 
   const CONFIG = window.APP_CONFIG || {};
@@ -25,9 +25,15 @@
     return m ? Number(m[1]) : null;
   }
 
-  function formatDob({ yyyy, mm, dd }) {
+  function formatDobISO({ yyyy, mm, dd }) {
     const z2 = (n) => (n < 10 ? "0" + n : "" + n);
     return `${yyyy}-${z2(mm)}-${z2(dd)}`;
+  }
+
+  function formatDobHuman({ yyyy, mm, dd }) {
+    const MON = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+    const z2 = (n) => (n < 10 ? "0" + n : "" + n);
+    return `${z2(dd)} ${MON[clamp(mm,1,12)-1]} ${yyyy}`;
   }
 
   function calcAgeFromDob(dobObj) {
@@ -50,11 +56,9 @@
    * HARD FIX: supervisor button NEVER appears
    ***********************/
   function nukeSupervisorButton() {
-    // Remove by known ID
     const sup = $id("btnContactSupervisor");
     if (sup) sup.remove();
 
-    // Also remove any accidental duplicates
     const allBtns = Array.from(document.querySelectorAll("button, .btn"));
     for (const b of allBtns) {
       const t = (b.textContent || "").trim().toLowerCase();
@@ -62,7 +66,6 @@
     }
   }
 
-  // Keep it nuked if something re-adds it
   function enforceSupervisorNukeForever() {
     nukeSupervisorButton();
     const mo = new MutationObserver(() => nukeSupervisorButton());
@@ -142,11 +145,33 @@
 
     const goingWhere = pick(["HQ building", "Logistics office", "Barracks admin", "Workshop"]);
 
+    const deliveryItems = [
+      "spare radio batteries",
+      "sealed maintenance tools",
+      "replacement filters",
+      "two labelled crates of supplies",
+      "a signed document pack",
+      "replacement parts for a vehicle",
+      "IT equipment (sealed boxes)"
+    ];
+
+    const deliveryReason = [
+      "They reported a shortage last week.",
+      "This was scheduled in advance and needs a signature.",
+      "They requested an urgent replacement.",
+      "It is part of a planned inspection.",
+      "It was ordered for routine maintenance."
+    ];
+
     return {
       mood,
       headshot,
       id: { name, nationality: nat, dob, age, idNumber: randomIdNumber(), expiry: randomExpiry() },
-      intake: { purpose, appointment, apptTime, meetingWith, goingWhere, subject },
+      intake: {
+        purpose, appointment, apptTime, meetingWith, goingWhere, subject,
+        deliveryItem: pick(deliveryItems),
+        deliveryReason: pick(deliveryReason)
+      },
       claims: { age: null, dob: null, nationality: null, name: null },
       inconsistencies: [],
       idShown: false
@@ -154,22 +179,48 @@
   }
 
   /***********************
-   * Intents (broader English)
+   * Intents (broader English, fixed collisions)
    ***********************/
   function compilePatterns(extra) {
+    // NOTE: order matters because we return the first intent that matches.
     const base = {
-      // Opening / helper
+      ask_feeling: [
+        /\bhow\s+are\s+you\s+feeling\b/i,
+        /\bhow\s+do\s+you\s+feel\b/i,
+        /\bhow\s+are\s+you\s+today\b/i
+      ],
+
       hello: [
         /\b(hello|hi|hey)\b/i,
         /\bgood\s+(morning|afternoon|evening)\b/i
       ],
+
       help_offer: [
-        /\b(can|could)\s+i\s+help\b/i,
-        /\bhow\s+(can|may)\s+i\s+help\b/i,
+        /\bhow\s+can\s+i\s+help\b/i,
+        /\bhow\s+can\s+i\s+help\s+you\b/i,
+        /\bhow\s+can\s+i\s+help\s+you\s+today\b/i,
+        /\bhow\s+may\s+i\s+help\b/i,
+        /\bcan\s+i\s+help\b/i,
         /\bwhat\s+can\s+i\s+do\s+for\s+you\b/i,
         /\bsure\b/i,
         /\bof\s+course\b/i,
         /\byes\b/i
+      ],
+
+      ask_need: [
+        /\bwhat\s+do\s+you\s+want\b/i,
+        /\bwhat\s+do\s+you\s+need\b/i,
+        /\bwhat\s+are\s+you\s+doing\s+here\b/i,
+        /\bwhat\s+can\s+i\s+help\s+you\s+with\b/i,
+        /\bhow\s+can\s+i\s+help\s+you\b/i,
+        /\bhow\s+can\s+i\s+help\s+you\s+today\b/i
+      ],
+
+      ask_why_need_base: [
+        /\bwhy\s+do\s+you\s+need\s+to\s+get\s+onto\s+the\s+base\b/i,
+        /\bwhy\s+do\s+you\s+need\s+to\s+enter\b/i,
+        /\bwhy\s+do\s+you\s+need\s+access\b/i,
+        /\bwhy\s+are\s+you\s+trying\s+to\s+enter\b/i
       ],
 
       // ID
@@ -201,47 +252,84 @@
         /\bcan\s+i\s+have\s+your\s+name\b/i,
         /\bmay\s+i\s+have\s+your\s+name\b/i,
         /\bstate\s+your\s+name\b/i,
-        /\bwho\s+are\s+you\b/i
+
+        // IMPORTANT FIX: only match "who are you?" when it's basically that question
+        /\bwho\s+are\s+you\b\s*[\?!.]*\s*$/i
       ],
+
       ask_purpose: [
         /\bwhat\s*(is|'s)\s+the\s+purpose\s+of\s+(your\s+)?visit\b/i,
         /\bwhat\s+are\s+you\s+here\s+for\b/i,
         /\bwhy\s+are\s+you\s+here\b/i,
         /\bwhat\s+brings\s+you\s+here\b/i,
-        /\breason\s+for\s+(your\s+)?visit\b/i
+        /\breason\s+for\s+(your\s+)?visit\b/i,
+        /\bwhat\s+are\s+you\s+doing\s+here\b/i
       ],
+
+      ask_delivery_item: [
+        /\bwhat\s+are\s+you\s+delivering\b/i,
+        /\bwhat\s+did\s+you\s+bring\b/i,
+        /\bwhat\s+is\s+in\s+(the\s+)?(package|box|crate)\b/i,
+        /\bwhat\s+supplies\s+did\s+you\s+bring\b/i
+      ],
+
       ask_appointment: [
         /\bdo\s+you\s+have\s+(an?\s+)?appointment\b/i,
         /\bare\s+you\s+expected\b/i,
         /\bdo\s+they\s+expect\s+you\b/i,
         /\bis\s+this\s+pre[-\s]?arranged\b/i
       ],
+
       ask_who: [
         /\bwho\s+are\s+you\s+(here\s+to\s+see|meeting|visiting)\b/i,
         /\bwho\s+is\s+(your\s+)?(appointment|meeting)\s+with\b/i,
         /\bwho\s+are\s+you\s+meeting\b/i,
         /\bwho\s+is\s+your\s+contact\b/i,
-        /\bwith\s+whom\s+are\s+you\s+meeting\b/i,     // your request
-        /\bwith\s+who\s+are\s+you\s+meeting\b/i        // student mistake tolerated
+        /\bwith\s+whom\s+are\s+you\s+meeting\b/i,
+        /\bwith\s+who\s+are\s+you\s+meeting\b/i,
+
+        // Added variants:
+        /\bwho\s+do\s+you\s+have\s+(a\s+)?(meeting|appointment|talk)\s+with\b/i,
+        /\bwho\s+are\s+you\s+talking\s+with\b/i,
+        /\bwho\s+is\s+the\s+host\b/i,
+        /\bwhat\s+is\s+the\s+name\s+of\s+the\s+(person|host)\s+you(?:'re)?\s+seeing\b/i,
+        /\bwho\s+gave\s+you\s+the\s+order\b/i,
+        /\bwho\s+told\s+you\s+to\s+come\b/i,
+        /\bwho\s+sent\s+you\b/i,
+        /\bwho\s+requested\s+this\b/i
       ],
+
       ask_time: [
         /\bwhat\s+time\s+is\s+(your\s+)?(appointment|meeting)\b/i,
+        /\bwhat\s+time\s+is\s+the\s+(appointment|meeting)\b/i,
         /\bwhen\s+is\s+(your\s+)?(appointment|meeting)\b/i,
+        /\bwhen\s+is\s+the\s+(appointment|meeting)\b/i,
         /\bwhat\s+time\s+are\s+you\s+expected\b/i,
-        /\bwhen\s+are\s+you\s+expected\b/i
+        /\bwhen\s+are\s+you\s+expected\b/i,
+        /\bwhat\s+time\s+were\s+you\s+meeting\b/i
       ],
+
       ask_where: [
         /\bwhere\s+are\s+you\s+going\b/i,
         /\bwhat\s+is\s+your\s+destination\b/i,
         /\bwhich\s+(building|unit|office|department|area)\b/i,
-        /\bwhere\s+is\s+the\s+(meeting|appointment)\b/i
+        /\bwhere\s+is\s+the\s+(meeting|appointment)\b/i,
+        /\bwhere\s+are\s+you\s+meeting\b/i,
+        /\bwhere\s+are\s+you\s+meeting\s+him\b/i,
+        /\bwhere\s+are\s+you\s+meeting\s+her\b/i,
+        /\bwhere\s+are\s+you\s+meeting\s+them\b/i
       ],
+
       ask_subject: [
         /\bwhat\s+is\s+(this|it|the\s+visit|the\s+meeting)\s+about\b/i,
         /\bwhat\s+will\s+you\s+discuss\b/i,
         /\bwhat\s+are\s+you\s+here\s+to\s+discuss\b/i,
         /\bcan\s+you\s+tell\s+me\s+more\s+about\s+(the\s+)?(meeting|visit)\b/i,
-        /\bwhy\s+is\s+the\s+meeting\b/i
+
+        // Added "why" variants:
+        /\bwhy\s+are\s+you\s+having\s+the\s+(meeting|appointment)\b/i,
+        /\bwhy\s+is\s+the\s+(meeting|appointment)\b/i,
+        /\bwhat\s+is\s+the\s+meeting\s+for\b/i
       ],
 
       // Control
@@ -359,7 +447,7 @@
   }
 
   /***********************
-   * ID panel show/hide (INLINE, not fullscreen)
+   * ID panel show/hide (INLINE)
    ***********************/
   function ensureIdCloseButton() {
     const panel = $id("idPanel");
@@ -375,7 +463,6 @@
 
     btn.addEventListener("click", () => {
       hideIdPanel();
-      // polite visitor line
       if (state.visitor) visitorSays("Thank you.", state.visitor.mood.text);
     });
 
@@ -402,80 +489,85 @@
     ctx.clearRect(0, 0, canvas.width, canvas.height);
   }
 
+  // Larger + readable + DOB format: DD Mon YYYY
   function drawIdCard(visitor) {
     const canvas = $id("idCanvas");
     if (!canvas) return;
 
+    // Make sure canvas is reasonably sized for readability
+    // (keeps inline, but improves text size)
+    if (canvas.width < 980) canvas.width = 980;
+    if (canvas.height < 620) canvas.height = 620;
+
     const ctx = canvas.getContext("2d");
     const W = canvas.width, H = canvas.height;
 
-    // background
     ctx.clearRect(0, 0, W, H);
     ctx.fillStyle = "#f4f6fb";
     ctx.fillRect(0, 0, W, H);
 
-    // header bar
+    // header
     ctx.fillStyle = "#163a66";
-    ctx.fillRect(0, 0, W, 92);
+    ctx.fillRect(0, 0, W, 110);
 
     ctx.fillStyle = "#ffffff";
-    ctx.font = "bold 38px system-ui, -apple-system, Segoe UI, Roboto, Arial";
-    ctx.fillText("VISITOR ID", 32, 58);
+    ctx.font = "bold 44px system-ui, -apple-system, Segoe UI, Roboto, Arial";
+    ctx.fillText("VISITOR ID", 34, 70);
 
-    ctx.font = "16px system-ui, -apple-system, Segoe UI, Roboto, Arial";
-    ctx.fillStyle = "rgba(255,255,255,0.85)";
-    ctx.fillText("Checkpoint Access Card", 34, 80);
+    ctx.font = "18px system-ui, -apple-system, Segoe UI, Roboto, Arial";
+    ctx.fillStyle = "rgba(255,255,255,0.88)";
+    ctx.fillText("Checkpoint Access Card", 36, 96);
 
     // photo box
     ctx.fillStyle = "#e8ecf5";
-    ctx.fillRect(34, 128, 190, 240);
+    ctx.fillRect(34, 150, 220, 280);
     ctx.strokeStyle = "rgba(0,0,0,0.12)";
-    ctx.strokeRect(34, 128, 190, 240);
+    ctx.strokeRect(34, 150, 220, 280);
 
     const v = visitor.id;
     const rows = [
       ["Name", v.name],
       ["Nationality", v.nationality],
-      ["DOB", formatDob(v.dob)],
+      ["DOB", formatDobHuman(v.dob)],
       ["Age", String(v.age)],
       ["ID nr", v.idNumber],
-      ["Expiry", formatDob(v.expiry)]
+      ["Expiry", formatDobHuman(v.expiry)]
     ];
 
-    let y = 150;
+    let y = 190;
     ctx.fillStyle = "#111827";
     for (const [label, value] of rows) {
-      ctx.font = "700 18px system-ui, -apple-system, Segoe UI, Roboto, Arial";
-      ctx.fillText(label + ":", 260, y);
-      ctx.font = "18px system-ui, -apple-system, Segoe UI, Roboto, Arial";
-      ctx.fillText(value, 380, y);
-      y += 44;
+      ctx.font = "800 22px system-ui, -apple-system, Segoe UI, Roboto, Arial";
+      ctx.fillText(label + ":", 290, y);
+      ctx.font = "22px system-ui, -apple-system, Segoe UI, Roboto, Arial";
+      ctx.fillText(value, 420, y);
+      y += 54;
     }
 
     // barcode-ish footer
     ctx.fillStyle = "#111827";
-    for (let i = 0; i < 140; i++) {
-      const x = 34 + i * 5;
-      const w = (i % 3 === 0) ? 2 : 1;
-      const h = (i % 7 === 0) ? 70 : 50;
-      ctx.fillRect(x, H - 110, w, h);
+    for (let i = 0; i < 160; i++) {
+      const x = 34 + i * 5.6;
+      const w = (i % 3 === 0) ? 2.2 : 1.2;
+      const h = (i % 7 === 0) ? 80 : 55;
+      ctx.fillRect(x, H - 140, w, h);
     }
 
     ctx.fillStyle = "rgba(17,24,39,0.75)";
-    ctx.font = "14px system-ui, -apple-system, Segoe UI, Roboto, Arial";
-    ctx.fillText("Valid only for stated purpose. Subject to search and denial.", 34, H - 22);
+    ctx.font = "16px system-ui, -apple-system, Segoe UI, Roboto, Arial";
+    ctx.fillText("Valid only for stated purpose. Subject to search and denial.", 34, H - 26);
 
     // face
     const img = new Image();
     img.onload = () => {
       ctx.save();
       ctx.beginPath();
-      ctx.rect(34, 128, 190, 240);
+      ctx.rect(34, 150, 220, 280);
       ctx.clip();
-      ctx.drawImage(img, 34, 128, 190, 240);
+      ctx.drawImage(img, 34, 150, 220, 280);
       ctx.restore();
       ctx.strokeStyle = "rgba(0,0,0,0.12)";
-      ctx.strokeRect(34, 128, 190, 240);
+      ctx.strokeRect(34, 150, 220, 280);
     };
     img.src = visitor.headshot;
   }
@@ -492,7 +584,7 @@
       const dob = { ...visitor.id.dob };
       if (chance(0.5)) dob.dd = clamp(dob.dd + pick([-2, -1, 1, 2]), 1, 28);
       else dob.mm = clamp(dob.mm + pick([-1, 1]), 1, 12);
-      return formatDob(dob);
+      return formatDobISO(dob);
     }
     if (kind === "nationality") return pick(NATIONALITIES.filter(n => n !== visitor.id.nationality));
     if (kind === "name") return pick(NAMES) + " " + pick(["Johnson", "Miller", "Brown", "Davis", "Rossi", "Schmidt"]);
@@ -506,7 +598,7 @@
 
     const truth = (() => {
       if (kind === "age") return String(visitor.id.age);
-      if (kind === "dob") return formatDob(visitor.id.dob);
+      if (kind === "dob") return formatDobISO(visitor.id.dob);
       if (kind === "nationality") return visitor.id.nationality;
       if (kind === "name") return visitor.id.name;
       return "";
@@ -579,12 +671,7 @@
     },
     finished: false,
     unknowns: 0,
-
-    // opening stages:
-    // "hello_shown" -> visitor said hello
-    // "help_prompted" -> student greeted; visitor asked can you help me
-    // "ready" -> student offered help; visitor stated "I need to get onto the base."
-    opening: "hello_shown"
+    opening: "hello_shown" // "hello_shown" -> "help_prompted" -> "ready"
   };
 
   function showScreen(which) {
@@ -611,34 +698,6 @@
     setVisitorMood(state.visitor?.mood?.text || "");
   }
 
-  /***********************
-   * Supervisor modal (still available, but only via text intent)
-   ***********************/
-  function openSupervisorModal() {
-    const modal = $id("supervisorModal");
-    if (!modal) return;
-    modal.classList.remove("hidden");
-
-    const v = state.visitor;
-    if ($id("wWho")) $id("wWho").value = v?.id?.name || "";
-    if ($id("wWhat")) $id("wWhat").value = v?.intake?.purpose || "";
-    if ($id("wWithWhom")) $id("wWithWhom").value = v?.intake?.meetingWith || "";
-    if ($id("wTime")) $id("wTime").value = v?.intake?.apptTime || "";
-    if ($id("wWhy")) $id("wWhy").value = v?.intake?.subject || "";
-
-    const resp = $id("supervisorResponse");
-    if (resp) resp.textContent = "";
-  }
-
-  function closeSupervisorModal() {
-    const modal = $id("supervisorModal");
-    if (!modal) return;
-    modal.classList.add("hidden");
-  }
-
-  /***********************
-   * Conversation: single bubble updates
-   ***********************/
   function visitorSays(text, moodLine = null) {
     setVisitorBubble(text);
     if (moodLine !== null) setVisitorMood(moodLine);
@@ -646,6 +705,15 @@
 
   function studentSays(text) {
     setStudentBubble(text);
+  }
+
+  function moodFeelingLine(moodKey) {
+    if (moodKey === "relaxed") return "I feel relaxed and confident today.";
+    if (moodKey === "tired") return "I feel a bit tired, but I’m okay.";
+    if (moodKey === "uneasy") return "I feel a little uneasy, to be honest.";
+    if (moodKey === "nervous") return "I feel nervous.";
+    if (moodKey === "irritated") return "I feel irritated.";
+    return "I feel fine.";
   }
 
   function handleBornYearConfirm(userText) {
@@ -670,7 +738,7 @@
 
     if (yearAsked === trueYear && claim.lied) {
       visitorSays(`Actually… you’re right. I was born in ${trueYear}. Sorry.`, state.visitor.mood.text);
-      v.claims.dob = formatDob(v.id.dob);
+      v.claims.dob = formatDobISO(v.id.dob);
       return;
     }
 
@@ -684,9 +752,8 @@
     if (kind === "name") return `My name is ${v.id.name}.`;
 
     if (kind === "purpose") {
-      // richer purpose answer
       if (a.purpose === "delivery") {
-        return "I’m here for a delivery. I was asked to bring supplies to the logistics section.";
+        return `I’m here for a delivery. I brought ${a.deliveryItem}. ${a.deliveryReason}`;
       }
       if (a.purpose === "maintenance") {
         return "I’m here for maintenance work. I need to check or repair equipment on site.";
@@ -697,7 +764,11 @@
       if (a.purpose === "contract work") {
         return "I’m here for contract work. I’m supporting a scheduled task for the unit.";
       }
-      return `I’m here for a visit.`;
+      return "I’m here for a visit.";
+    }
+
+    if (kind === "delivery_item") {
+      return `I’m delivering ${a.deliveryItem}. ${a.deliveryReason}`;
     }
 
     if (kind === "appointment") {
@@ -716,11 +787,20 @@
     }
 
     if (kind === "where") {
+      // if delivery: give more specific place
+      if (a.purpose === "delivery") {
+        const places = [
+          `At the ${a.goingWhere}.`,
+          `At the loading area near the ${a.goingWhere}.`,
+          `At reception at the ${a.goingWhere}.`,
+          `At the logistics counter inside the ${a.goingWhere}.`
+        ];
+        return pick(places);
+      }
       return `I’m going to the ${a.goingWhere}.`;
     }
 
     if (kind === "subject") {
-      // richer “meeting about” / why explanation
       const templates = [
         `It’s about ${a.subject}. We spoke about it earlier, and they asked me to come today to sort it out.`,
         `It’s about ${a.subject}. There was a problem last week, so they arranged a follow-up with me.`,
@@ -775,26 +855,24 @@
   }
 
   function handleOpeningFlow(intent, rawText) {
-    const t = (rawText || "").trim();
-
     // Stage 1: student greets -> visitor asks for help
     if (state.opening === "hello_shown" && intent === "hello") {
       visitorSays("Can you help me?", state.visitor.mood.text);
       state.opening = "help_prompted";
-      setStep("Start", "Ask what the visitor needs. Then continue with 5W/5WH questions.");
+      setStep("Start", "Offer help (e.g., “How can I help you?”). Then continue with 5W/5WH questions.");
       return true;
     }
 
     // Stage 2: student offers help -> visitor states goal
-    if (state.opening === "help_prompted" && intent === "help_offer") {
+    if (state.opening === "help_prompted" && (intent === "help_offer" || intent === "ask_need")) {
       visitorSays("Yes. I need to get onto the base.", state.visitor.mood.text);
       state.opening = "ready";
       setStep("Intake", "Now ask the 5W/5WH questions (name, purpose, appointment, who, time, where, subject).");
       return true;
     }
 
-    // If student tries to offer help before greeting, allow anyway
-    if (state.opening === "hello_shown" && intent === "help_offer") {
+    // Allow skipping greet
+    if (state.opening === "hello_shown" && (intent === "help_offer" || intent === "ask_need")) {
       visitorSays("I need to get onto the base.", state.visitor.mood.text);
       state.opening = "ready";
       setStep("Intake", "Now ask the 5W/5WH questions.");
@@ -818,20 +896,45 @@
     // Opening logic first
     if (handleOpeningFlow(intent, t)) return;
 
+    // Feeling
+    if (intent === "ask_feeling") {
+      visitorSays(moodFeelingLine(state.visitor.mood.key), state.visitor.mood.text);
+      return;
+    }
+
+    // If student asks "what do you want/need" later too:
+    if (intent === "ask_need") {
+      visitorSays("I need to get onto the base.", state.visitor.mood.text);
+      return;
+    }
+
+    if (intent === "ask_why_need_base") {
+      // Give a reason tied to intake
+      const a = state.visitor.intake;
+      if (a.appointment && a.meetingWith) {
+        visitorSays(`Because I have an appointment with ${a.meetingWith}.`, state.visitor.mood.text);
+      } else if (a.purpose === "delivery") {
+        visitorSays(`Because I need to deliver ${a.deliveryItem}. ${a.deliveryReason}`, state.visitor.mood.text);
+      } else {
+        visitorSays(`Because I’m here for ${a.purpose}.`, state.visitor.mood.text);
+      }
+      return;
+    }
+
     // Deny always
     if (intent === "deny") {
       denyEntrance();
       return;
     }
 
-    // Return ID (by text) also hides panel
+    // Return ID
     if (intent === "return_id") {
       hideIdPanel();
       visitorSays("Thank you.", state.visitor.mood.text);
       return;
     }
 
-    // Ask ID -> show/draw ID
+    // Ask ID
     if (intent === "ask_id") {
       state.flags.asked_id = true;
       state.visitor.idShown = true;
@@ -843,7 +946,7 @@
       return;
     }
 
-    // Supervisor only via TEXT (modal still exists)
+    // Supervisor only via TEXT
     if (intent === "contact_supervisor") {
       state.flags.supervisor_contacted = true;
       visitorSays("Okay. Please contact your supervisor.", state.visitor.mood.text);
@@ -853,7 +956,7 @@
       return;
     }
 
-    // Control questions
+    // Control
     if (intent === "ask_age") {
       state.flags.asked_age = true;
       const a = visitorControlAnswer(state.visitor, "age");
@@ -884,13 +987,13 @@
     // Intake
     if (intent === "ask_name") { state.flags.asked_name = true; visitorSays(intakeAnswer("name"), state.visitor.mood.text); return; }
     if (intent === "ask_purpose") { state.flags.asked_purpose = true; visitorSays(intakeAnswer("purpose"), state.visitor.mood.text); return; }
+    if (intent === "ask_delivery_item") { visitorSays(intakeAnswer("delivery_item"), state.visitor.mood.text); return; }
 
     if (intent === "ask_appointment") {
       state.flags.asked_appointment = true;
       visitorSays(intakeAnswer("appointment"), state.visitor.mood.text);
 
       if (!state.visitor.intake.appointment) {
-        // Give student the “next line” clearly
         setStep("No appointment", "Use: “I will contact my supervisor for approval.” (or similar).");
         setVisitorMood("The visitor looks uncertain.");
       }
@@ -913,6 +1016,31 @@
     state.unknowns += 1;
     visitorSays("Sorry, I don’t understand. Can you ask it another way?", state.visitor.mood.text);
     if (LOG_UNKNOWN) logEvent("unknown_question", { runId: state.runId, text: t });
+  }
+
+  /***********************
+   * Supervisor modal (kept; no supervisor button)
+   ***********************/
+  function openSupervisorModal() {
+    const modal = $id("supervisorModal");
+    if (!modal) return;
+    modal.classList.remove("hidden");
+
+    const v = state.visitor;
+    if ($id("wWho")) $id("wWho").value = v?.id?.name || "";
+    if ($id("wWhat")) $id("wWhat").value = v?.intake?.purpose || "";
+    if ($id("wWithWhom")) $id("wWithWhom").value = v?.intake?.meetingWith || "";
+    if ($id("wTime")) $id("wTime").value = v?.intake?.apptTime || "";
+    if ($id("wWhy")) $id("wWhy").value = v?.intake?.subject || "";
+
+    const resp = $id("supervisorResponse");
+    if (resp) resp.textContent = "";
+  }
+
+  function closeSupervisorModal() {
+    const modal = $id("supervisorModal");
+    if (!modal) return;
+    modal.classList.add("hidden");
   }
 
   /***********************
@@ -962,7 +1090,6 @@
         btn.classList.remove("listening");
         setStatus("");
 
-        // auto send on release/end
         if (VOICE_AUTO_SEND) {
           const val = (input.value || "").trim();
           if (val) {
@@ -983,11 +1110,9 @@
       try { rec.stop(); } catch {}
     }
 
-    // mouse
     btn.addEventListener("mousedown", (e) => { e.preventDefault(); startRec(); });
     document.addEventListener("mouseup", () => { if (listening) stopRec(); });
 
-    // touch
     btn.addEventListener("touchstart", (e) => { e.preventDefault(); startRec(); }, { passive: false });
     btn.addEventListener("touchend", (e) => { e.preventDefault(); stopRec(); }, { passive: false });
   }
@@ -998,15 +1123,12 @@
   async function init() {
     enforceSupervisorNukeForever();
 
-    // teacher button optional
     const teacherBtn = $id("btnTeacher");
     if (teacherBtn) teacherBtn.style.display = (CONFIG.showTeacherButton === false) ? "none" : "";
 
-    // Load phrasebank
     const pb = await loadPhrasebank();
     state.intents = compilePatterns(pb);
 
-    // login screen default
     showScreen("login");
     hideIdPanel();
 
@@ -1033,7 +1155,6 @@
       state.finished = false;
       state.unknowns = 0;
 
-      // reset flags
       state.flags = {
         asked_name: false,
         asked_purpose: false,
@@ -1053,7 +1174,6 @@
       state.visitor = buildVisitor();
       state.opening = "hello_shown";
 
-      // avatars
       const vA = $id("visitorAvatar");
       if (vA) {
         vA.src = state.visitor.headshot;
@@ -1062,26 +1182,21 @@
       const sA = $id("studentAvatar");
       if (sA) sA.src = "assets/photos/soldier.png";
 
-      // meta header
       const meta = $id("meta");
       if (meta) meta.textContent = `${name}${cls ? " · " + cls : ""} · ${diff} · Run ${state.runId.slice(0, 6)}`;
 
-      // clear bubbles + ID
       resetBubbles();
       hideIdPanel();
       clearIdCanvas();
 
-      // show training screen
       showScreen("train");
 
       await logEvent("start", { runId: state.runId, student: state.student, mood: state.visitor.mood.key });
 
-      // Opening: visitor says Hello (student responds)
       visitorSays("Hello.", state.visitor.mood.text);
-      setStep("Start", "Say hello to the visitor. Then respond when the visitor asks for help.");
+      setStep("Start", "Say hello to the visitor. Then offer help (e.g., “How can I help you today?”).");
     });
 
-    // Send
     $id("btnSend")?.addEventListener("click", () => {
       const input = $id("studentInput");
       if (!input) return;
@@ -1099,10 +1214,8 @@
       }
     });
 
-    // Deny entrance
     $id("btnDenyEntrance")?.addEventListener("click", () => denyEntrance());
 
-    // Return to visitor button: also hides ID (acts like giving it back)
     $id("btnReturnVisitor")?.addEventListener("click", () => {
       if (state.visitor?.idShown) {
         hideIdPanel();
@@ -1112,32 +1225,27 @@
       }
     });
 
-    // Go person search
     $id("btnGoPersonSearch")?.addEventListener("click", () => {
       state.flags.did_person_search = true;
       visitorSays("Yes, that’s okay.", state.visitor?.mood?.text || "");
       finishRun("completed");
     });
 
-    // New scenario
     $id("btnNewScenario")?.addEventListener("click", () => {
       showScreen("login");
       state.finished = false;
       hideIdPanel();
     });
 
-    // Finish run
     $id("btnFinishRun")?.addEventListener("click", () => finishRun("manual_finish"));
 
-    // Hint
     $id("btnHint")?.addEventListener("click", () => {
       visitorSays(
-        "Try: What is your name? / Why are you here? / Do you have an appointment? / Who are you meeting?",
+        "Try: How can I help you today? / What is your name? / Why are you here? / Do you have an appointment? / Who are you meeting?",
         state.visitor?.mood?.text || ""
       );
     });
 
-    // Done step helper
     $id("btnDoneStep")?.addEventListener("click", () => {
       if (!state.flags.asked_name) { visitorSays("Next: ask their name.", state.visitor.mood.text); return; }
       if (!state.flags.asked_purpose) { visitorSays("Next: ask the purpose of the visit.", state.visitor.mood.text); return; }
@@ -1146,7 +1254,6 @@
       if (!state.flags.did_person_search) { visitorSays("Next: person search.", state.visitor.mood.text); return; }
     });
 
-    // Supervisor modal buttons
     $id("btnCloseModal")?.addEventListener("click", closeSupervisorModal);
     $id("btnBackToVisitor")?.addEventListener("click", () => {
       closeSupervisorModal();
@@ -1160,8 +1267,8 @@
       visitorSays("Understood.", state.visitor?.mood?.text || "");
     });
 
-    // Feedback buttons
     $id("btnBackToStart")?.addEventListener("click", () => showScreen("login"));
+
     $id("btnDownloadCsv")?.addEventListener("click", () => {
       const rows = [
         ["ts", nowIso()],
