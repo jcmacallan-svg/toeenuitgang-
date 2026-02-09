@@ -817,7 +817,6 @@ function renderIdCard(state){
     const age  = (state.revealed.id || state.revealed.age) ? ((computeAge(id.dob) ?? "—").toString()) : "—";
 
     field("Name", name, 170);
-    field("Company", org, 222);
     field("Nationality", nat, 274);
     field("Date of birth", dob, 326);
     field("Age", age, 378);
@@ -1241,10 +1240,38 @@ $("#btnHint").addEventListener("click", () => {
   });
 
   
+
+  // Main action buttons
+  $("#btnDenyEntrance")?.addEventListener("click", () => denyEntrance(state));
+  $("#btnGoPersonSearch")?.addEventListener("click", () => {
+    goToStep(state, "person_search");
+    updateIdVisibility(state);
+    focusQuestion();
+  });
+  // Return to visitor (after supervisor). If supervisor hasn't approved yet, open supervisor modal.
+  $("#btnReturnVisitor")?.addEventListener("click", () => {
+    if(state.supervisorApproved){
+      showVisitor("Alright, everything checks out. Here is your ID back. Before I let you on the base: prohibited items include weapons, drugs, alcohol, and sharp objects. Do you have any prohibited items?");
+      goToStep(state, "threat_rules");
+      updateIdVisibility(state);
+      focusQuestion();
+    } else {
+      openSupervisorModal(state);
+    }
+  });
+
   // Supervisor modal buttons
   $("#btnContactSupervisor")?.addEventListener("click", () => openSupervisorModal(state));
   $("#btnCloseModal")?.addEventListener("click", () => closeSupervisorModal());
   $("#btnSendSupervisor")?.addEventListener("click", () => sendToSupervisor(state));
+  $("#btnBackToVisitor")?.addEventListener("click", () => {
+    state.supervisorComplete = true;
+    closeSupervisorModal();
+    showVisitor("Alright, everything checks out. Here is your ID back. Before I let you on the base: prohibited items include weapons, drugs, alcohol, and sharp objects. Do you have any prohibited items?");
+    goToStep(state, "threat_rules");
+    updateIdVisibility(state);
+    focusQuestion();
+  });
   // Return to visitor
   $("#btnReturnVisitor")?.addEventListener("click", () => {
     state.supervisorComplete = true;
@@ -1840,8 +1867,10 @@ function denyEntrance(state){
   // disable input
   const inp = $("#studentInput");
   const btn = $("#btnSend");
+  const mic = $("#btnMicHold");
   if(inp) inp.disabled = true;
   if(btn) btn.disabled = true;
+  if(mic) mic.disabled = true;
 }
 
 function idCheckComplete(state){
