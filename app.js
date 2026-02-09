@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "veva-whatsapp-v2-2026-02-09";
+  const APP_VERSION = "veva-whatsapp-v2-2026-02-09a";
   console.log("[VEVA]", APP_VERSION, "loaded");
 
   const CONFIG = window.APP_CONFIG || {};
@@ -21,6 +21,7 @@
   }
   function clamp(n, a, b) { return Math.max(a, Math.min(b, n)); }
   function chance(p) { return Math.random() < clamp(p, 0, 1); }
+  function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
 
   function parseYear(text) {
     const m = (text || "").match(/\b(19\d{2}|20\d{2})\b/);
@@ -68,8 +69,6 @@
     "David", "Michael", "James", "Robert", "Daniel", "Thomas",
     "Mark", "Lucas", "Noah", "Adam", "Omar", "Yusuf", "Mateusz", "Julien", "Marco"
   ];
-
-  function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
 
   function randomDob() {
     const today = new Date();
@@ -130,187 +129,154 @@
 
   // ---- Intents ----
   function compilePatterns(extra) {
-  // Helper to build common polite prefixes (optional)
-  // We keep regexes readable rather than overly nested.
-  const base = {
-    // =========================
-    // ID / Identification
-    // =========================
-    ask_id: [
-      /\b(can|could|may)\s+i\s+(see|check|verify|inspect|look\s+at)\s+(your|ur)\s+(id|identification|passport|card)\b/i,
-      /\b(show|present)\s+(me\s+)?(your|ur)\s+(id|identification|passport|card)\b/i,
-      /\b(id|identification)\s+(please|pls)\b/i,
-      /\bdo\s+you\s+(have|carry)\s+(an?\s+)?(id|identification|passport)\b/i,
-      /\bcan\s+you\s+provide\s+(an?\s+)?(id|identification)\b/i,
-      /\blet\s+me\s+(see|check)\s+(your|ur)\s+(id|identification)\b/i,
-      /\bwhat\s+is\s+your\s+(id\s+number|identification\s+number)\b/i
-    ],
+    const base = {
+      ask_id: [
+        /\b(can|could|may)\s+i\s+(see|check|verify|inspect|look\s+at)\s+(your|ur)\s+(id|identification|passport|card)\b/i,
+        /\b(show|present)\s+(me\s+)?(your|ur)\s+(id|identification|passport|card)\b/i,
+        /\b(id|identification|passport)\s+(please|pls)\b/i,
+        /\bdo\s+you\s+(have|carry)\s+(an?\s+)?(id|identification|passport)\b/i,
+        /\bcan\s+you\s+provide\s+(an?\s+)?(id|identification)\b/i,
+        /\blet\s+me\s+(see|check)\s+(your|ur)\s+(id|identification)\b/i
+      ],
 
-    return_id: [
-      /\bhere\s+(is|are)\s+(your|ur)\s+(id|card|identification)\s+back\b/i,
-      /\b(return|give)\s+(it|the\s+(id|card|identification))\s+back\b/i,
-      /\byou\s+can\s+have\s+(your|ur)\s+(id|card)\s+back\b/i,
-      /\breturn\s+to\s+visitor\b/i
-    ],
+      return_id: [
+        /\bhere\s+(is|are)\s+(your|ur)\s+(id|card|identification|passport)\s+back\b/i,
+        /\b(return|give)\s+(it|the\s+(id|card|identification|passport))\s+back\b/i,
+        /\byou\s+can\s+have\s+(your|ur)\s+(id|passport|card)\s+back\b/i,
+        /\breturn\s+to\s+visitor\b/i,
+        /\bthank\s+you\s+here\s+you\s+go\b/i
+      ],
 
-    // =========================
-    // Supervisor / Boss
-    // =========================
-    contact_supervisor: [
-      // "I will contact my supervisor", "I'll contact my boss", "I need to call my manager", etc.
-      /\b(i\s*(will|’ll|'ll|need\s+to|have\s+to|must|may\s+need\s+to)\s+)?(contact|call|ring|phone|speak\s+to|talk\s+to|ask)\s+(my\s+)?(supervisor|boss|manager|team\s*leader|officer)\b/i,
+      contact_supervisor: [
+        /\b(i\s*(will|’ll|'ll|need\s+to|have\s+to|must|may\s+need\s+to)\s+)?(contact|call|ring|phone|speak\s+to|talk\s+to|ask|check\s+with)\s+(my\s+)?(supervisor|boss|manager|team\s*leader|officer)\b/i,
+        /\b(i\s*(will|’ll|'ll)\s+)?(have\s+to|need\s+to|must)\s+ask\s+(my\s+)?(supervisor|boss|manager)\b/i,
+        /\b(i\s+)?need\s+(approval|authori[sz]ation|permission)\b/i,
+        /\b(get|request)\s+(approval|authori[sz]ation|permission)\b/i,
+        /\b(for\s+approval|for\s+authori[sz]ation|for\s+permission)\b/i
+      ],
 
-      // "I will have to ask my supervisor for approval"
-      /\b(i\s*(will|’ll|'ll)\s+)?(have\s+to|need\s+to|must)\s+ask\s+(my\s+)?(supervisor|boss|manager)\b/i,
+      ask_name: [
+        /\bwhat\s*(is|'s)\s+your\s+name\b/i,
+        /\bcan\s+i\s+have\s+your\s+name\b/i,
+        /\bmay\s+i\s+have\s+your\s+name\b/i,
+        /\byour\s+name\s*,?\s+please\b/i,
+        /\bstate\s+your\s+name\b/i,
+        /\bwho\s+are\s+you\b/i
+      ],
 
-      // "I need approval / I need authorization"
-      /\b(i\s+)?need\s+(approval|authori[sz]ation|permission)\b/i,
-      /\b(for\s+approval|for\s+authori[sz]ation|for\s+permission)\b/i
-    ],
+      ask_purpose: [
+        /\bwhat\s*(is|'s)\s+the\s+purpose\s+of\s+(your\s+)?visit\b/i,
+        /\bwhat\s+are\s+you\s+here\s+for\b/i,
+        /\bwhy\s+are\s+you\s+here\b/i,
+        /\bwhat\s+brings\s+you\s+here\b/i,
+        /\bstate\s+your\s+purpose\b/i,
+        /\breason\s+for\s+(your\s+)?visit\b/i,
+        /\bwhat\s+do\s+you\s+need\b/i
+      ],
 
-    // =========================
-    // 5W/5WH intake questions
-    // =========================
-    ask_name: [
-      /\bwhat\s*(is|'s)\s+your\s+name\b/i,
-      /\bcan\s+i\s+have\s+your\s+name\b/i,
-      /\bmay\s+i\s+have\s+your\s+name\b/i,
-      /\byour\s+name\s*,?\s+please\b/i,
-      /\bstate\s+your\s+name\b/i,
-      /\bwho\s+are\s+you\b/i
-    ],
+      ask_appointment: [
+        /\bdo\s+you\s+have\s+(an?\s+)?appointment\b/i,
+        /\bare\s+you\s+expected\b/i,
+        /\bdo\s+they\s+expect\s+you\b/i,
+        /\bis\s+this\s+pre[-\s]?arranged\b/i,
+        /\bdid\s+you\s+schedule\s+(a\s+)?(meeting|appointment)\b/i
+      ],
 
-    ask_purpose: [
-      /\bwhat\s*(is|'s)\s+the\s+purpose\s+of\s+(your\s+)?visit\b/i,
-      /\bwhat\s+are\s+you\s+here\s+for\b/i,
-      /\bwhy\s+are\s+you\s+here\b/i,
-      /\bwhat\s+brings\s+you\s+here\b/i,
-      /\bstate\s+your\s+purpose\b/i,
-      /\breason\s+for\s+(your\s+)?visit\b/i,
-      /\bwhat\s+is\s+the\s+reason\s+for\s+(your\s+)?visit\b/i
-    ],
+      ask_who: [
+        /\bwho\s+are\s+you\s+(here\s+to\s+see|meeting|visiting)\b/i,
+        /\bwho\s+is\s+(your\s+)?(appointment|meeting)\s+with\b/i,
+        /\bwho\s+are\s+you\s+meeting\b/i,
+        /\bwho\s+is\s+your\s+contact\b/i,
+        /\bwho\s+is\s+expecting\s+you\b/i
+      ],
 
-    ask_appointment: [
-      /\bdo\s+you\s+have\s+(an?\s+)?appointment\b/i,
-      /\bare\s+you\s+expected\b/i,
-      /\bdo\s+they\s+expect\s+you\b/i,
-      /\bis\s+this\s+pre[-\s]?arranged\b/i,
-      /\bdid\s+you\s+schedule\s+(a\s+)?(meeting|appointment)\b/i
-    ],
+      ask_time: [
+        /\bwhat\s+time\s+is\s+(your\s+)?(appointment|meeting)\b/i,
+        /\bwhen\s+is\s+(your\s+)?(appointment|meeting)\b/i,
+        /\bwhat\s+time\s+are\s+you\s+expected\b/i,
+        /\bwhen\s+are\s+you\s+expected\b/i,
+        /\bwhat\s+time\s+did\s+they\s+tell\s+you\b/i
+      ],
 
-    ask_who: [
-      /\bwho\s+are\s+you\s+(here\s+to\s+see|meeting|visiting)\b/i,
-      /\bwho\s+is\s+(your\s+)?(appointment|meeting)\s+with\b/i,
-      /\bwho\s+are\s+you\s+meeting\b/i,
-      /\bwho\s+is\s+your\s+contact\b/i,
-      /\bwho\s+is\s+expecting\s+you\b/i
-    ],
+      ask_where: [
+        /\bwhere\s+are\s+you\s+going\b/i,
+        /\bwhat\s+is\s+your\s+destination\b/i,
+        /\bwhich\s+(building|unit|office|department|area)\b/i,
+        /\bwhere\s+is\s+the\s+(meeting|appointment)\b/i,
+        /\bwhere\s+will\s+you\s+go\b/i
+      ],
 
-    ask_time: [
-      /\bwhat\s+time\s+is\s+(your\s+)?(appointment|meeting)\b/i,
-      /\bwhen\s+is\s+(your\s+)?(appointment|meeting)\b/i,
-      /\bwhat\s+time\s+are\s+you\s+expected\b/i,
-      /\bwhen\s+are\s+you\s+expected\b/i,
-      /\bwhat\s+time\s+did\s+they\s+tell\s+you\b/i
-    ],
+      ask_subject: [
+        /\bwhat\s+is\s+(this|it|the\s+visit|the\s+meeting)\s+about\b/i,
+        /\bwhat\s+will\s+you\s+discuss\b/i,
+        /\bwhat\s+are\s+you\s+here\s+to\s+discuss\b/i,
+        /\bcan\s+you\s+tell\s+me\s+more\s+about\s+(the\s+)?(meeting|visit)\b/i,
+        /\bwhat\s+do\s+you\s+want\s+to\s+talk\s+about\b/i
+      ],
 
-    ask_where: [
-      /\bwhere\s+are\s+you\s+going\b/i,
-      /\bwhat\s+is\s+your\s+destination\b/i,
-      /\bwhich\s+(building|unit|office|department|area)\b/i,
-      /\bwhere\s+is\s+the\s+(meeting|appointment)\b/i,
-      /\bwhere\s+will\s+you\s+go\b/i
-    ],
+      ask_age: [
+        /\bhow\s+old\s+are\s+you\b/i,
+        /\bwhat\s+is\s+your\s+age\b/i,
+        /\bwhat\s+age\s+are\s+you\b/i,
+        /\bmay\s+i\s+ask\s+your\s+age\b/i,
+        /\bcan\s+you\s+confirm\s+your\s+age\b/i
+      ],
 
-    ask_subject: [
-      /\bwhat\s+is\s+(this|it|the\s+visit|the\s+meeting)\s+about\b/i,
-      /\bwhat\s+will\s+you\s+discuss\b/i,
-      /\bwhat\s+are\s+you\s+here\s+to\s+discuss\b/i,
-      /\bcan\s+you\s+tell\s+me\s+more\s+about\s+(the\s+)?(meeting|visit)\b/i,
-      /\bwhat\s+is\s+the\s+purpose\s+of\s+the\s+meeting\b/i
-    ],
+      ask_dob: [
+        /\bwhat\s*(is|'s)\s+your\s+(date\s+of\s+birth|dob)\b/i,
+        /\bdate\s+of\s+birth\b/i,
+        /\bdob\b/i,
+        /\bwhen\s+were\s+you\s+born\b/i,
+        /\bcan\s+you\s+confirm\s+your\s+date\s+of\s+birth\b/i
+      ],
 
-    // =========================
-    // Control questions
-    // =========================
-    ask_age: [
-      /\bhow\s+old\s+are\s+you\b/i,
-      /\bwhat\s+is\s+your\s+age\b/i,
-      /\bwhat\s+age\s+are\s+you\b/i,
-      /\bmay\s+i\s+ask\s+your\s+age\b/i,
-      /\bcan\s+you\s+confirm\s+your\s+age\b/i
-    ],
+      confirm_born_year: [
+        /\bwere\s+you\s+born\s+in\s+(19\d{2}|20\d{2})\b/i,
+        /\bwere\s+you\s+born\s+around\s+(19\d{2}|20\d{2})\b/i,
+        /\byou\s+were\s+born\s+in\s+(19\d{2}|20\d{2})\s*\?\s*$/i,
+        /\bis\s+your\s+birth\s+year\s+(19\d{2}|20\d{2})\b/i,
+        /\byour\s+birth\s+year\s+is\s+(19\d{2}|20\d{2})\s*\?\s*$/i
+      ],
 
-    ask_dob: [
-      /\bwhat\s*(is|'s)\s+your\s+(date\s+of\s+birth|dob)\b/i,
-      /\bdate\s+of\s+birth\b/i,
-      /\bdob\b/i,
-      /\bwhen\s+were\s+you\s+born\b/i,
-      /\bcan\s+you\s+confirm\s+your\s+date\s+of\s+birth\b/i
-    ],
+      ask_nationality: [
+        /\bwhat\s+is\s+your\s+nationality\b/i,
+        /\bwhat\s+nationality\s+are\s+you\b/i,
+        /\bwhere\s+are\s+you\s+from\b/i,
+        /\bwhat\s+country\s+are\s+you\s+from\b/i,
+        /\bwhat\s+is\s+your\s+citizenship\b/i
+      ],
 
-    // "Were you born in 1993?" (any year)
-    confirm_born_year: [
-      /\bwere\s+you\s+born\s+in\s+(19\d{2}|20\d{2})\b/i,
-      /\bwere\s+you\s+born\s+around\s+(19\d{2}|20\d{2})\b/i,
-      /\byou\s+were\s+born\s+in\s+(19\d{2}|20\d{2})\s*\?\s*$/i,
-      /\bis\s+your\s+birth\s+year\s+(19\d{2}|20\d{2})\b/i,
-      /\byour\s+birth\s+year\s+is\s+(19\d{2}|20\d{2})\s*\?\s*$/i
-    ],
+      go_person_search: [
+        /\b(go\s+to|start|begin|proceed\s+to)\s+(the\s+)?(person\s+search|pat[-\s]?down|frisk|search)\b/i,
+        /\b(i\s+will|we\s+will|i\s+am\s+going\s+to|we\s+are\s+going\s+to)\s+(pat\s+you\s+down|search\s+you|do\s+a\s+pat[-\s]?down)\b/i,
+        /\b(person\s+search|pat[-\s]?down)\s+now\b/i
+      ],
 
-    ask_nationality: [
-      /\bwhat\s+is\s+your\s+nationality\b/i,
-      /\bwhat\s+nationality\s+are\s+you\b/i,
-      /\bwhere\s+are\s+you\s+from\b/i,
-      /\bwhat\s+country\s+are\s+you\s+from\b/i,
-      /\bwhat\s+is\s+your\s+citizenship\b/i,
-      /\bare\s+you\s+(dutch|german|belgian|french|spanish|italian|polish|romanian|turkish|british|american|canadian)\b/i
-    ],
+      deny: [
+        /\bdeny\s+(entrance|entry|access)\b/i,
+        /\b(refuse|reject)\s+(entry|access)\b/i,
+        /\byou\s+cannot\s+enter\b/i,
+        /\byou\s+may\s+not\s+enter\b/i,
+        /\bnot\s+allowed\s+to\s+enter\b/i,
+        /\bi\s+(am\s+)?(denying|refusing)\s+(entry|access)\b/i
+      ],
 
-    // =========================
-    // Person search / pat-down
-    // =========================
-    go_person_search: [
-      /\b(go\s+to|start|begin|proceed\s+to)\s+(the\s+)?(person\s+search|pat[-\s]?down|frisk|search)\b/i,
-      /\b(i\s+will|we\s+will|i\s+am\s+going\s+to|we\s+are\s+going\s+to)\s+(pat\s+you\s+down|search\s+you|do\s+a\s+pat[-\s]?down)\b/i,
-      /\b(person\s+search|pat[-\s]?down)\s+now\b/i
-    ],
+      smalltalk: [
+        /\bhello\b/i,
+        /\bhi\b/i,
+        /\bhey\b/i,
+        /\bgood\s+(morning|afternoon|evening)\b/i,
+        /\bhow\s+are\s+you\b/i,
+        /\bhow\s+are\s+you\s+doing\b/i
+      ]
+    };
 
-    // =========================
-    // Deny / refuse entry
-    // =========================
-    deny: [
-      /\bdeny\s+(entrance|entry|access)\b/i,
-      /\b(refuse|reject)\s+(entry|access)\b/i,
-      /\byou\s+cannot\s+enter\b/i,
-      /\byou\s+may\s+not\s+enter\b/i,
-      /\bnot\s+allowed\s+to\s+enter\b/i,
-      /\bi\s+(am\s+)?(denying|refusing)\s+(entry|access)\b/i
-    ],
+    const merged = { ...base };
 
-    // =========================
-    // Smalltalk / greetings
-    // =========================
-    smalltalk: [
-      /\bhello\b/i,
-      /\bhi\b/i,
-      /\bhey\b/i,
-      /\bgood\s+(morning|afternoon|evening)\b/i,
-      /\bhow\s+are\s+you\b/i,
-      /\bhow\s+are\s+you\s+doing\b/i
-    ]
-  };
-
-  // Merge optional phrasebank patterns if present.
-  // Supported shapes:
-  // - { intents: { ask_id: { patterns: ["..."] } } }
-  // - { ask_id: ["..."] }
-  // Strings are treated as regex sources.
-  const merged = { ...base };
-
-  if (extra) {
-    const intentsObj = extra.intents && typeof extra.intents === "object" ? extra.intents : null;
-
+    // Merge optional phrasebank patterns if present.
+    // Supported shapes:
+    // - { intents: { ask_id: { patterns: ["..."] } } }
+    // - { ask_id: ["..."] }
     const addPatterns = (key, arr) => {
       if (!arr || !Array.isArray(arr)) return;
       merged[key] = merged[key] || [];
@@ -318,57 +284,29 @@
         if (!p) continue;
         if (p instanceof RegExp) merged[key].push(p);
         else if (typeof p === "string") {
-          try { merged[key].push(new RegExp(p, "i")); } catch { /* ignore invalid */ }
+          try { merged[key].push(new RegExp(p, "i")); } catch {}
         }
       }
     };
 
-    if (intentsObj) {
-      for (const [k, v] of Object.entries(intentsObj)) {
-        if (v && Array.isArray(v.patterns)) addPatterns(k, v.patterns);
-      }
-    } else {
-      for (const [k, v] of Object.entries(extra)) {
-        if (Array.isArray(v)) addPatterns(k, v);
-      }
-    }
-  }
-
-  // Compile to predicate functions
-  const compiled = {};
-  for (const [k, arr] of Object.entries(merged)) {
-    compiled[k] = (text) => arr.some(rx => rx.test(text || ""));
-  }
-  compiled._raw = merged;
-  return compiled;
-}
-    const merged = { ...base };
-
-    // optional phrasebank merge (same structure as earlier)
     if (extra) {
       const intentsObj = extra.intents && typeof extra.intents === "object" ? extra.intents : null;
-
-      const addPatterns = (key, arr) => {
-        if (!arr || !Array.isArray(arr)) return;
-        merged[key] = merged[key] || [];
-        for (const p of arr) {
-          if (!p) continue;
-          if (p instanceof RegExp) merged[key].push(p);
-          else if (typeof p === "string") {
-            try { merged[key].push(new RegExp(p, "i")); } catch {}
-          }
-        }
-      };
 
       if (intentsObj) {
         for (const [k, v] of Object.entries(intentsObj)) {
           if (v && Array.isArray(v.patterns)) addPatterns(k, v.patterns);
         }
+      } else {
+        for (const [k, v] of Object.entries(extra)) {
+          if (Array.isArray(v)) addPatterns(k, v);
+        }
       }
     }
 
     const compiled = {};
-    for (const [k, arr] of Object.entries(merged)) compiled[k] = (text) => arr.some(rx => rx.test(text));
+    for (const [k, arr] of Object.entries(merged)) {
+      compiled[k] = (text) => arr.some(rx => rx.test(text || ""));
+    }
     compiled._raw = merged;
     return compiled;
   }
@@ -384,10 +322,38 @@
   }
 
   function matchIntent(intents, text) {
-    for (const k of Object.keys(intents)) {
+    // Prefer key-order stability: check common keys first, then fallback
+    const order = [
+      "deny",
+      "ask_id",
+      "return_id",
+      "contact_supervisor",
+      "go_person_search",
+      "ask_name",
+      "ask_purpose",
+      "ask_appointment",
+      "ask_who",
+      "ask_time",
+      "ask_where",
+      "ask_subject",
+      "ask_age",
+      "ask_dob",
+      "confirm_born_year",
+      "ask_nationality",
+      "smalltalk"
+    ];
+
+    for (const k of order) {
+      if (intents?.[k] && intents[k](text)) return k;
+    }
+
+    // if phrasebank adds extra keys, allow them too:
+    for (const k of Object.keys(intents || {})) {
       if (k === "_raw") continue;
+      if (order.includes(k)) continue;
       if (intents[k](text)) return k;
     }
+
     return "unknown";
   }
 
@@ -407,13 +373,26 @@
     bubble.style.display = text ? "" : "none";
   }
 
+  // ---- ID Panel show/hide (your CSS can make it overlay via body.id-open) ----
+  function showIdPanel() {
+    const panel = $id("idPanel");
+    if (panel) panel.style.display = "";
+    document.body.classList.add("id-open");
+  }
+  function hideIdPanel() {
+    const panel = $id("idPanel");
+    if (panel) panel.style.display = "none";
+    document.body.classList.remove("id-open");
+  }
+
   // ---- ID Canvas ----
   function drawIdCard(visitor) {
     const canvas = $id("idCanvas");
     const panel = $id("idPanel");
     if (!canvas || !panel) return;
 
-    panel.style.display = ""; // ensure visible (desktop)
+    showIdPanel();
+
     const ctx = canvas.getContext("2d");
     const W = canvas.width, H = canvas.height;
 
@@ -477,18 +456,15 @@
     // load face on top
     const img = new Image();
     img.onload = () => {
-      // cover crop
-      const sx = 0, sy = 0, sw = img.width, sh = img.height;
       ctx.save();
       ctx.beginPath();
       ctx.rect(34, 128, 190, 240);
       ctx.clip();
-      ctx.drawImage(img, sx, sy, sw, sh, 34, 128, 190, 240);
+      ctx.drawImage(img, 0, 0, img.width, img.height, 34, 128, 190, 240);
       ctx.restore();
       ctx.strokeStyle = "rgba(0,0,0,0.12)";
       ctx.strokeRect(34, 128, 190, 240);
     };
-    img.onerror = () => {};
     img.src = visitor.headshot;
   }
 
@@ -617,7 +593,6 @@
     if (!modal) return;
     modal.classList.remove("hidden");
 
-    // prefill
     const v = state.visitor;
     $id("wWho").value = v?.id?.name || "";
     $id("wWhat").value = v?.intake?.purpose || "";
@@ -653,7 +628,7 @@
     }
 
     const v = state.visitor;
-    const claim = visitorControlAnswer(v, "dob");   // may be truth or lie
+    const claim = visitorControlAnswer(v, "dob");
     const claimYear = parseYear(claim.value) || v.id.dob.yyyy;
     const trueYear = v.id.dob.yyyy;
 
@@ -663,10 +638,8 @@
       return;
     }
 
-    // mismatch
     visitorSays("No, that’s not correct.");
 
-    // If student said true year but visitor lied, allow correction
     if (yearAsked === trueYear && claim.lied) {
       visitorSays(`Actually… you’re right. I was born in ${trueYear}. Sorry.`);
       v.claims.dob = formatDob(v.id.dob);
@@ -676,16 +649,65 @@
     visitorSays(`I was born in ${claimYear}.`);
   }
 
+  // ---- Intake answer variations (more room) ----
   function intakeAnswer(kind) {
     const v = state.visitor;
     const a = v.intake;
-    if (kind === "name") return `My name is ${v.id.name}.`;
-    if (kind === "purpose") return `I’m here for ${a.purpose}.`;
-    if (kind === "appointment") return a.appointment ? "Yes, I have an appointment." : "No, I don’t have an appointment.";
-    if (kind === "who") return a.meetingWith ? `I’m meeting ${a.meetingWith}.` : "I’m not meeting anyone specific.";
-    if (kind === "time") return a.apptTime ? `It’s at ${a.apptTime}.` : "I don’t have a specific time.";
-    if (kind === "where") return `I’m going to the ${a.goingWhere}.`;
-    if (kind === "subject") return `It’s about ${a.subject}.`;
+
+    const variants = {
+      name: [
+        `My name is ${v.id.name}.`,
+        `It's ${v.id.name}.`,
+        `${v.id.name}.`,
+        `I'm ${v.id.name}.`
+      ],
+      purpose: [
+        `I’m here for ${a.purpose}.`,
+        `I’m here because of ${a.purpose}.`,
+        `I need to come in for ${a.purpose}.`,
+        `It’s for ${a.purpose}.`
+      ],
+      appointment_yes: [
+        "Yes, I have an appointment.",
+        "Yes, I’m expected.",
+        "Yes, it’s scheduled.",
+        "Yes, I have a meeting."
+      ],
+      appointment_no: [
+        "No, I don’t have an appointment.",
+        "No, I’m not sure I have one.",
+        "No, I didn’t schedule anything.",
+        "No appointment, I just need to get in."
+      ],
+      who: [
+        a.meetingWith ? `I’m meeting ${a.meetingWith}.` : "I’m not meeting anyone specific.",
+        a.meetingWith ? `${a.meetingWith}.` : "I don’t really have a contact person."
+      ],
+      time: [
+        a.apptTime ? `It’s at ${a.apptTime}.` : "I don’t have a specific time.",
+        a.apptTime ? `${a.apptTime}.` : "I wasn’t given a time."
+      ],
+      where: [
+        `I’m going to the ${a.goingWhere}.`,
+        `To the ${a.goingWhere}.`,
+        `The ${a.goingWhere}.`
+      ],
+      subject: [
+        `It’s about ${a.subject}.`,
+        `We’ll discuss ${a.subject}.`,
+        `It’s related to ${a.subject}.`,
+        `Mainly ${a.subject}.`
+      ]
+    };
+
+    if (kind === "name") return pick(variants.name);
+    if (kind === "purpose") return pick(variants.purpose);
+    if (kind === "appointment") return a.appointment ? pick(variants.appointment_yes) : pick(variants.appointment_no);
+    if (kind === "who") return pick(variants.who);
+    if (kind === "time") return pick(variants.time);
+    if (kind === "where") return pick(variants.where);
+    if (kind === "subject") return pick(variants.subject);
+
     return "Okay.";
   }
 
@@ -727,15 +749,13 @@
 
     studentSays(t);
     logEvent("message", { runId: state.runId, from: "student", text: t });
-    // If student greets, visitor asks for help (opening script)
-    const low = safeLower(t);
-    const isHello = /\b(hello|hi|good\s+morning|good\s+afternoon|good\s+evening)\b/i.test(t);
 
+    // Opening: If student greets, visitor asks for help.
+    const isHello = /\b(hello|hi|good\s+morning|good\s+afternoon|good\s+evening|hey)\b/i.test(t);
     if (isHello) {
-    // Visitor follows up with help request
-    visitorSays("Can you help me?", state.visitor.mood.text);
-    setStep("Intake", "Now ask the 5W/5WH questions (name, purpose, appointment, who, time, where, subject).");
-    return;
+      visitorSays("Can you help me?", state.visitor.mood.text);
+      setStep("Intake", "Now ask the 5W/5WH questions (name, purpose, appointment, who, time, where, subject).");
+      return;
     }
 
     const intent = matchIntent(state.intents, t);
@@ -743,6 +763,14 @@
     // deny always
     if (intent === "deny") {
       denyEntrance();
+      return;
+    }
+
+    // Return ID (intent OR you can also wire a button)
+    if (intent === "return_id") {
+      hideIdPanel();
+      visitorSays("Thank you.", state.visitor.mood.text);
+      logEvent("return_id", { runId: state.runId, source: "text" });
       return;
     }
 
@@ -799,8 +827,13 @@
     if (intent === "ask_appointment") {
       state.flags.asked_appointment = true;
       visitorSays(intakeAnswer("appointment"), state.visitor.mood.text);
+
       if (!state.visitor.intake.appointment) {
         setVisitorMood("The visitor looks uncertain.");
+        setStep(
+          "No appointment",
+          "If there is no appointment, contact your supervisor. Try: “I will contact my supervisor for approval.”"
+        );
       }
       return;
     }
@@ -869,7 +902,6 @@
         btn.classList.remove("listening");
         setStatus("");
 
-        // auto send on release/end
         if (VOICE_AUTO_SEND) {
           const val = (input.value || "").trim();
           if (val) {
@@ -890,26 +922,21 @@
       try { rec.stop(); } catch {}
     }
 
-    // mouse
     btn.addEventListener("mousedown", (e) => { e.preventDefault(); startRec(); });
     document.addEventListener("mouseup", () => { if (listening) stopRec(); });
 
-    // touch
     btn.addEventListener("touchstart", (e) => { e.preventDefault(); startRec(); }, { passive: false });
     btn.addEventListener("touchend", (e) => { e.preventDefault(); stopRec(); }, { passive: false });
   }
 
   // ---- Init / wiring ----
   async function init() {
-    // teacher button optionally hidden
     const teacherBtn = $id("btnTeacher");
     if (teacherBtn) teacherBtn.style.display = (CONFIG.showTeacherButton === false) ? "none" : "";
 
     // Hide the supervisor BUTTON (text trigger only), but keep it in DOM
     const supBtn = $id("btnContactSupervisor");
     if (supBtn) supBtn.style.display = "none";
-
-    // Hide ID panel on mobile is already handled by your CSS @media rule
 
     // Load phrasebank
     const pb = await loadPhrasebank();
@@ -940,7 +967,23 @@
       state.runId = uid();
       state.finished = false;
       state.unknowns = 0;
-      state.flags = Object.fromEntries(Object.keys(state.flags).map(k => [k, false]));
+
+      // reset flags
+      state.flags = {
+        asked_name: false,
+        asked_purpose: false,
+        asked_appointment: false,
+        asked_who: false,
+        asked_time: false,
+        asked_where: false,
+        asked_subject: false,
+        asked_id: false,
+        asked_age: false,
+        asked_dob: false,
+        asked_nationality: false,
+        supervisor_contacted: false,
+        did_person_search: false
+      };
 
       state.visitor = buildVisitor();
 
@@ -956,9 +999,10 @@
       // mood line
       setVisitorMood(state.visitor.mood.text);
 
-      // clear ID canvas (don’t show yet)
-      const idPanel = $id("idPanel");
-      if (idPanel) idPanel.style.display = ""; // visible on desktop, hidden on mobile by CSS
+      // ID panel should be hidden until asked
+      hideIdPanel();
+
+      // clear ID canvas
       const canvas = $id("idCanvas");
       if (canvas) {
         const ctx = canvas.getContext("2d");
@@ -972,15 +1016,12 @@
       // move to training
       showScreen("train");
       resetBubbles();
-      setStep("Intake", "Start with 5W/5WH (name, purpose, appointment, who, time, where, subject).");
 
       await logEvent("start", { runId: state.runId, student: state.student, mood: state.visitor.mood.key });
 
       // Opening flow (your desired script)
       visitorSays("Hello.", state.visitor.mood.text);
 
-      // We do NOT auto-force a soldier line. Student should type/speak it.
-      // After the student says hello, visitor will ask "Can you help me?" (handled in handleMessage below).
       setStep("Start", "Say hello to the visitor. Then ask the 5W/5WH questions.");
     });
 
@@ -1005,7 +1046,6 @@
     $id("btnDenyEntrance")?.addEventListener("click", () => denyEntrance());
 
     $id("btnNewScenario")?.addEventListener("click", () => {
-      // back to login
       showScreen("login");
       state.finished = false;
     });
@@ -1013,11 +1053,13 @@
     $id("btnFinishRun")?.addEventListener("click", () => finishRun("manual_finish"));
 
     $id("btnHint")?.addEventListener("click", () => {
-      visitorSays("Try: What is your name? / What is the purpose of your visit? / Do you have an appointment?", state.visitor?.mood?.text || "");
+      visitorSays(
+        "Try: What is your name? / What is the purpose of your visit? / Do you have an appointment?",
+        state.visitor?.mood?.text || ""
+      );
     });
 
     $id("btnDoneStep")?.addEventListener("click", () => {
-      // lightweight guidance
       if (!state.flags.asked_id) {
         visitorSays("Next step: ask for an ID.", state.visitor.mood.text);
         setStep("ID check", "Ask for ID. Then verify DOB / age / nationality.");
@@ -1035,7 +1077,9 @@
       finishRun("completed");
     });
 
+    // Return to visitor button: also hide ID (so “return ID” can be done via UI)
     $id("btnReturnVisitor")?.addEventListener("click", () => {
+      hideIdPanel();
       visitorSays("Okay.", state.visitor?.mood?.text || "");
     });
 
@@ -1053,7 +1097,7 @@
       visitorSays("Understood.", state.visitor?.mood?.text || "");
     });
 
-    // Feedback screen buttons (basic)
+    // Feedback screen buttons
     $id("btnBackToStart")?.addEventListener("click", () => showScreen("login"));
     $id("btnDownloadCsv")?.addEventListener("click", () => {
       const rows = [
