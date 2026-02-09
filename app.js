@@ -279,7 +279,8 @@ function computeMeetingTime(){
 }
 
 
-function isSupervisorTrigger  // SUPERVISOR_TRIGGER_V42(raw){
+// SUPERVISOR_TRIGGER_V42
+function isSupervisorTrigger(raw){
   const t = norm(raw || "");
   // normalize common contraction: i'll -> ill
   const tt = t.replace(/i['’]ll/g, "ill");
