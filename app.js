@@ -180,6 +180,32 @@ const VISITORS = [
 ];
 
 
+
+function stepIndexByKey(key){
+  try{
+    for(let i=0;i<STEPS.length;i++){
+      if(STEPS[i].key === key) return i;
+    }
+  }catch(e){}
+  return -1;
+}
+function setStepByKey(state, key){
+  const idx = stepIndexByKey(key);
+  if(idx >= 0){
+    state.stepIndex = idx;
+    updatePage(state);
+    updateActionButtons(state);
+    return true;
+  }
+  return false;
+}
+function goToPersonSearch(state){
+  if(setStepByKey(state, "person_search")) return;
+  if(setStepByKey(state, "pat_down")) return;
+  if(setStepByKey(state, "search")) return;
+  if(typeof advanceStep === "function") advanceStep(state);
+}
+
 const STEPS = [
   { key:"gate", title:"1) Poort (intake)",
     opening:["Good morning.","I need to enter the base."],
@@ -1101,6 +1127,21 @@ function processUserLine(state, userText){
   // threat rules completion (simple)
   if(state.stepKey === "threat_rules"){
     const t = norm(userText);
+
+  // AUTOTRIGGERS_V40: supervisor popup + go to person search
+  if(t.includes("contact my supervisor") || t.includes("call my supervisor") || t.includes("i'll contact my supervisor") || t.includes("i will contact my supervisor") || t.includes("i'll call my supervisor") || t.includes("i will call my supervisor")){
+    showVisitor("Okay, I'll wait.");
+    setTimeout(() => { try { openSupervisorModal(state); } catch(e) {} }, 300);
+    return;
+  }
+
+  if(t.includes("person search") || t.includes("pat down") || t.includes("pat-down")){
+    if(t.includes("follow") || t.includes("go to") || t.includes("proceed") || t.includes("let's go")){
+      goToPersonSearch(state);
+      return;
+    }
+  }
+
   // LASTCLAIM_CHALLENGE_V37: handle "are you sure" / "but you said" challenges
   if((t.includes("are you sure") || t.includes("but you said") || t.includes("you said")) && state.lastClaim){
     const rate = moodMistakeRate(state);
@@ -1401,6 +1442,15 @@ $("#btnHint").addEventListener("click", () => {
   });
 
   $("#btnSend").addEventListener("click", () => {
+
+// WIRE_PERSONSEARCH_V40
+try{
+  const b = $("#btnPersonSearch") || $("#btnGoPersonSearch") || $("#btnGoToPersonSearch") || $("#btnPatDown") || $("#btnGoPerson");
+  if(b){
+    b.addEventListener("click", () => { goToPersonSearch(state); });
+  }
+}catch(e){}
+
     const inp = $("#studentInput");
     const text = inp.value.trim();
     if(!text) return;

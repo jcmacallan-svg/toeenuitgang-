@@ -304,6 +304,19 @@
       "can you spell your name?",
       "spell your name",
       "spell your name?"
+    ],
+    "go_person_search": [
+      "go to person search",
+      "go to the person search",
+      "go to person search area",
+      "follow me to the person search area",
+      "follow me to the person search",
+      "please follow me to the person search area",
+      "we are going to the person search area",
+      "proceed to the person search",
+      "let's go to the person search",
+      "go to pat down",
+      "proceed to pat down"
     ]
   }
 }
