@@ -388,6 +388,24 @@ function listPhotoFiles(){
 }
 
 
+
+function getDobFromCard(card){
+  try{
+    return (card && card.id && card.id.dob) ? card.id.dob : (card && card.dob ? card.dob : null);
+  }catch(e){ return null; }
+}
+function computeAgeFromDob(dobStr){
+  try{
+    const dob = new Date(dobStr);
+    if(isNaN(dob.getTime())) return null;
+    const now = new Date();
+    let age = now.getFullYear() - dob.getFullYear();
+    const m = now.getMonth() - dob.getMonth();
+    if(m < 0 || (m === 0 && now.getDate() < dob.getDate())) age--;
+    return age;
+  }catch(e){ return null; }
+}
+
 function buildAboutDetail(card){
   const topic = (card.about || "").toLowerCase();
   const purpose = (card.purpose || "").toLowerCase();
@@ -581,10 +599,19 @@ function visitorResponseForIntent(state, intent, userText, card){
     case "ask_sharp":
       return card.twist==="sharp_object" ? "I already mentioned the pocket knife—nothing else." : "No.";
     case "ask_age":
-        return "I'm " + state.card.age + " years old.";
+        {
+          const dob = getDobFromCard(state.card);
+          const age = computeAgeFromDob(dob);
+          if(age !== null) return "I'm " + age + " years old.";
+          return "I'm 37 years old.";
+        }
 
       case "ask_dob":
-        return "My date of birth is " + formatDob(state.card.dob) + ".";
+        {
+          const dob = getDobFromCard(state.card);
+          if(dob) return "My date of birth is " + formatDob(dob) + ".";
+          return "My date of birth is 18 Apr 1987.";
+        }
 
       case "challenge":
         // Mood can shift when challenged
@@ -681,7 +708,8 @@ function setScreen(id){
 }
 
 function showVisitor(text){
-  // Primary UI bubble
+  if(text === undefined || text === null) text = "";
+// Primary UI bubble
   const bubble = $("#visitorBubble");
   if(bubble) bubble.textContent = text;
 
@@ -690,7 +718,8 @@ function showVisitor(text){
   if(box) box.textContent = text;
 
   // Optional chat log (if present in future)
-  try{ addChatMessage(window.__state || null, "visitor", text); }catch(e){}
+  try{ addChatMessage(window.__state || null, "visitor", text); 
+}catch(e){}
 }
 
 
