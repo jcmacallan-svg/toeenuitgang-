@@ -629,6 +629,13 @@ function visitorResponseForIntent(state, intent, userText, card){
         markAsked(state, "who");
         return "My name is " + state.card.name + ".";
 
+      case "spell_name":
+        {
+          const nm = (state.card && state.card.name) ? state.card.name : "Mark";
+          const letters = nm.replace(/[^A-Za-z]/g,"").toUpperCase().split("").join("-");
+          return "It is " + letters + ".";
+        }
+
       default:
       return "Understood.";
   }
@@ -1050,6 +1057,21 @@ function processUserLine(state, userText){
   // threat rules completion (simple)
   if(state.stepKey === "threat_rules"){
     const t = norm(userText);
+
+  // AGE_VERIFICATION_V36: handle questions like "are you 35?"
+  const ageMatch = t.match(/\bare you\s+(\d{1,3})\b/);
+  if(ageMatch){
+    const guess = parseInt(ageMatch[1],10);
+    const dob = getDobFromCard(state.card);
+    const realAge = computeAgeFromDob(dob);
+    if(realAge !== null){
+      if(guess === realAge) return showVisitor("Yes, that's correct.");
+      // sometimes correct the student
+      if(Math.random() < 0.75) return showVisitor("No, I'm " + realAge + ".");
+      return showVisitor("Sorry, I might have misheard you.");
+    }
+  }
+
 
   // Auto-open supervisor popup when the student says they will contact/call the supervisor
   // Examples: "I'll contact my supervisor", "I will call my supervisor", "Contact supervisor"
@@ -1993,9 +2015,23 @@ function threatComplete(state){
 }
 
 function denyEntrance(state){
-  state.finished = true;
-  showVisitor("You are denied entry. Please step aside and wait.");
-  logEvent(state, "deny_entrance", {reason:"manual"});
+  state.denied = true;
+  try{ logEvent(state, "deny_entrance"); }catch(e){}
+  // Show message as the soldier/student
+  const msg = "You are denied entry. Please step aside and wait.";
+  const sb = $("#studentBubble");
+  if(sb){ sb.style.display="block"; sb.textContent = msg; }
+  try{ addChatMessage(state, "me", msg); }catch(e){}
+  const vb = $("#visitorBubble");
+  if(vb) vb.textContent = "";
+  // disable inputs
+  const btn = $("#btnSend"); if(btn) btn.disabled = true;
+  const inp = $("#studentInput"); if(inp) inp.disabled = true;
+  const micBtn = $("#btnMicHold"); if(micBtn) micBtn.disabled = true;
+
+  // auto-finish after short delay
+  setTimeout(()=>{ try{ finishRun(state); }catch(e){} }, 3000);
+});
   // disable input
   const inp = $("#studentInput");
   const btn = $("#btnSend");

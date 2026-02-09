@@ -208,3 +208,21 @@ main { min-height: calc(100vh - 120px); }
 .visitorCol{max-width: calc(100% - 90px)}
 
 .studentCol{display:flex; justify-content:flex-end;}
+
+/* v36: hard right-align student message row */
+.studentRow{
+  width:100% !important;
+  justify-content:flex-end !important;
+  align-items:flex-start !important;
+}
+.studentCol{
+  flex: 1 1 auto !important;
+  width:100% !important;
+  display:flex !important;
+  justify-content:flex-end !important;
+}
+#studentBubble.bubble.me{
+  margin-left:auto !important;
+  text-align:left; /* keep bubble text readable */
+  max-width: 70%;
+}

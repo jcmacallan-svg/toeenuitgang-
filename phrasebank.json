@@ -120,7 +120,9 @@
       "what is your age?",
       "are you 42",
       "are you 42?",
-      "your age?"
+      "your age?",
+      "how old r you",
+      "how old are u"
     ],
     "ask_dob": [
       "what is your date of birth",
@@ -284,6 +286,24 @@
       "can i enter now?",
       "am i allowed in now",
       "am i allowed in now?"
+    ],
+    "contact_supervisor": [
+      "i'll contact my supervisor",
+      "i will contact my supervisor",
+      "i'll call my supervisor",
+      "i will call my supervisor",
+      "contact my supervisor",
+      "call my supervisor",
+      "contact supervisor",
+      "call supervisor"
+    ],
+    "spell_name": [
+      "how do you spell your name",
+      "how do you spell your name?",
+      "can you spell your name",
+      "can you spell your name?",
+      "spell your name",
+      "spell your name?"
     ]
   }
 }
