@@ -1232,29 +1232,29 @@
   document.addEventListener("DOMContentLoaded", init);
 })();
 /* ============================
-   VEVA PATCH: supervisor v1.0
-   - Hide "Contact supervisor" button everywhere
-   - Text trigger "I will contact my supervisor" opens the SAME popup by clicking the (hidden) button
-   - Survives rerenders
+   VEVA PATCH v2: Supervisor Kill + Text Trigger
+   - hides "Contact supervisor" button everywhere (even after rerenders)
+   - typing "I will contact my supervisor" triggers the same popup by clicking the hidden button
    ============================ */
-
 (() => {
-  const PATCH_VERSION = "supfix-2026-02-09a";
+  const PATCH_VERSION = "supfix-v2-2026-02-09b";
   window.__VEVA_SUP_PATCH_VERSION = PATCH_VERSION;
-  console.log("[VEVA] Supervisor patch loaded:", PATCH_VERSION);
+  console.log("[VEVA]", PATCH_VERSION, "loaded");
 
-  // Matches the UI button label(s)
+  // Detect the button label (EN/NL)
   const RX_SUP_BTN = /(contact\s+supervisor|contact\s+leidinggevende)/i;
 
-  // Matches typed intents (very forgiving)
+  // Detect typed intent (very tolerant)
   const RX_SUP_TEXT =
-    /\b(contact|call|ring|phone)\b.*\b(supervisor|boss|team\s*leader|manager)\b/i;
+    /\b(i\s+(will|’ll|'ll)\s+)?(please\s+)?(contact|call|ring|phone)\s+(my\s+)?(supervisor|boss|team\s*leader|manager)\b/i;
 
-  const RX_SUP_TEXT_EXACT =
-    /\bi\s+(will|’ll|'ll)\s+contact\s+(my\s+)?supervisor\b/i;
+  // Your exact phrase too (belt + braces)
+  const RX_SUP_TEXT_EXACT = /\bi\s+will\s+contact\s+my\s+supervisor\b/i;
 
   function allClickable() {
-    return Array.from(document.querySelectorAll("button, a, [role='button'], input[type='button'], input[type='submit']"));
+    return Array.from(document.querySelectorAll(
+      "button, a, [role='button'], input[type='button'], input[type='submit']"
+    ));
   }
 
   function findSupervisorButtons() {
@@ -1264,20 +1264,20 @@
   function hideSupervisorButtons() {
     const btns = findSupervisorButtons();
     btns.forEach(btn => {
-      if (btn.dataset.vevaSupHidden === "1") return;
+      // keep it in DOM (so we can click it), but make it invisible & non-interactive
       btn.dataset.vevaSupHidden = "1";
-      btn.style.display = "none";     // removes it from layout
-      btn.style.visibility = "hidden";
-      btn.style.pointerEvents = "none";
+      btn.style.setProperty("display", "none", "important");
+      btn.style.setProperty("visibility", "hidden", "important");
+      btn.style.setProperty("pointer-events", "none", "important");
+      btn.setAttribute("aria-hidden", "true");
+      btn.tabIndex = -1;
     });
-    return btns;
+    return btns.length;
   }
 
   function clickSupervisorButton() {
     const btns = findSupervisorButtons();
     if (!btns.length) return false;
-
-    // click the first (hidden) button – this should open your existing popup
     try {
       btns[0].click();
       return true;
@@ -1288,107 +1288,82 @@
   }
 
   function findQuestionInput() {
-    const candidates = Array.from(document.querySelectorAll("input[type='text'], textarea"));
-    // Your screenshot shows placeholder "Type your question in English..."
-    return (
-      candidates.find(el => /type your question/i.test(el.placeholder || "")) ||
-      candidates[0] ||
-      null
-    );
+    const inputs = Array.from(document.querySelectorAll("input[type='text'], textarea, [contenteditable='true']"));
+    // match your UI placeholder: "Type your question in English..."
+    return inputs.find(el => /type your question/i.test(el.placeholder || "")) || inputs[0] || null;
   }
 
-  function findSendButton() {
-    const btns = allClickable();
-    return btns.find(el => /^send$/i.test((el.textContent || el.value || "").trim())) || null;
-  }
-
-  function maybeTriggerFromInput(text) {
+  function maybeTrigger(text) {
     const t = (text || "").trim();
     if (!t) return false;
-
     if (RX_SUP_TEXT_EXACT.test(t) || RX_SUP_TEXT.test(t)) {
       const ok = clickSupervisorButton();
-      if (ok) {
-        console.log("[VEVA] Supervisor triggered by text:", t);
-      } else {
-        console.warn("[VEVA] Text looked like supervisor intent, but no supervisor button found.");
-      }
+      console.log("[VEVA] Supervisor text trigger:", t, "=>", ok);
       return ok;
     }
     return false;
   }
 
-  function wireInterceptors() {
-    // 1) Always hide button(s)
-    hideSupervisorButtons();
+  function interceptSend() {
+    // Capture click on ANY "Send" button so we run before existing listeners
+    const sendButtons = allClickable().filter(el => /^send$/i.test((el.textContent || el.value || "").trim()));
+    sendButtons.forEach(btn => {
+      if (btn.dataset.vevaSupSendHooked === "1") return;
+      btn.dataset.vevaSupSendHooked = "1";
+      btn.addEventListener("click", (e) => {
+        const input = findQuestionInput();
+        const txt = input?.value || "";
+        if (maybeTrigger(txt)) {
+          // prevent normal processing so it doesn't get treated as a regular question
+          e.preventDefault();
+          e.stopImmediatePropagation();
+          if (input) input.value = "";
+        }
+      }, true);
+    });
 
-    // 2) Intercept Send click
-    const sendBtn = findSendButton();
-    if (sendBtn && sendBtn.dataset.vevaSupHooked !== "1") {
-      sendBtn.dataset.vevaSupHooked = "1";
-      sendBtn.addEventListener(
-        "click",
-        (e) => {
-          const input = findQuestionInput();
-          const t = (input?.value || "").trim();
-          if (maybeTriggerFromInput(t)) {
-            // prevent the old handler from consuming it as a normal question
-            e.preventDefault();
-            e.stopImmediatePropagation();
-            if (input) input.value = "";
-          }
-        },
-        true // capture to run before existing listeners
-      );
-    }
-
-    // 3) Intercept Enter key
+    // Intercept Enter
     const input = findQuestionInput();
-    if (input && input.dataset.vevaSupKeyHooked !== "1") {
-      input.dataset.vevaSupKeyHooked = "1";
-      input.addEventListener(
-        "keydown",
-        (e) => {
-          if (e.key !== "Enter") return;
-          const t = (input.value || "").trim();
-          if (maybeTriggerFromInput(t)) {
-            e.preventDefault();
-            e.stopImmediatePropagation();
-            input.value = "";
-          }
-        },
-        true
-      );
+    if (input && input.dataset.vevaSupEnterHooked !== "1") {
+      input.dataset.vevaSupEnterHooked = "1";
+      input.addEventListener("keydown", (e) => {
+        if (e.key !== "Enter") return;
+        const txt = input.value || "";
+        if (maybeTrigger(txt)) {
+          e.preventDefault();
+          e.stopImmediatePropagation();
+          input.value = "";
+        }
+      }, true);
     }
 
-    // 4) If there is a suggestion chip like "I will contact my supervisor" (your screenshot),
-    // hook it too (but do NOT remove it; only trigger the popup on click)
+    // Intercept quick-reply chip "I will contact my supervisor" (like your screenshot)
     const chips = allClickable().filter(el =>
-      /\bi\s+(will|’ll|'ll)\s+contact\s+(my\s+)?supervisor\b/i.test((el.textContent || el.value || "").trim())
+      /\bi\s+will\s+contact\s+my\s+supervisor\b/i.test((el.textContent || el.value || "").trim())
     );
     chips.forEach(chip => {
       if (chip.dataset.vevaSupChipHooked === "1") return;
       chip.dataset.vevaSupChipHooked = "1";
       chip.addEventListener("click", () => {
+        console.log("[VEVA] Supervisor chip clicked");
         clickSupervisorButton();
       }, true);
     });
   }
 
-  function start() {
-    wireInterceptors();
-
-    // Survive rerenders
-    const mo = new MutationObserver(() => wireInterceptors());
-    mo.observe(document.body, { childList: true, subtree: true });
-
-    // Extra safety: periodic re-hide (cheap)
-    setInterval(() => wireInterceptors(), 1500);
+  function run() {
+    const hiddenCount = hideSupervisorButtons();
+    interceptSend();
+    // optional: log once when it finds the button
+    if (hiddenCount) console.log("[VEVA] Hidden supervisor buttons:", hiddenCount);
   }
 
+  // Start + keep alive (rerenders)
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", start);
+    document.addEventListener("DOMContentLoaded", run);
   } else {
-    start();
+    run();
   }
+  const mo = new MutationObserver(run);
+  mo.observe(document.documentElement, { childList: true, subtree: true });
 })();
