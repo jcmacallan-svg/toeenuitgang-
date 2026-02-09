@@ -1,1 +1,0 @@
-Place headshot images here (copied from assets/photos). The app uses assets/photos by default.
