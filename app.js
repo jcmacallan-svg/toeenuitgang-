@@ -2344,15 +2344,30 @@ function denyEntrance(state){
 ;
 
 ;
-/*CHAT_ALIGN_FIX_V45*/
+/*CHAT_ALIGN_FIX_V47*/
 (function(){
   try{
     const style = document.createElement("style");
     style.textContent = `
+      /* Ensure "me" (soldier) bubbles align to the right */
       .chatRow.me{justify-content:flex-end;}
-      .chatRow.me .bubble{margin-left:auto;}
-      .chatAvatar.me, .chatAvatar.visitor{width:72px;height:72px;border-radius:999px;object-fit:cover;}
+      .chatRow.me .msgBubble{margin-left:auto;}
+      /* Equal avatar sizes everywhere */
+      #visitorAvatar, #studentAvatar, .msgAvatar{width:72px;height:72px;border-radius:999px;object-fit:cover;flex:0 0 72px;}
+      /* If any legacy avatar classes exist */
+      .chatAvatar.me, .chatAvatar.visitor{width:72px;height:72px;border-radius:999px;object-fit:cover;flex:0 0 72px;}
     `;
     document.head.appendChild(style);
+
+    // Also force inline sizes in case CSS is overridden elsewhere
+    const va = document.getElementById("visitorAvatar");
+    const sa = document.getElementById("studentAvatar");
+    [va, sa].forEach(el => {
+      if(!el) return;
+      el.style.width = "72px";
+      el.style.height = "72px";
+      el.style.objectFit = "cover";
+      el.style.borderRadius = "999px";
+    });
   }catch(e){}
 })();
