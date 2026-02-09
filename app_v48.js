@@ -296,6 +296,8 @@ function isSupervisorTrigger(raw){
   return /\b(ill|i will|i would like to|id like to)?\s*(contact|call)\s+(my\s+)?supervisor\b/.test(t);
 }
 function triggerSupervisorFlow(state){
+  try{ removeContactSupervisorBtn(); }catch(e){}
+
   // jump to ID/control step and open the 5W modal
   try{ state.idVisible = true; }catch(e){}
   try{
@@ -309,6 +311,18 @@ function triggerSupervisorFlow(state){
   try{ updatePage(state); updateActionButtons(state); }catch(e){}
 }
 
+
+function removeContactSupervisorBtn(){
+  try{
+    const bc = document.getElementById("btnContact");
+    if(bc){
+      bc.style.display = "none";
+      bc.disabled = true;
+      // Optional hard removal to prevent tabbing/clicking
+      bc.setAttribute("aria-hidden","true");
+    }
+  }catch(e){}
+}
 function norm(s){
   return String(s ?? "").toLowerCase().trim().replace(/\s+/g," ");
 }
@@ -1142,6 +1156,8 @@ function setStepUI(state){
 
 
 function updateActionButtons(state){
+  try{ removeContactSupervisorBtn(); }catch(e){}
+
   const step = currentStep(state);
   const btnContact = $("#btnContactSupervisor");
   if(btnContact) btnContact.style.display = 'none';
@@ -2308,7 +2324,7 @@ function denyEntrance(state){
 }
 
 // CLOSE_ACTS_AS_RETURN: make closing supervisor modal also continue the flow
-(function(){
+;(function(){
   const closeBtn = $("#btnCloseSupervisor");
   if(closeBtn){
     closeBtn.addEventListener("click", () => {
@@ -2320,7 +2336,7 @@ function denyEntrance(state){
 })();
 
 // Ensure student avatar always points to soldier.png (if present)
-(function(){
+;(function(){
   const sa = $("#studentAvatar");
   if(sa){
     sa.onerror = () => { sa.style.display = "none"; };
@@ -2328,7 +2344,7 @@ function denyEntrance(state){
 })()
 
 // Equalize avatar sizes (visitor + soldier) for consistent chat look
-(function(){
+;(function(){
   try{
     const va = $("#visitorAvatar");
     const sa = $("#studentAvatar");
@@ -2347,7 +2363,7 @@ function denyEntrance(state){
 
 ;
 /*CHAT_ALIGN_FIX_V47*/
-(function(){
+;(function(){
   try{
     const style = document.createElement("style");
     style.textContent = `
