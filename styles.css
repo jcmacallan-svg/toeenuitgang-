@@ -77,3 +77,8 @@ body.teacher .teacherOnly{display:block !important}
 
 .idCard{min-height:240px}
 .idCard .idFooter{font-size:12px;line-height:1.15}
+
+/* When ID panel is hidden, expand the conversation pane */
+#trainGrid.trainGridOneCol{grid-template-columns: 1fr !important;}
+#trainGrid.trainGridOneCol #idPanel{display:none !important;}
+#trainGrid.trainGridOneCol{display:block !important;}

@@ -40,10 +40,15 @@ function parseHotkey(str){
 
 // --- ID panel visibility (declared early) ---
 function updateIdVisibility(state){
-  const panel = $("#idPanel");
+  const panel = $("#idPanel") || $("#idCardPanel");
+  const grid = $("#trainGrid");
   const step = currentStep(state);
   const show = (step && step.key !== "gate") || (state.asked && state.asked["request_id"]);
   if(panel) panel.style.display = show ? "" : "none";
+  if(grid){
+    if(show) grid.classList.remove("trainGridOneCol");
+    else grid.classList.add("trainGridOneCol");
+  }
 }
 window.updateIdVisibility = updateIdVisibility;
 
@@ -1614,6 +1619,20 @@ function openTeacher(){
 
 function updateVisitorAvatar(state){
   const img = $("#visitorAvatar");
-  if(!img || !state || !state.card) return;
-  img.src = state.card.headshot || "";
+  if(!img) return;
+  const src = (state && state.card && state.card.headshot) ? state.card.headshot : "";
+  img.onerror = () => {
+    if(src && src.includes("assets/photos/")) {
+      setAvatarSrc(img, src.replace("assets/photos/","assets/fotos/"));
+    } else {
+      setAvatarSrc(img, "data:image/svg+xml;charset=utf-8,<svg xmlns=%27http://www.w3.org/2000/svg%27 width=%2764%27 height=%2764%27> <rect width=%27100%%27 height=%27100%%27 fill=%27%231b2a44%27/> <circle cx=%2732%27 cy=%2726%27 r=%2714%27 fill=%27%237aa2d6%27/> <rect x=%2714%27 y=%2742%27 width=%2736%27 height=%2718%27 rx=%279%27 fill=%27%237aa2d6%27/> </svg>");
+    }
+  };
+  setAvatarSrc(img, src || "data:image/svg+xml;charset=utf-8,<svg xmlns=%27http://www.w3.org/2000/svg%27 width=%2764%27 height=%2764%27> <rect width=%27100%%27 height=%27100%%27 fill=%27%231b2a44%27/> <circle cx=%2732%27 cy=%2726%27 r=%2714%27 fill=%27%237aa2d6%27/> <rect x=%2714%27 y=%2742%27 width=%2736%27 height=%2718%27 rx=%279%27 fill=%27%237aa2d6%27/> </svg>");
+}
+
+function setAvatarSrc(img, src){
+  if(!img) return;
+  img.onerror = null;
+  img.src = src || "data:image/svg+xml;charset=utf-8,<svg xmlns=%27http://www.w3.org/2000/svg%27 width=%2764%27 height=%2764%27> <rect width=%27100%%27 height=%27100%%27 fill=%27%231b2a44%27/> <circle cx=%2732%27 cy=%2726%27 r=%2714%27 fill=%27%237aa2d6%27/> <rect x=%2714%27 y=%2742%27 width=%2736%27 height=%2718%27 rx=%279%27 fill=%27%237aa2d6%27/> </svg>";
 }
