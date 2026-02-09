@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>VEVA Ingang/Uitgang Trainer</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+
+<body>
+  <div class="app" id="app">
+    <aside class="sidebar" aria-label="Controls">
+      <div class="brand">
+        <div class="brand__title">VEVA Checkpoint</div>
+        <div class="brand__sub">Ingang/Uitgang Trainer</div>
+      </div>
+
+      <div class="controls">
+        <button class="btn" id="btnReturn" type="button">Return</button>
+        <button class="btn" id="btnPersonSearch" type="button">Go to Person Search</button>
+        <button class="btn btn--danger" id="btnDeny" type="button">Deny entrance</button>
+      </div>
+
+      <div class="divider" role="separator" aria-hidden="true"></div>
+
+      <div class="hintBox" id="hintBox" hidden></div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div class="topbar__left">
+          <div class="pill">Last-bubble-only</div>
+          <div class="pill" id="studentPill">Student: —</div>
+          <div class="pill" id="voiceStatus">Voice: ready</div>
+        </div>
+        <div class="topbar__right">
+          <button class="btn btn--small" id="btnReset" type="button">Reset</button>
+        </div>
+      </header>
+
+      <!-- Mandatory login screen -->
+      <section class="screen screen--active" id="screenLogin" aria-label="Login Screen">
+        <div class="loginWrap">
+          <div class="loginCard">
+            <h2>Start training</h2>
+            <div class="loginGrid">
+              <div class="loginRow">
+                <label for="studentSurname">Student surname (required)</label>
+                <input id="studentSurname" type="text" placeholder="e.g. Jansen" autocomplete="off" />
+              </div>
+
+              <div class="loginRow">
+                <label for="studentGroup">Group (required)</label>
+                <select id="studentGroup">
+                  <option value="">Choose…</option>
+                  <option value="Alpha">Alpha</option>
+                  <option value="Bravo">Bravo</option>
+                  <option value="Charlie">Charlie</option>
+                  <option value="Delta">Delta</option>
+                </select>
+              </div>
+
+              <div class="loginRow">
+                <label for="studentDifficulty">Difficulty</label>
+                <select id="studentDifficulty">
+                  <option value="basic">Basic</option>
+                  <option value="standard" selected>Standard</option>
+                  <option value="advanced">Advanced</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="loginActions">
+              <button class="btn btn--primary" id="btnStartTraining" type="button">Start</button>
+            </div>
+
+            <div class="loginError" id="loginError">Please enter your surname and select a group.</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen" id="screenTraining" aria-label="Training Screen">
+        <div class="chat">
+          <div class="msg msg--left">
+            <img class="avatar" id="visitorAvatar" src="assets/photos/headshot_01.png" alt="Visitor avatar" />
+            <div class="bubbleCol">
+              <div class="bubble bubble--visitor" id="visitorBubble">Hello.</div>
+              <div class="mood" id="moodLine">The visitor looks neutral.</div>
+            </div>
+          </div>
+
+          <div class="msg msg--right">
+            <div class="bubbleCol bubbleCol--right">
+              <div class="bubble bubble--student" id="studentBubble">Hold-to-talk or type below.</div>
+            </div>
+            <img class="avatar" id="studentAvatar" src="assets/photos/soldier.png" alt="Student avatar" />
+          </div>
+        </div>
+
+        <div class="chatDivider" aria-hidden="true"></div>
+
+        <!-- ID card under the chat bubbles -->
+        <div class="idUnderChat" aria-label="Identity card area">
+          <!-- Force hidden at start (both hidden attr + inline style) -->
+          <div class="idUnderChatInner" id="idCardWrap" hidden style="display:none;">
+            <div class="idCard" role="group" aria-label="ID Card">
+              <div class="idCard__top">
+                <div class="idCard__title">IDENTITY CARD</div>
+                <button class="btn btn--small" id="btnReturnId" type="button">Return ID</button>
+              </div>
+
+              <div class="idCard__body">
+                <img class="idPhoto" id="idPhoto" alt="ID photo" />
+                <div class="idFields">
+                  <div class="idRow"><span class="k">Name</span><span class="v" id="idName"></span></div>
+                  <div class="idRow"><span class="k">DOB</span><span class="v" id="idDob"></span></div>
+                  <div class="idRow"><span class="k">Nationality</span><span class="v" id="idNat"></span></div>
+                  <div class="idRow"><span class="k">ID No.</span><span class="v" id="idNo"></span></div>
+                </div>
+              </div>
+
+              <div class="idCard__note">Shown after you ask for ID.</div>
+            </div>
+          </div>
+
+          <div class="idSlotHint" id="idSlotHint">Ask for the visitor’s ID to display it here.</div>
+        </div>
+
+        <div class="inputBar">
+          <div class="holdWrap">
+            <button class="btn btn--mic" id="holdToTalk" type="button" aria-label="Hold to talk">
+              Hold to talk
+            </button>
+            <div class="micHint">Release to send (autosend)</div>
+          </div>
+
+          <div class="typeWrap">
+            <input class="input" id="textInput" type="text" placeholder="Type your English sentence…" autocomplete="off" />
+            <button class="btn btn--primary" id="btnSend" type="button">Send</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen" id="screenPersonSearch" aria-label="Person Search Screen">
+        <div class="placeholder">
+          <h2>Person Search (later)</h2>
+          <p>Placeholder.</p>
+          <button class="btn" id="btnBackToTraining" type="button">Back to Training</button>
+        </div>
+      </section>
+
+      <section class="screen" id="screenReturn" aria-label="Return Screen">
+        <div class="placeholder">
+          <h2>Return</h2>
+          <p>Placeholder.</p>
+          <button class="btn" id="btnBackReturn" type="button">Back to Training</button>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
