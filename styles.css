@@ -156,3 +156,44 @@ main { min-height: calc(100vh - 120px); }
 /* Bigger visitor avatar */
 .visitorAvatar{width:88px !important;height:88px !important;}
 .visitorRow{align-items:center !important;}
+
+/* Chat log */
+.chatWrap{
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 14px;
+  padding: 14px;
+  background: rgba(0,0,0,0.14);
+  min-height: 220px;
+  max-height: 360px;
+  overflow: auto;
+}
+.chatLog{display:flex; flex-direction:column; gap:10px;}
+.msgRow{display:flex; gap:10px; align-items:flex-start;}
+.msgRow.me{flex-direction:row-reverse;}
+.msgAvatar{
+  width:54px; height:54px; border-radius:50%;
+  object-fit:cover; flex: 0 0 auto;
+  border: 1px solid rgba(255,255,255,0.16);
+  background: rgba(255,255,255,0.06);
+}
+.msgBubble{
+  max-width: 76%;
+  padding: 10px 12px;
+  border-radius: 14px;
+  line-height: 1.35;
+  white-space: pre-wrap;
+  border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.06);
+}
+.msgRow.me .msgBubble{
+  background: rgba(120,180,255,0.12);
+  border-color: rgba(120,180,255,0.25);
+}
+
+/* Question input: slightly smaller but full width */
+#studentInput{
+  width: 100% !important;
+  min-height: 44px !important;
+  font-size: 16px !important;
+  padding: 10px 12px !important;
+}

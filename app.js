@@ -681,15 +681,12 @@ function setScreen(id){
 }
 
 function showVisitor(text){
-  const bubble = $("#visitorBubble");
-  bubble.textContent = text || "";
-  bubble.style.display = "flex";
-  // hide after 8 seconds (writing practice)
-  window.clearTimeout(window.__hideTimer);
-  window.__hideTimer = window.setTimeout(() => {
-    bubble.textContent = "Ask your next question…";
-  }, 8000);
+  // Legacy area (if present)
+  const box = $("#visitorAnswer");
+  if(box) box.textContent = text;
+  try{ addChatMessage(window.__state || null, "visitor", text); }catch(e){}
 }
+
 
 function updateMeta(state){
   const meta = $("#meta");
@@ -1165,6 +1162,9 @@ function finishRun(state){
 
 (async function init(){
   const state = buildState();
+  window.__state = state;
+  clearChat();
+  window.__state = state;
   initSpeechRecognition(state);
 
   // BIND_CRITICAL_BUTTONS
@@ -1884,6 +1884,51 @@ function initSpeechRecognition(state){
       stop();
     }
   });
+}
+
+
+function resolveVisitorAvatar(state){
+  // Prefer current visitor headshot if available
+  try{
+    const card = state && state.card ? state.card : null;
+    if(card && card.headshot){
+      // Most repos store photos under assets/photos/
+      return "assets/photos/" + card.headshot;
+    }
+  }catch(e){}
+  return null;
+}
+function resolveStudentAvatar(){
+  // User-provided soldier avatar (place soldier.png in assets/photos/)
+  return "assets/photos/soldier.png";
+}
+function addChatMessage(state, who, text){
+  const log = $("#chatLog");
+  if(!log) return;
+  const row = document.createElement("div");
+  row.className = "msgRow" + (who === "me" ? " me" : "");
+  const img = document.createElement("img");
+  img.className = "msgAvatar";
+  img.alt = (who === "me") ? "student" : "visitor";
+  const src = (who === "me") ? resolveStudentAvatar() : (resolveVisitorAvatar(state) || "");
+  if(src){
+    img.src = src;
+    img.onerror = () => { img.style.display = "none"; };
+  }else{
+    img.style.display = "none";
+  }
+  const bubble = document.createElement("div");
+  bubble.className = "msgBubble";
+  bubble.textContent = text || "";
+  row.appendChild(img);
+  row.appendChild(bubble);
+  log.appendChild(row);
+  // autoscroll
+  log.parentElement.scrollTop = log.parentElement.scrollHeight;
+}
+function clearChat(){
+  const log = $("#chatLog");
+  if(log) log.innerHTML = "";
 }
 
 function focusQuestion(){
