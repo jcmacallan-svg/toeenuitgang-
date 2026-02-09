@@ -1,354 +1,351 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "veva-whatsapp-v1-2026-02-09";
+  const APP_VERSION = "veva-whatsapp-v2-2026-02-09";
   console.log("[VEVA]", APP_VERSION, "loaded");
 
   const CONFIG = window.APP_CONFIG || {};
   const LOG_ENDPOINT = CONFIG.logEndpoint || "";
   const LOG_UNKNOWN = CONFIG.logUnknownQuestions !== false;
+
   const VOICE_AUTO_SEND = CONFIG.voiceAutoSend === true;
   const VOICE_LANG = CONFIG.voiceLang || "en-US";
 
-  const $ = (sel, root = document) => root.querySelector(sel);
+  const $id = (id) => document.getElementById(id);
 
   const nowIso = () => new Date().toISOString();
   const uid = () => Math.random().toString(16).slice(2) + "-" + Date.now().toString(16);
-  const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
 
-  function safeLower(s){ return (s || "").toString().trim().toLowerCase(); }
-  function sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
+  function safeLower(s) {
+    return (s || "").toString().trim().toLowerCase();
+  }
+  function clamp(n, a, b) { return Math.max(a, Math.min(b, n)); }
+  function chance(p) { return Math.random() < clamp(p, 0, 1); }
 
-  function parseYear(text){
+  function parseYear(text) {
     const m = (text || "").match(/\b(19\d{2}|20\d{2})\b/);
     return m ? Number(m[1]) : null;
   }
 
-  function z2(n){ return n < 10 ? "0" + n : "" + n; }
-  function formatDob(d){ return `${d.yyyy}-${z2(d.mm)}-${z2(d.dd)}`; }
+  function formatDob({ yyyy, mm, dd }) {
+    const z2 = (n) => (n < 10 ? "0" + n : "" + n);
+    return `${yyyy}-${z2(mm)}-${z2(dd)}`;
+  }
 
-  function calcAgeFromDob(dob){
+  function calcAgeFromDob(dobObj) {
     const today = new Date();
-    let age = today.getFullYear() - dob.yyyy;
+    const y = today.getFullYear();
+    let age = y - dobObj.yyyy;
     const m = today.getMonth() + 1;
     const d = today.getDate();
-    if (m < dob.mm || (m === dob.mm && d < dob.dd)) age -= 1;
+    if (m < dobObj.mm || (m === dobObj.mm && d < dobObj.dd)) age -= 1;
     return age;
   }
 
-  function chance(p){ return Math.random() < clamp(p, 0, 1); }
-
-  // -------- logging (no-cors to avoid Apps Script CORS) ----------
-  function logEvent(event, payload = {}){
+  async function logEvent(type, payload = {}) {
     if (!LOG_ENDPOINT) return;
+    const body = JSON.stringify({ ts: nowIso(), type, ...payload });
     try {
-      fetch(LOG_ENDPOINT, {
-        method: "POST",
-        mode: "no-cors",
-        body: JSON.stringify({ ts: nowIso(), event, ...payload })
-      }).catch(() => {});
+      await fetch(LOG_ENDPOINT, { method: "POST", mode: "no-cors", body });
     } catch {}
   }
 
-  // ----------------- intents -----------------
-  const INTENTS = {
-    ask_name: [
-      /\bwhat\s+is\s+your\s+name\b/i,
-      /\bname\s*,?\s+please\b/i
-    ],
-    ask_purpose: [
-      /\bpurpose\s+of\s+(your\s+)?visit\b/i,
-      /\bwhy\s+are\s+you\s+here\b/i,
-      /\bwhat\s+brings\s+you\s+here\b/i
-    ],
-    ask_appointment: [
-      /\bdo\s+you\s+have\s+an?\s+appointment\b/i,
-      /\bare\s+you\s+expected\b/i
-    ],
-    ask_who: [
-      /\bwho\s+are\s+you\s+(meeting|here\s+to\s+see)\b/i,
-      /\bwho\s+is\s+your\s+appointment\s+with\b/i
-    ],
-    ask_time: [
-      /\bwhat\s+time\s+is\s+your\s+appointment\b/i,
-      /\bwhen\s+is\s+your\s+appointment\b/i
-    ],
-    ask_where: [
-      /\bwhere\s+are\s+you\s+going\b/i,
-      /\bwhich\s+(building|unit|office)\b/i
-    ],
-    ask_subject: [
-      /\bwhat\s+is\s+the\s+meeting\s+about\b/i,
-      /\bwhat\s+is\s+it\s+about\b/i
-    ],
-    ask_id: [
-      /\b(can\s+i|could\s+i|may\s+i|let\s+me)\s+(see|check)\s+(your\s+)?(id|identification)\b/i,
-      /\bshow\s+(me\s+)?(your\s+)?(id|identification)\b/i,
-      /\bid\s+please\b/i
-    ],
-    ask_age: [
-      /\bhow\s+old\s+are\s+you\b/i,
-      /\bwhat\s+is\s+your\s+age\b/i
-    ],
-    ask_dob: [
-      /\bwhat\s+is\s+your\s+(date\s+of\s+birth|dob)\b/i,
-      /\bwhen\s+were\s+you\s+born\b/i,
-      /\bdob\b/i
-    ],
-    confirm_born_year: [
-      /\bwere\s+you\s+born\s+in\s+(19\d{2}|20\d{2})\b/i
-    ],
-    ask_nationality: [
-      /\bwhat\s+is\s+your\s+nationality\b/i,
-      /\bwhere\s+are\s+you\s+from\b/i
-    ],
-    contact_supervisor: [
-      /\b(i\s+(will|’ll|'ll)\s+)?(contact|call|ring|phone)\s+(my\s+)?(supervisor|boss|team\s*leader|manager)\b/i
-    ],
-    go_person_search: [
-      /\bgo\s+to\s+person\s+search\b/i,
-      /\bpat-?\s*down\b/i,
-      /\bfrisk\b/i
-    ],
-    deny: [
-      /\bdeny\s+(entrance|entry|access)\b/i,
-      /\byou\s+cannot\s+enter\b/i,
-      /\bnot\s+allowed\s+to\s+enter\b/i
-    ]
-  };
-
-  function matchIntent(text){
-    const t = text || "";
-    for (const [k, arr] of Object.entries(INTENTS)) {
-      if (arr.some(rx => rx.test(t))) return k;
-    }
-    return "unknown";
-  }
-
-  // ----------------- scenario -----------------
+  // ---- Visitor generation ----
   const MOODS = [
-    { name: "relaxed", lieBoost: 0.02, inconsBoost: 0.02 },
-    { name: "tired but cooperative", lieBoost: 0.05, inconsBoost: 0.05 },
-    { name: "uneasy", lieBoost: 0.10, inconsBoost: 0.12 },
-    { name: "nervous", lieBoost: 0.18, inconsBoost: 0.20 },
-    { name: "irritated", lieBoost: 0.12, inconsBoost: 0.10 }
+    { key: "relaxed", text: "The visitor looks relaxed and confident.", lieBoost: 0.02, inconsBoost: 0.02 },
+    { key: "tired", text: "The visitor looks tired but cooperative.", lieBoost: 0.05, inconsBoost: 0.05 },
+    { key: "uneasy", text: "The visitor looks uneasy.", lieBoost: 0.10, inconsBoost: 0.12 },
+    { key: "nervous", text: "The visitor looks nervous.", lieBoost: 0.18, inconsBoost: 0.20 },
+    { key: "irritated", text: "The visitor looks irritated.", lieBoost: 0.12, inconsBoost: 0.10 }
   ];
 
-  const NATIONALITIES = ["Dutch","German","Belgian","French","Spanish","Italian","Polish","Romanian","Turkish","British","American","Canadian"];
-  const FIRST = ["David","Michael","James","Robert","Daniel","Thomas","Mark","Lucas","Noah","Adam","Omar","Yusuf","Mateusz","Julien","Marco"];
-  const LAST = ["Johnson","Miller","Brown","Davis","Martinez","Kowalski","Nowak","Schmidt","Dubois","Rossi","Yilmaz"];
+  const NATIONALITIES = [
+    "Dutch", "German", "Belgian", "French", "Spanish", "Italian",
+    "Polish", "Romanian", "Turkish", "British", "American", "Canadian"
+  ];
 
-  function pick(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
+  const NAMES = [
+    "David", "Michael", "James", "Robert", "Daniel", "Thomas",
+    "Mark", "Lucas", "Noah", "Adam", "Omar", "Yusuf", "Mateusz", "Julien", "Marco"
+  ];
 
-  function randomDob(){
-    const y = new Date().getFullYear() - (18 + Math.floor(Math.random() * 38));
-    return { yyyy: y, mm: 1 + Math.floor(Math.random()*12), dd: 1 + Math.floor(Math.random()*28) };
+  function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+  function randomDob() {
+    const today = new Date();
+    const year = today.getFullYear() - (18 + Math.floor(Math.random() * 38)); // 18..55
+    const mm = 1 + Math.floor(Math.random() * 12);
+    const dd = 1 + Math.floor(Math.random() * 28);
+    return { yyyy: year, mm, dd };
   }
-  function randomExpiry(){
-    const y = new Date().getFullYear() + (1 + Math.floor(Math.random()*8));
-    return { yyyy: y, mm: 1 + Math.floor(Math.random()*12), dd: 1 + Math.floor(Math.random()*28) };
-  }
-  function randomIdNumber(){
-    const a = Math.floor(100000 + Math.random()*900000);
-    const b = Math.floor(1000 + Math.random()*9000);
+
+  function randomIdNumber() {
+    const a = Math.floor(100000 + Math.random() * 900000);
+    const b = Math.floor(1000 + Math.random() * 9000);
     return `ID-${a}-${b}`;
   }
 
-  function buildVisitor(){
+  function randomExpiry() {
+    const today = new Date();
+    const y = today.getFullYear() + (1 + Math.floor(Math.random() * 8));
+    const mm = 1 + Math.floor(Math.random() * 12);
+    const dd = 1 + Math.floor(Math.random() * 28);
+    return { yyyy: y, mm, dd };
+  }
+
+  function buildVisitor() {
     const mood = pick(MOODS);
     const dob = randomDob();
-    const name = `${pick(FIRST)} ${pick(LAST)}`;
-    const nationality = pick(NATIONALITIES);
-    const id = {
-      name,
-      nationality,
-      dob,
-      age: calcAgeFromDob(dob),
-      idNumber: randomIdNumber(),
-      expiry: randomExpiry()
-    };
+    const nat = pick(NATIONALITIES);
+    const last = pick(["Johnson", "Miller", "Brown", "Davis", "Martinez", "Kowalski", "Nowak", "Schmidt", "Dubois", "Rossi", "Yilmaz"]);
+    const name = pick(NAMES) + " " + last;
+    const age = calcAgeFromDob(dob);
 
-    const idx = 1 + Math.floor(Math.random()*12);
-    const headshot = `assets/photos/headshot_${String(idx).padStart(2,"0")}.png`;
+    const idx = 1 + Math.floor(Math.random() * 12);
+    const headshot = `assets/photos/headshot_${String(idx).padStart(2, "0")}.png`;
 
-    const purpose = pick(["delivery","maintenance","meeting","visit","contract work"]);
     const appointment = chance(0.7);
-    const apptTime = appointment ? pick(["09:30","10:00","13:15","14:00","15:45"]) : "";
-    const meetingWith = appointment ? pick(["Captain Lewis","Sgt. van Dijk","Mr. Peters","Lt. Schmidt"]) : "";
-    const goingWhere = pick(["HQ building","Logistics office","Barracks admin","Workshop"]);
-    const subject = pick(["paperwork","equipment handover","maintenance report","security briefing","contract discussion"]);
+    const apptTime = appointment ? pick(["09:30", "10:00", "13:15", "14:00", "15:45"]) : null;
+    const meetingWith = appointment ? pick(["Captain Lewis", "Sgt. van Dijk", "Mr. Peters", "Lt. Schmidt"]) : null;
+
+    const intake = {
+      purpose: pick(["delivery", "maintenance", "meeting", "visit", "contract work"]),
+      appointment,
+      apptTime,
+      meetingWith,
+      goingWhere: pick(["HQ building", "Logistics office", "Barracks admin", "Workshop"]),
+      subject: pick(["paperwork", "equipment handover", "maintenance report", "security briefing", "contract discussion"])
+    };
 
     return {
       mood,
       headshot,
-      id,
-      intake: { purpose, appointment, apptTime, meetingWith, goingWhere, subject },
-      claims: { dob: null, age: null, nationality: null, name: null },
-      inconsistencies: []
+      id: { name, nationality: nat, dob, age, idNumber: randomIdNumber(), expiry: randomExpiry() },
+      intake,
+      claims: { age: null, dob: null, nationality: null, name: null },
+      inconsistencies: [],
+      idShown: false
     };
   }
 
-  // ----------------- UI helpers (WhatsApp style: ONLY last messages) -----------------
-  function setVisitorText(text, moodText = ""){
-    const vb = $("#visitorBubble");
-    const vm = $("#visitorMood");
-    if (vb) vb.textContent = text || "";
-    if (vm) vm.textContent = moodText || "";
-  }
+  // ---- Intents ----
+  function compilePatterns(extra) {
+    const base = {
+      ask_id: [
+        /\b(can i|could i|may i|let me)\s+(see|check)\s+(your|ur)\s+(id|identification)\b/i,
+        /\bshow\s+me\s+(your|ur)\s+(id|identification)\b/i,
+        /\bdo\s+you\s+have\s+an?\s+id\b/i,
+        /\bid\s+please\b/i,
+      ],
+      ask_name: [/\bwhat\s+is\s+your\s+name\b/i, /\bname\s*,?\s+please\b/i],
+      ask_purpose: [/\bpurpose\s+of\s+your\s+visit\b/i, /\bwhy\s+are\s+you\s+here\b/i],
+      ask_appointment: [/\bdo\s+you\s+have\s+an?\s+appointment\b/i, /\bare\s+you\s+expected\b/i],
+      ask_who: [/\bwho\s+are\s+you\s+(here\s+to\s+see|meeting)\b/i],
+      ask_time: [/\bwhat\s+time\s+is\s+your\s+appointment\b/i, /\bwhen\s+is\s+your\s+appointment\b/i],
+      ask_where: [/\bwhere\s+are\s+you\s+going\b/i],
+      ask_subject: [/\bwhat\s+is\s+the\s+meeting\s+about\b/i, /\bwhat\s+is\s+it\s+about\b/i],
 
-  function setStudentText(text){
-    const sb = $("#studentBubble");
-    if (!sb) return;
-    sb.style.display = "";
-    sb.textContent = text || "";
-  }
+      ask_age: [/\bhow\s+old\s+are\s+you\b/i, /\bwhat\s+is\s+your\s+age\b/i],
+      ask_dob: [/\bdate\s+of\s+birth\b/i, /\bwhen\s+were\s+you\s+born\b/i],
+      confirm_born_year: [/\bwere\s+you\s+born\s+in\s+(19\d{2}|20\d{2})\b/i],
 
-  function setMoodLine(){
-    const v = state.visitor;
-    const vm = $("#visitorMood");
-    if (!vm || !v) return;
-    vm.textContent = `The visitor looks ${v.mood.name}.`;
-  }
+      ask_nationality: [/\bwhat\s+is\s+your\s+nationality\b/i, /\bwhere\s+are\s+you\s+from\b/i],
 
-  function equalizeAvatars(){
-    const va = $("#visitorAvatar");
-    const sa = $("#studentAvatar");
-    const size = 56;
+      contact_supervisor: [
+        /\b(i\s+(will|i'll|ill)\s+)?(please\s+)?(contact|call|ring|phone)\s+(my\s+)?(supervisor|boss|team\s*leader|manager)\b/i
+      ],
 
-    if (va instanceof HTMLImageElement) {
-      va.width = size;
-      va.height = size;
-      va.style.width = size + "px";
-      va.style.height = size + "px";
-      va.style.borderRadius = "50%";
-      va.style.objectFit = "cover";
+      go_person_search: [/\bgo\s+to\s+person\s+search\b/i, /\bpat\s*down\b/i, /\bfrisk\b/i],
+      deny: [/\bdeny\s+(entrance|entry|access)\b/i, /\byou\s+cannot\s+enter\b/i]
+    };
+
+    const merged = { ...base };
+
+    // optional phrasebank merge (same structure as earlier)
+    if (extra) {
+      const intentsObj = extra.intents && typeof extra.intents === "object" ? extra.intents : null;
+
+      const addPatterns = (key, arr) => {
+        if (!arr || !Array.isArray(arr)) return;
+        merged[key] = merged[key] || [];
+        for (const p of arr) {
+          if (!p) continue;
+          if (p instanceof RegExp) merged[key].push(p);
+          else if (typeof p === "string") {
+            try { merged[key].push(new RegExp(p, "i")); } catch {}
+          }
+        }
+      };
+
+      if (intentsObj) {
+        for (const [k, v] of Object.entries(intentsObj)) {
+          if (v && Array.isArray(v.patterns)) addPatterns(k, v.patterns);
+        }
+      }
     }
-    if (sa instanceof HTMLImageElement) {
-      sa.width = size;
-      sa.height = size;
-      sa.style.width = size + "px";
-      sa.style.height = size + "px";
-      sa.style.borderRadius = "50%";
-      sa.style.objectFit = "cover";
+
+    const compiled = {};
+    for (const [k, arr] of Object.entries(merged)) compiled[k] = (text) => arr.some(rx => rx.test(text));
+    compiled._raw = merged;
+    return compiled;
+  }
+
+  async function loadPhrasebank() {
+    try {
+      const res = await fetch("phrasebank.json", { cache: "no-store" });
+      if (!res.ok) return null;
+      return await res.json();
+    } catch {
+      return null;
     }
   }
 
-  // ----------------- ID canvas -----------------
-  function drawIdCard(v){
-    const canvas = $("#idCanvas");
-    if (!(canvas instanceof HTMLCanvasElement)) return;
+  function matchIntent(intents, text) {
+    for (const k of Object.keys(intents)) {
+      if (k === "_raw") continue;
+      if (intents[k](text)) return k;
+    }
+    return "unknown";
+  }
+
+  // ---- UI helpers: ONLY LAST BUBBLES ----
+  function setVisitorBubble(text) {
+    const bubble = $id("visitorBubble");
+    if (bubble) bubble.textContent = text || "";
+  }
+  function setVisitorMood(text) {
+    const mood = $id("visitorMood");
+    if (mood) mood.textContent = text || "";
+  }
+  function setStudentBubble(text) {
+    const bubble = $id("studentBubble");
+    if (!bubble) return;
+    bubble.textContent = text || "";
+    bubble.style.display = text ? "" : "none";
+  }
+
+  // ---- ID Canvas ----
+  function drawIdCard(visitor) {
+    const canvas = $id("idCanvas");
+    const panel = $id("idPanel");
+    if (!canvas || !panel) return;
+
+    panel.style.display = ""; // ensure visible (desktop)
     const ctx = canvas.getContext("2d");
-    if (!ctx) return;
+    const W = canvas.width, H = canvas.height;
 
     // background
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = "#0b1b36";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.clearRect(0, 0, W, H);
+    ctx.fillStyle = "#f4f6fb";
+    ctx.fillRect(0, 0, W, H);
 
-    // inner card
-    ctx.fillStyle = "rgba(255,255,255,0.06)";
-    ctx.strokeStyle = "rgba(255,255,255,0.15)";
-    ctx.lineWidth = 4;
-    roundRect(ctx, 40, 40, canvas.width - 80, canvas.height - 80, 24, true, true);
+    // header bar
+    ctx.fillStyle = "#163a66";
+    ctx.fillRect(0, 0, W, 92);
 
-    // title
-    ctx.fillStyle = "rgba(255,255,255,0.92)";
-    ctx.font = "bold 40px system-ui, -apple-system, Segoe UI, Roboto, Arial";
-    ctx.fillText("IDENTIFICATION CARD", 80, 120);
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "bold 38px system-ui, -apple-system, Segoe UI, Roboto, Arial";
+    ctx.fillText("VISITOR ID", 32, 58);
 
-    // fields
-    ctx.font = "600 30px system-ui, -apple-system, Segoe UI, Roboto, Arial";
-    ctx.fillStyle = "rgba(255,255,255,0.86)";
+    ctx.font = "16px system-ui, -apple-system, Segoe UI, Roboto, Arial";
+    ctx.fillStyle = "rgba(255,255,255,0.85)";
+    ctx.fillText("Checkpoint Access Card", 34, 80);
 
-    const lines = [
-      ["Name", v.id.name],
-      ["Nationality", v.id.nationality],
-      ["DOB", formatDob(v.id.dob)],
-      ["Age", String(v.id.age)],
-      ["ID number", v.id.idNumber],
-      ["Expiry", formatDob(v.id.expiry)]
+    // photo box
+    ctx.fillStyle = "#e8ecf5";
+    ctx.fillRect(34, 128, 190, 240);
+    ctx.strokeStyle = "rgba(0,0,0,0.12)";
+    ctx.strokeRect(34, 128, 190, 240);
+
+    // text fields
+    const v = visitor.id;
+    const rows = [
+      ["Name", v.name],
+      ["Nationality", v.nationality],
+      ["DOB", formatDob(v.dob)],
+      ["Age", String(v.age)],
+      ["ID nr", v.idNumber],
+      ["Expiry", formatDob(v.expiry)]
     ];
 
-    let y = 190;
-    for (const [k, val] of lines) {
-      ctx.fillStyle = "rgba(255,255,255,0.70)";
-      ctx.fillText(k + ":", 80, y);
-      ctx.fillStyle = "rgba(255,255,255,0.92)";
-      ctx.fillText(val, 300, y);
-      y += 60;
+    let y = 150;
+    ctx.fillStyle = "#111827";
+    for (const [label, value] of rows) {
+      ctx.font = "700 18px system-ui, -apple-system, Segoe UI, Roboto, Arial";
+      ctx.fillText(label + ":", 260, y);
+      ctx.font = "18px system-ui, -apple-system, Segoe UI, Roboto, Arial";
+      ctx.fillText(value, 380, y);
+      y += 44;
     }
+
+    // simple barcode-ish footer
+    ctx.fillStyle = "#111827";
+    for (let i = 0; i < 140; i++) {
+      const x = 34 + i * 5;
+      const w = (i % 3 === 0) ? 2 : 1;
+      const h = (i % 7 === 0) ? 70 : 50;
+      ctx.fillRect(x, H - 110, w, h);
+    }
+
+    ctx.fillStyle = "rgba(17,24,39,0.75)";
+    ctx.font = "14px system-ui, -apple-system, Segoe UI, Roboto, Arial";
+    ctx.fillText("Valid only for stated purpose. Subject to search and denial.", 34, H - 22);
+
+    // load face on top
+    const img = new Image();
+    img.onload = () => {
+      // cover crop
+      const sx = 0, sy = 0, sw = img.width, sh = img.height;
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(34, 128, 190, 240);
+      ctx.clip();
+      ctx.drawImage(img, sx, sy, sw, sh, 34, 128, 190, 240);
+      ctx.restore();
+      ctx.strokeStyle = "rgba(0,0,0,0.12)";
+      ctx.strokeRect(34, 128, 190, 240);
+    };
+    img.onerror = () => {};
+    img.src = visitor.headshot;
   }
 
-  function roundRect(ctx, x, y, w, h, r, fill, stroke){
-    if (w < 2*r) r = w/2;
-    if (h < 2*r) r = h/2;
-    ctx.beginPath();
-    ctx.moveTo(x+r, y);
-    ctx.arcTo(x+w, y, x+w, y+h, r);
-    ctx.arcTo(x+w, y+h, x, y+h, r);
-    ctx.arcTo(x, y+h, x, y, r);
-    ctx.arcTo(x, y, x+w, y, r);
-    ctx.closePath();
-    if (fill) ctx.fill();
-    if (stroke) ctx.stroke();
-  }
-
-  function showIdPanel(show){
-    const p = $("#idPanel");
-    if (!p) return;
-    p.style.display = show ? "" : "none";
-  }
-
-  // ----------------- supervisor modal -----------------
-  function openSupervisorModal(){
-    $("#supervisorModal")?.classList.remove("hidden");
-
-    // prefill from scenario
-    const v = state.visitor;
-    if (!v) return;
-    $("#wWho") && ($("#wWho").value = v.id.name);
-    $("#wWhat") && ($("#wWhat").value = v.intake.purpose);
-    $("#wWithWhom") && ($("#wWithWhom").value = v.intake.meetingWith);
-    $("#wTime") && ($("#wTime").value = v.intake.apptTime);
-    $("#wWhy") && ($("#wWhy").value = v.intake.subject);
-  }
-
-  function closeSupervisorModal(){
-    $("#supervisorModal")?.classList.add("hidden");
-  }
-
-  // ----------------- control answers -----------------
-  function makeFake(kind){
-    const v = state.visitor;
-    if (kind === "age") return String(clamp(v.id.age + pick([-2,-1,1,2,3]), 18, 70));
+  // ---- Control answers (lie/inconsistency) ----
+  function makeFakeControl(visitor, kind) {
+    if (kind === "age") {
+      const delta = pick([-2, -1, 1, 2, 3]);
+      return String(clamp(visitor.id.age + delta, 18, 70));
+    }
     if (kind === "dob") {
-      const d = { ...v.id.dob };
-      if (chance(0.5)) d.dd = clamp(d.dd + pick([-2,-1,1,2]), 1, 28);
-      else d.mm = clamp(d.mm + pick([-1,1]), 1, 12);
-      return formatDob(d);
+      const dob = { ...visitor.id.dob };
+      if (chance(0.5)) dob.dd = clamp(dob.dd + pick([-2, -1, 1, 2]), 1, 28);
+      else dob.mm = clamp(dob.mm + pick([-1, 1]), 1, 12);
+      return formatDob(dob);
     }
-    if (kind === "nationality") return pick(NATIONALITIES.filter(n => n !== v.id.nationality));
-    if (kind === "name") return `${pick(FIRST)} ${pick(LAST)}`;
+    if (kind === "nationality") return pick(NATIONALITIES.filter(n => n !== visitor.id.nationality));
+    if (kind === "name") return pick(NAMES) + " " + pick(["Johnson", "Miller", "Brown", "Davis", "Rossi", "Schmidt"]);
     return "";
   }
 
-  function controlAnswer(kind){
-    const v = state.visitor;
-    const lieP = 0.04 + v.mood.lieBoost;
-    const inconsP = 0.05 + v.mood.inconsBoost;
+  function visitorControlAnswer(visitor, kind) {
+    const mood = visitor.mood;
+    const lieP = 0.04 + mood.lieBoost;
+    const inconsP = 0.05 + mood.inconsBoost;
 
-    const truth = (kind === "dob") ? formatDob(v.id.dob)
-                : (kind === "age") ? String(v.id.age)
-                : (kind === "nationality") ? v.id.nationality
-                : v.id.name;
+    const truth = (() => {
+      if (kind === "age") return String(visitor.id.age);
+      if (kind === "dob") return formatDob(visitor.id.dob);
+      if (kind === "nationality") return visitor.id.nationality;
+      if (kind === "name") return visitor.id.name;
+      return "";
+    })();
 
-    const prev = v.claims[kind];
+    const prev = visitor.claims[kind];
     if (prev) {
       if (chance(inconsP)) {
-        const fake = makeFake(kind);
+        const fake = makeFakeControl(visitor, kind);
         if (fake !== prev) {
-          v.inconsistencies.push({ kind, prev, next: fake, ts: nowIso() });
-          v.claims[kind] = fake;
+          visitor.inconsistencies.push({ kind, prev, next: fake, ts: nowIso() });
+          visitor.claims[kind] = fake;
           return { value: fake, lied: true, inconsistent: true };
         }
       }
@@ -356,354 +353,534 @@
     }
 
     if (chance(lieP)) {
-      const fake = makeFake(kind);
-      v.claims[kind] = fake;
+      const fake = makeFakeControl(visitor, kind);
+      visitor.claims[kind] = fake;
       return { value: fake, lied: fake !== truth, inconsistent: false };
     }
 
-    v.claims[kind] = truth;
+    visitor.claims[kind] = truth;
     return { value: truth, lied: false, inconsistent: false };
   }
 
-  // ----------------- state -----------------
+  // ---- Required checkpoints for feedback ----
+  const REQUIRED = [
+    { key: "asked_name", label: "You didn’t ask the visitor’s name.", example: "What is your name, please?" },
+    { key: "asked_purpose", label: "You didn’t ask the purpose of the visit.", example: "What is the purpose of your visit today?" },
+    { key: "asked_appointment", label: "You didn’t confirm the appointment.", example: "Do you have an appointment?" },
+    { key: "asked_who", label: "You didn’t ask who they are meeting.", example: "Who are you here to see?" },
+    { key: "asked_time", label: "You didn’t confirm the time.", example: "What time is your appointment?" },
+    { key: "asked_where", label: "You didn’t confirm where they are going.", example: "Where are you going on base?" },
+    { key: "asked_subject", label: "You didn’t ask what the meeting is about.", example: "What is the meeting about?" },
+    { key: "asked_id", label: "You didn’t ask to see an ID.", example: "Can I see your ID, please?" },
+    { key: "asked_dob", label: "You didn’t verify date of birth (DOB).", example: "What is your date of birth?" },
+    { key: "asked_age", label: "You didn’t verify age.", example: "How old are you?" },
+    { key: "asked_nationality", label: "You didn’t verify nationality.", example: "What is your nationality?" },
+    { key: "supervisor_contacted", label: "You didn’t contact a supervisor when needed.", example: "I’ll contact my supervisor for approval." },
+    { key: "did_person_search", label: "You didn’t complete the person search step.", example: "I’m going to do a quick pat-down search. Is that okay?" }
+  ];
+
+  // ---- App State ----
   const state = {
     runId: uid(),
-    started: false,
-    finished: false,
-    processing: false,
-    student: { name: "", className: "", difficulty: "Standard" },
+    student: { name: "", className: "", difficulty: "" },
     visitor: null,
-    stats: {
+    intents: null,
+    flags: {
+      asked_name: false,
+      asked_purpose: false,
+      asked_appointment: false,
+      asked_who: false,
+      asked_time: false,
+      asked_where: false,
+      asked_subject: false,
       asked_id: false,
-      asked_dob: false,
       asked_age: false,
+      asked_dob: false,
       asked_nationality: false,
       supervisor_contacted: false,
       did_person_search: false
-    }
+    },
+    finished: false,
+    unknowns: 0
   };
 
-  // ----------------- core flow -----------------
-  function startRun(){
-    state.started = true;
-    state.finished = false;
-    state.processing = false;
-    state.runId = uid();
-    state.visitor = buildVisitor();
+  function showScreen(which) {
+    const a = $id("screen-login");
+    const b = $id("screen-train");
+    const c = $id("screen-feedback");
+    if (!a || !b || !c) return;
 
-    // switch screens
-    $("#screen-login")?.classList.add("hidden");
-    $("#screen-train")?.classList.remove("hidden");
-    $("#screen-feedback")?.classList.add("hidden");
-
-    // avatars
-    const va = $("#visitorAvatar");
-    if (va instanceof HTMLImageElement) {
-      va.src = state.visitor.headshot;
-      va.onerror = () => { va.src = "assets/photos/headshot_01.png"; };
-    }
-    equalizeAvatars();
-
-    // initial bubbles: only last messages
-    setVisitorText("Hello.");
-    setMoodLine();
-    setStudentText("");
-
-    showIdPanel(false);
-
-    logEvent("start", {
-      runId: state.runId,
-      student: state.student,
-      mood: state.visitor.mood.name
-    });
+    a.classList.toggle("hidden", which !== "login");
+    b.classList.toggle("hidden", which !== "train");
+    c.classList.toggle("hidden", which !== "feedback");
   }
 
-  async function denyEntrance(){
-    if (state.finished) return;
-    setStudentText("I’m denying entry. You cannot enter the site.");
-    setVisitorText("Okay…", "");
-    state.finished = true;
-    logEvent("deny", { runId: state.runId, student: state.student });
-    await sleep(500);
-    finishRun();
+  function setStep(title, help) {
+    const t = $id("stepTitle");
+    const h = $id("stepHelp");
+    if (t) t.textContent = title || "";
+    if (h) h.textContent = help || "";
   }
 
-  function finishRun(){
-    // For now: just go to feedback screen minimal
-    $("#screen-train")?.classList.add("hidden");
-    $("#screen-feedback")?.classList.remove("hidden");
-
-    // show minimal feedback (you can expand later)
-    const top3 = $("#top3");
-    if (top3) {
-      top3.innerHTML = "";
-      const li = document.createElement("li");
-      li.textContent = "Run finished (feedback can be expanded).";
-      top3.appendChild(li);
-    }
-
-    logEvent("finish", { runId: state.runId, student: state.student, stats: state.stats });
+  function resetBubbles() {
+    setVisitorBubble("Ask your first question…");
+    setStudentBubble("");
+    setVisitorMood(state.visitor?.mood?.text || "");
   }
 
-  function handleBornYearConfirm(text){
-    const yearAsked = parseYear(text);
+  // ---- Supervisor modal ----
+  function openSupervisorModal() {
+    const modal = $id("supervisorModal");
+    if (!modal) return;
+    modal.classList.remove("hidden");
+
+    // prefill
+    const v = state.visitor;
+    $id("wWho").value = v?.id?.name || "";
+    $id("wWhat").value = v?.intake?.purpose || "";
+    $id("wWithWhom").value = v?.intake?.meetingWith || "";
+    $id("wTime").value = v?.intake?.apptTime || "";
+    $id("wWhy").value = v?.intake?.subject || "";
+
+    const resp = $id("supervisorResponse");
+    if (resp) resp.textContent = "";
+  }
+
+  function closeSupervisorModal() {
+    const modal = $id("supervisorModal");
+    if (!modal) return;
+    modal.classList.add("hidden");
+  }
+
+  // ---- Conversation core (LAST bubble only) ----
+  function visitorSays(text, moodLine = null) {
+    setVisitorBubble(text);
+    if (moodLine !== null) setVisitorMood(moodLine);
+  }
+
+  function studentSays(text) {
+    setStudentBubble(text);
+  }
+
+  function handleBornYearConfirm(userText) {
+    const yearAsked = parseYear(userText);
     if (!yearAsked) {
-      setVisitorText("Sorry, could you repeat the year?");
-      setMoodLine();
+      visitorSays("Sorry, could you repeat the year?");
       return;
     }
 
     const v = state.visitor;
-    const claim = controlAnswer("dob"); // may be lie
+    const claim = visitorControlAnswer(v, "dob");   // may be truth or lie
     const claimYear = parseYear(claim.value) || v.id.dob.yyyy;
     const trueYear = v.id.dob.yyyy;
 
     if (yearAsked === claimYear) {
-      setVisitorText("Yes, that’s correct.");
-      setMoodLine();
+      visitorSays("Yes, that’s correct.");
+      if (claim.lied) setVisitorMood("The visitor looks a bit stressed.");
       return;
     }
 
-    // not matching
+    // mismatch
+    visitorSays("No, that’s not correct.");
+
+    // If student said true year but visitor lied, allow correction
     if (yearAsked === trueYear && claim.lied) {
-      setVisitorText(`Actually… you’re right. I was born in ${trueYear}. Sorry.`);
-      v.claims.dob = formatDob(v.id.dob); // align back to truth
-      setMoodLine();
+      visitorSays(`Actually… you’re right. I was born in ${trueYear}. Sorry.`);
+      v.claims.dob = formatDob(v.id.dob);
       return;
     }
 
-    setVisitorText(`No, that’s not correct. I was born in ${claimYear}.`);
-    setMoodLine();
+    visitorSays(`I was born in ${claimYear}.`);
   }
 
-  async function onSend(text){
-    if (state.processing || state.finished) return;
+  function intakeAnswer(kind) {
+    const v = state.visitor;
+    const a = v.intake;
+    if (kind === "name") return `My name is ${v.id.name}.`;
+    if (kind === "purpose") return `I’m here for ${a.purpose}.`;
+    if (kind === "appointment") return a.appointment ? "Yes, I have an appointment." : "No, I don’t have an appointment.";
+    if (kind === "who") return a.meetingWith ? `I’m meeting ${a.meetingWith}.` : "I’m not meeting anyone specific.";
+    if (kind === "time") return a.apptTime ? `It’s at ${a.apptTime}.` : "I don’t have a specific time.";
+    if (kind === "where") return `I’m going to the ${a.goingWhere}.`;
+    if (kind === "subject") return `It’s about ${a.subject}.`;
+    return "Okay.";
+  }
+
+  function showFeedback() {
+    showScreen("feedback");
+    const misses = REQUIRED.filter(r => !state.flags[r.key]);
+
+    const top3 = misses.slice(0, 3);
+    const ulTop = $id("top3");
+    const all = $id("allMisses");
+    if (ulTop) ulTop.innerHTML = top3.map(m => `<li><b>${m.label}</b><br><span class="muted small">Example: ${m.example}</span></li>`).join("");
+    if (all) all.innerHTML = misses.map(m => `<div style="margin:10px 0;"><b>${m.label}</b><div class="muted small">Example: ${m.example}</div></div>`).join("");
+  }
+
+  function finishRun(reason) {
+    if (state.finished) return;
+    state.finished = true;
+    logEvent("finish", {
+      runId: state.runId,
+      reason,
+      student: state.student,
+      flags: state.flags,
+      unknowns: state.unknowns,
+      inconsistencies: state.visitor?.inconsistencies || []
+    });
+    showFeedback();
+  }
+
+  function denyEntrance() {
+    studentSays("I’m denying entry. You cannot enter the site.");
+    visitorSays("Okay.", state.visitor.mood.text);
+    finishRun("denied");
+  }
+
+  function handleMessage(text) {
+    if (state.finished) return;
     const t = (text || "").trim();
     if (!t) return;
 
-    state.processing = true;
-    setStudentText(t);
+    studentSays(t);
+    logEvent("message", { runId: state.runId, from: "student", text: t });
 
-    logEvent("message", { runId: state.runId, student: state.student, text: t });
+    const intent = matchIntent(state.intents, t);
 
-    const intent = matchIntent(t);
-
-    try {
-      if (intent === "deny") return denyEntrance();
-
-      if (intent === "ask_id") {
-        state.stats.asked_id = true;
-        drawIdCard(state.visitor);
-        showIdPanel(true);
-        setVisitorText("Yes. Here you go.");
-        setMoodLine();
-        return;
-      }
-
-      if (intent === "ask_dob") {
-        state.stats.asked_dob = true;
-        const a = controlAnswer("dob");
-        setVisitorText(`My date of birth is ${a.value}.`);
-        setMoodLine();
-        return;
-      }
-
-      if (intent === "confirm_born_year") {
-        state.stats.asked_dob = true;
-        handleBornYearConfirm(t);
-        return;
-      }
-
-      if (intent === "ask_age") {
-        state.stats.asked_age = true;
-        const a = controlAnswer("age");
-        setVisitorText(`I’m ${a.value} years old.`);
-        setMoodLine();
-        return;
-      }
-
-      if (intent === "ask_nationality") {
-        state.stats.asked_nationality = true;
-        const a = controlAnswer("nationality");
-        setVisitorText(`I’m ${a.value}.`);
-        setMoodLine();
-        return;
-      }
-
-      if (intent === "contact_supervisor") {
-        state.stats.supervisor_contacted = true;
-        openSupervisorModal();
-        setVisitorText("Okay. Please contact your supervisor.");
-        setMoodLine();
-        return;
-      }
-
-      if (intent === "go_person_search") {
-        state.stats.did_person_search = true;
-        setVisitorText("Okay.", "");
-        setMoodLine();
-        setStudentText("I’m going to do a quick pat-down search. Is that okay?");
-        await sleep(350);
-        setVisitorText("Yes, that’s okay.");
-        setMoodLine();
-        await sleep(450);
-        finishRun();
-        return;
-      }
-
-      // basic 5W replies from scenario (optional, but nice)
-      const v = state.visitor;
-      if (intent === "ask_name") { setVisitorText(`My name is ${v.id.name}.`); setMoodLine(); return; }
-      if (intent === "ask_purpose") { setVisitorText(`I’m here for ${v.intake.purpose}.`); setMoodLine(); return; }
-      if (intent === "ask_appointment") {
-        setVisitorText(v.intake.appointment ? "Yes, I have an appointment." : "No, I don’t have an appointment.");
-        setMoodLine();
-        return;
-      }
-      if (intent === "ask_who") { setVisitorText(v.intake.meetingWith ? `I’m meeting ${v.intake.meetingWith}.` : "I’m not meeting anyone specific."); setMoodLine(); return; }
-      if (intent === "ask_time") { setVisitorText(v.intake.apptTime ? `It’s at ${v.intake.apptTime}.` : "I don’t have a specific time."); setMoodLine(); return; }
-      if (intent === "ask_where") { setVisitorText(`I’m going to the ${v.intake.goingWhere}.`); setMoodLine(); return; }
-      if (intent === "ask_subject") { setVisitorText(`It’s about ${v.intake.subject}.`); setMoodLine(); return; }
-
-      // unknown
-      setVisitorText("Sorry, I don’t understand. Can you ask it another way?");
-      setMoodLine();
-      if (LOG_UNKNOWN) logEvent("unknown", { runId: state.runId, student: state.student, text: t });
-
-    } finally {
-      state.processing = false;
-    }
-  }
-
-  // ----------------- voice: hold to talk -----------------
-  function setupVoice(){
-    const btn = $("#btnMicHold");
-    const status = $("#micStatus");
-    const input = $("#studentInput");
-
-    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!btn || !input || !SR) {
-      if (status) status.textContent = SR ? "" : "Voice not supported in this browser.";
+    // deny always
+    if (intent === "deny") {
+      denyEntrance();
       return;
     }
 
-    const rec = new SR();
-    rec.lang = VOICE_LANG;
-    rec.interimResults = true;
-    rec.continuous = false;
-
-    let isHolding = false;
-    let finalText = "";
-
-    const setStatus = (t) => { if (status) status.textContent = t; };
-
-    rec.onresult = (e) => {
-      let interim = "";
-      finalText = "";
-      for (let i = e.resultIndex; i < e.results.length; i++) {
-        const txt = e.results[i][0].transcript;
-        if (e.results[i].isFinal) finalText += txt;
-        else interim += txt;
-      }
-      input.value = (finalText || interim || "").trim();
-    };
-
-    rec.onerror = () => setStatus("Voice error.");
-    rec.onend = async () => {
-      setStatus("");
-      if (!isHolding) return;
-      isHolding = false;
-
-      const txt = (input.value || "").trim();
-      if (VOICE_AUTO_SEND && txt) {
-        input.value = "";
-        await onSend(txt);
-      }
-    };
-
-    function start(){
-      if (isHolding) return;
-      isHolding = true;
-      setStatus("Listening…");
-      try { rec.start(); } catch { /* ignore */ }
+    // ID request -> show/draw ID card
+    if (intent === "ask_id") {
+      state.flags.asked_id = true;
+      state.visitor.idShown = true;
+      visitorSays("Yes. Here you go.", state.visitor.mood.text);
+      drawIdCard(state.visitor);
+      setStep("ID check", "Check the ID details and ask control questions (DOB, age, nationality).");
+      logEvent("show_id", { runId: state.runId });
+      return;
     }
 
-    function stop(){
-      if (!isHolding) return;
-      try { rec.stop(); } catch { /* ignore */ }
+    // supervisor via TEXT
+    if (intent === "contact_supervisor") {
+      state.flags.supervisor_contacted = true;
+      visitorSays("Okay. Please contact your supervisor.", state.visitor.mood.text);
+      openSupervisorModal();
+      setStep("Supervisor", "Fill the 5W briefing. Then continue.");
+      logEvent("supervisor_trigger", { runId: state.runId, source: "text" });
+      return;
+    }
+
+    // control questions
+    if (intent === "ask_age") {
+      state.flags.asked_age = true;
+      const a = visitorControlAnswer(state.visitor, "age");
+      visitorSays(`I’m ${a.value} years old.`, state.visitor.mood.text);
+      return;
+    }
+    if (intent === "ask_dob") {
+      state.flags.asked_dob = true;
+      const a = visitorControlAnswer(state.visitor, "dob");
+      visitorSays(`My date of birth is ${a.value}.`, state.visitor.mood.text);
+      return;
+    }
+    if (intent === "confirm_born_year") {
+      state.flags.asked_dob = true;
+      handleBornYearConfirm(t);
+      return;
+    }
+    if (intent === "ask_nationality") {
+      state.flags.asked_nationality = true;
+      const a = visitorControlAnswer(state.visitor, "nationality");
+      visitorSays(`I’m ${a.value}.`, state.visitor.mood.text);
+      return;
+    }
+
+    // intake questions
+    if (intent === "ask_name") { state.flags.asked_name = true; visitorSays(intakeAnswer("name"), state.visitor.mood.text); return; }
+    if (intent === "ask_purpose") { state.flags.asked_purpose = true; visitorSays(intakeAnswer("purpose"), state.visitor.mood.text); return; }
+
+    if (intent === "ask_appointment") {
+      state.flags.asked_appointment = true;
+      visitorSays(intakeAnswer("appointment"), state.visitor.mood.text);
+      if (!state.visitor.intake.appointment) {
+        setVisitorMood("The visitor looks uncertain.");
+      }
+      return;
+    }
+
+    if (intent === "ask_who") { state.flags.asked_who = true; visitorSays(intakeAnswer("who"), state.visitor.mood.text); return; }
+    if (intent === "ask_time") { state.flags.asked_time = true; visitorSays(intakeAnswer("time"), state.visitor.mood.text); return; }
+    if (intent === "ask_where") { state.flags.asked_where = true; visitorSays(intakeAnswer("where"), state.visitor.mood.text); return; }
+    if (intent === "ask_subject") { state.flags.asked_subject = true; visitorSays(intakeAnswer("subject"), state.visitor.mood.text); return; }
+
+    if (intent === "go_person_search") {
+      state.flags.did_person_search = true;
+      visitorSays("Yes, that’s okay.", state.visitor.mood.text);
+      finishRun("completed");
+      return;
+    }
+
+    // Unknown
+    state.unknowns += 1;
+    visitorSays("Sorry, I don’t understand. Can you ask it another way?", state.visitor.mood.text);
+    if (LOG_UNKNOWN) logEvent("unknown_question", { runId: state.runId, text: t });
+  }
+
+  // ---- Voice (hold-to-talk) ----
+  function setupVoice() {
+    const btn = $id("btnMicHold");
+    const status = $id("micStatus");
+    const input = $id("studentInput");
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!btn || !status || !input) return;
+
+    if (!SpeechRecognition) {
+      status.textContent = "Voice not supported in this browser.";
+      btn.disabled = true;
+      return;
+    }
+
+    let rec = null;
+    let finalText = "";
+    let listening = false;
+
+    function setStatus(s) { status.textContent = s || ""; }
+
+    function startRec() {
+      if (listening) return;
+      finalText = "";
+      rec = new SpeechRecognition();
+      rec.lang = VOICE_LANG;
+      rec.interimResults = true;
+      rec.continuous = true;
+
+      rec.onresult = (e) => {
+        let interim = "";
+        for (let i = e.resultIndex; i < e.results.length; i++) {
+          const txt = e.results[i][0]?.transcript || "";
+          if (e.results[i].isFinal) finalText += txt;
+          else interim += txt;
+        }
+        const combined = (finalText + " " + interim).trim();
+        input.value = combined;
+      };
+
+      rec.onerror = () => setStatus("Mic error.");
+      rec.onend = () => {
+        listening = false;
+        btn.classList.remove("listening");
+        setStatus("");
+
+        // auto send on release/end
+        if (VOICE_AUTO_SEND) {
+          const val = (input.value || "").trim();
+          if (val) {
+            input.value = "";
+            handleMessage(val);
+          }
+        }
+      };
+
+      listening = true;
+      btn.classList.add("listening");
+      setStatus("Listening…");
+      try { rec.start(); } catch {}
+    }
+
+    function stopRec() {
+      if (!rec) return;
+      try { rec.stop(); } catch {}
     }
 
     // mouse
-    btn.addEventListener("mousedown", (e) => { e.preventDefault(); start(); });
-    btn.addEventListener("mouseup", (e) => { e.preventDefault(); stop(); });
-    btn.addEventListener("mouseleave", () => { if (isHolding) stop(); });
+    btn.addEventListener("mousedown", (e) => { e.preventDefault(); startRec(); });
+    document.addEventListener("mouseup", () => { if (listening) stopRec(); });
 
     // touch
-    btn.addEventListener("touchstart", (e) => { e.preventDefault(); start(); }, { passive: false });
-    btn.addEventListener("touchend", (e) => { e.preventDefault(); stop(); }, { passive: false });
-    btn.addEventListener("touchcancel", (e) => { e.preventDefault(); stop(); }, { passive: false });
+    btn.addEventListener("touchstart", (e) => { e.preventDefault(); startRec(); }, { passive: false });
+    btn.addEventListener("touchend", (e) => { e.preventDefault(); stopRec(); }, { passive: false });
   }
 
-  // ----------------- init wiring -----------------
-  function init(){
-    // Fix your HTML typo: if you still have "<<script", the page breaks.
-    // (Nothing we can do here, but mentioning: make sure it’s "<script ...>")
+  // ---- Init / wiring ----
+  async function init() {
+    // teacher button optionally hidden
+    const teacherBtn = $id("btnTeacher");
+    if (teacherBtn) teacherBtn.style.display = (CONFIG.showTeacherButton === false) ? "none" : "";
 
-    // Buttons
-    $("#btnStart")?.addEventListener("click", () => {
-      const name = ($("#studentName")?.value || "").trim();
-      const className = ($("#className")?.value || "").trim();
-      const difficulty = ($("#difficulty")?.value || "Standard").trim();
+    // Hide the supervisor BUTTON (text trigger only), but keep it in DOM
+    const supBtn = $id("btnContactSupervisor");
+    if (supBtn) supBtn.style.display = "none";
+
+    // Hide ID panel on mobile is already handled by your CSS @media rule
+
+    // Load phrasebank
+    const pb = await loadPhrasebank();
+    state.intents = compilePatterns(pb);
+
+    // LOGIN screen
+    showScreen("login");
+
+    const btnStart = $id("btnStart");
+    const btnReset = $id("btnResetLocal");
+
+    btnReset?.addEventListener("click", () => {
+      localStorage.removeItem("veva_runs");
+      alert("Lokaal gereset.");
+    });
+
+    btnStart?.addEventListener("click", async () => {
+      const name = ($id("studentName")?.value || "").trim();
+      const cls = ($id("className")?.value || "").trim();
+      const diff = ($id("difficulty")?.value || "Standard").trim();
 
       if (!name) {
         alert("Vul je naam in.");
         return;
       }
 
-      state.student = { name, className, difficulty };
-      startRun();
+      state.student = { name, className: cls, difficulty: diff };
+      state.runId = uid();
+      state.finished = false;
+      state.unknowns = 0;
+      state.flags = Object.fromEntries(Object.keys(state.flags).map(k => [k, false]));
+
+      state.visitor = buildVisitor();
+
+      // avatars
+      const vA = $id("visitorAvatar");
+      if (vA) {
+        vA.src = state.visitor.headshot;
+        vA.onerror = () => { vA.src = "assets/photos/headshot_01.png"; };
+      }
+      const sA = $id("studentAvatar");
+      if (sA) sA.src = "assets/photos/soldier.png";
+
+      // mood line
+      setVisitorMood(state.visitor.mood.text);
+
+      // clear ID canvas (don’t show yet)
+      const idPanel = $id("idPanel");
+      if (idPanel) idPanel.style.display = ""; // visible on desktop, hidden on mobile by CSS
+      const canvas = $id("idCanvas");
+      if (canvas) {
+        const ctx = canvas.getContext("2d");
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+      }
+
+      // meta header
+      const meta = $id("meta");
+      if (meta) meta.textContent = `${name}${cls ? " · " + cls : ""} · ${diff} · Run ${state.runId.slice(0, 6)}`;
+
+      // move to training
+      showScreen("train");
+      resetBubbles();
+      setStep("Intake", "Start with 5W/5WH (name, purpose, appointment, who, time, where, subject).");
+
+      await logEvent("start", { runId: state.runId, student: state.student, mood: state.visitor.mood.key });
+
+      // greet
+      visitorSays("Hello.", state.visitor.mood.text);
+      setTimeout(() => {
+        visitorSays("Good day. Please state your name and the purpose of your visit.", state.visitor.mood.text);
+      }, 300);
     });
 
-    $("#btnSend")?.addEventListener("click", () => {
-      const input = $("#studentInput");
-      const txt = input?.value || "";
-      if (input) input.value = "";
-      onSend(txt);
+    // Training controls
+    $id("btnSend")?.addEventListener("click", () => {
+      const input = $id("studentInput");
+      if (!input) return;
+      const val = input.value;
+      input.value = "";
+      handleMessage(val);
     });
 
-    $("#studentInput")?.addEventListener("keydown", (e) => {
+    $id("studentInput")?.addEventListener("keydown", (e) => {
       if (e.key === "Enter") {
-        const input = $("#studentInput");
-        const txt = input?.value || "";
-        if (input) input.value = "";
-        onSend(txt);
+        const input = $id("studentInput");
+        const val = input.value;
+        input.value = "";
+        handleMessage(val);
       }
     });
 
-    $("#btnDenyEntrance")?.addEventListener("click", denyEntrance);
-    $("#btnFinishRun")?.addEventListener("click", finishRun);
-    $("#btnNewScenario")?.addEventListener("click", startRun);
+    $id("btnDenyEntrance")?.addEventListener("click", () => denyEntrance());
 
-    // Supervisor modal buttons
-    $("#btnCloseModal")?.addEventListener("click", closeSupervisorModal);
-    $("#btnBackToVisitor")?.addEventListener("click", closeSupervisorModal);
-
-    $("#btnSendSupervisor")?.addEventListener("click", () => {
-      $("#supervisorResponse") && ($("#supervisorResponse").textContent = "Supervisor: OK. Proceed with checks.");
-      logEvent("supervisor_request", { runId: state.runId, student: state.student });
+    $id("btnNewScenario")?.addEventListener("click", () => {
+      // back to login
+      showScreen("login");
+      state.finished = false;
     });
 
-    // Voice
+    $id("btnFinishRun")?.addEventListener("click", () => finishRun("manual_finish"));
+
+    $id("btnHint")?.addEventListener("click", () => {
+      visitorSays("Try: What is your name? / What is the purpose of your visit? / Do you have an appointment?", state.visitor?.mood?.text || "");
+    });
+
+    $id("btnDoneStep")?.addEventListener("click", () => {
+      // lightweight guidance
+      if (!state.flags.asked_id) {
+        visitorSays("Next step: ask for an ID.", state.visitor.mood.text);
+        setStep("ID check", "Ask for ID. Then verify DOB / age / nationality.");
+        return;
+      }
+      if (!state.flags.did_person_search) {
+        visitorSays("Next step: person search.", state.visitor.mood.text);
+        setStep("Person search", "Type: Go to person search");
+      }
+    });
+
+    $id("btnGoPersonSearch")?.addEventListener("click", () => {
+      state.flags.did_person_search = true;
+      visitorSays("Yes, that’s okay.", state.visitor.mood.text);
+      finishRun("completed");
+    });
+
+    $id("btnReturnVisitor")?.addEventListener("click", () => {
+      visitorSays("Okay.", state.visitor?.mood?.text || "");
+    });
+
+    // Supervisor modal buttons
+    $id("btnCloseModal")?.addEventListener("click", closeSupervisorModal);
+    $id("btnBackToVisitor")?.addEventListener("click", () => {
+      closeSupervisorModal();
+      visitorSays("Okay.", state.visitor?.mood?.text || "");
+    });
+
+    $id("btnSendSupervisor")?.addEventListener("click", () => {
+      const resp = $id("supervisorResponse");
+      if (resp) resp.textContent = "Supervisor response: Approved. Proceed with additional checks.";
+      closeSupervisorModal();
+      visitorSays("Understood.", state.visitor?.mood?.text || "");
+    });
+
+    // Feedback screen buttons (basic)
+    $id("btnBackToStart")?.addEventListener("click", () => showScreen("login"));
+    $id("btnDownloadCsv")?.addEventListener("click", () => {
+      const rows = [
+        ["ts", nowIso()],
+        ["runId", state.runId],
+        ["studentName", state.student.name],
+        ["className", state.student.className],
+        ["difficulty", state.student.difficulty],
+        ["unknowns", String(state.unknowns)]
+      ];
+      const csv = rows.map(r => r.map(x => `"${String(x).replaceAll('"', '""')}"`).join(",")).join("\n");
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `veva_${state.runId}.csv`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    });
+
     setupVoice();
-
-    // Make sure avatars are equal size even if images load late
-    equalizeAvatars();
-    window.addEventListener("resize", equalizeAvatars);
   }
 
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", init);
-  } else {
-    init();
-  }
+  document.addEventListener("DOMContentLoaded", init);
 })();
