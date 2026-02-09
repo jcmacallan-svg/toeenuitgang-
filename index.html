@@ -29,17 +29,17 @@
   <!-- Screen 1: Login -->
   <section class="card" id="screen-login">
     <h1>Start</h1>
-    <p class="muted">Vul je naam en groep in. Daarna start de oefening.</p>
+    <p class="muted">Vul je naam in. Daarna start de oefening.</p>
 
     <div class="grid2">
       <label class="field">
         <span>Naam leerling</span>
-        <input id="studentName" autocomplete="name" placeholder="Bijv. Jansen" />
+        <input id="studentName" autocomplete="name" placeholder="Vul in je achternaam (bijv. Jansen)" />
       </label>
 
       <label class="field">
         <span>Groep</span>
-        <select id="className" required>
+        <select id="className">
           <option value="">— kies —</option>
           <option value="Alpha">Alpha</option>
           <option value="Bravo">Bravo</option>
@@ -56,11 +56,6 @@
         <option value="Standard" selected>Standard</option>
         <option value="Advanced">Advanced</option>
       </select>
-      <div class="muted small levelHelp">
-        <div><b>Basic:</b> bij een foute/onbegrepen vraag krijg je meteen een hint.</div>
-        <div><b>Standard:</b> hint pas na 2 missers.</div>
-        <div><b>Advanced:</b> geen hints.</div>
-      </div>
     </label>
 
     <div class="row">
@@ -73,8 +68,8 @@
   <section class="card hidden" id="screen-train">
     <div class="trainHead">
       <div>
-        <div class="stepTitle" id="stepTitle">Start</div>
-        <div class="muted" id="stepHelp">Say hello to the visitor. Then continue with your questions in English.</div>
+        <div class="stepTitle" id="stepTitle">Intake</div>
+        <div class="muted" id="stepHelp">Start with 5W/5WH (name, purpose, appointment, who, time, where, subject).</div>
       </div>
       <div class="trainBtns">
         <button class="btn" id="btnHint">Hint</button>
@@ -83,9 +78,8 @@
     </div>
 
     <div class="gridTrain" id="trainGrid">
-      <!-- LEFT: conversation -->
-      <div class="panel convoPanel">
-        <div class="panelTitle">Conversation</div>
+      <div class="panel">
+        <div class="panelTitle">Visitor answer</div>
 
         <div class="visitorRow">
           <img id="visitorAvatar" class="visitorAvatar" alt="visitor" />
@@ -103,15 +97,15 @@
         </div>
 
         <div class="panelTitle mt">Your question</div>
-
-        <div class="inputBar">
+        <div class="row">
           <input id="studentInput" placeholder="Type your question in English…" />
           <button class="btn primary" id="btnSend">Send</button>
-          <button class="btn" id="btnMicHold" type="button" title="Hold to talk">🎙 Hold</button>
+          <button class="btn" id="btnMicHold" type="button" title="Hold to talk">🎙 Hold to talk</button>
           <span class="micStatus" id="micStatus" aria-live="polite"></span>
         </div>
 
         <div class="row actionBar">
+          <button class="btn" id="btnContactSupervisor" title="Open supervisor 5W briefing (Step 2)">Contact supervisor</button>
           <button class="btn" id="btnReturnVisitor" title="Return to visitor after supervisor response">Return</button>
           <button class="btn" id="btnGoPersonSearch" title="Proceed to person search / pat-down">Go to person search</button>
           <button class="btn danger" id="btnDenyEntrance" title="Deny entrance at any time">Deny entrance</button>
@@ -120,21 +114,25 @@
         <div class="muted small">Tip: schrijf de antwoorden in je eigen boekje.</div>
 
         <div class="divider"></div>
+
+        <!-- INLINE ID (appears here, under the buttons) -->
+        <div id="idPanel" aria-label="ID panel">
+          <div class="idInner">
+            <div class="row" style="justify-content:space-between; align-items:center;">
+              <div class="panelTitle">ID Card</div>
+              <button class="btn small" id="btnCloseId" type="button">Close ID</button>
+            </div>
+            <canvas id="idCanvas" width="900" height="560" class="idCanvas"></canvas>
+            <div class="muted small" style="margin-top:8px;">
+              Ask control questions about name / nationality / DOB / age.
+            </div>
+          </div>
+        </div>
+
+        <div class="divider"></div>
         <div class="row">
           <button class="btn" id="btnNewScenario">New scenario</button>
           <button class="btn" id="btnFinishRun">Finish run</button>
-        </div>
-      </div>
-
-      <!-- RIGHT: ID card -->
-      <div class="panel" id="idPanel" aria-live="polite">
-        <div class="row" style="justify-content:space-between; align-items:center;">
-          <div class="panelTitle">ID Card</div>
-          <button class="btn small" id="btnCloseId" type="button">Close ID</button>
-        </div>
-        <canvas id="idCanvas" width="980" height="560" class="idCanvas"></canvas>
-        <div class="muted small" style="margin-top:8px;">
-          Ask control questions about name / nationality / DOB / age.
         </div>
       </div>
     </div>
@@ -161,7 +159,7 @@
     </div>
   </section>
 
-  <!-- Supervisor modal (kept, but no button in UI; only text trigger) -->
+  <!-- Supervisor modal -->
   <div class="modal hidden" id="supervisorModal" role="dialog" aria-modal="true">
     <div class="modalCard">
       <div class="modalHead">
@@ -172,11 +170,11 @@
       <p class="muted small">Fill in the 5W briefing (can be in Dutch). Then send to supervisor.</p>
 
       <div class="grid2">
-        <label class="field"><span>Who?</span><input id="wWho" placeholder="Naam bezoeker" /></label>
-        <label class="field"><span>What?</span><input id="wWhat" placeholder="Doel (delivery/inspection/etc.)" /></label>
-        <label class="field"><span>With whom?</span><input id="wWithWhom" placeholder="Host / contactpersoon" /></label>
-        <label class="field"><span>What time?</span><input id="wTime" placeholder="Bijv. 10:30" /></label>
-        <label class="field"><span>Why?</span><input id="wWhy" placeholder="Onderwerp / reden" /></label>
+        <label class="field"><span>Who are you?</span><input id="wWho" placeholder="Naam bezoeker" /></label>
+        <label class="field"><span>What are you doing here?</span><input id="wWhat" placeholder="Doel (delivery/inspection/etc.)" /></label>
+        <label class="field"><span>With whom is the meeting?</span><input id="wWithWhom" placeholder="Host / contactpersoon" /></label>
+        <label class="field"><span>What time is the meeting?</span><input id="wTime" placeholder="Bijv. 10:30" /></label>
+        <label class="field"><span>Why is the meeting?</span><input id="wWhy" placeholder="Onderwerp / reden" /></label>
       </div>
 
       <div class="row">
