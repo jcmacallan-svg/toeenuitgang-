@@ -109,7 +109,9 @@
       "can i see your id card",
       "can i see your id card?",
       "can you show me an id",
-      "can you show me an id?"
+      "can you show me an id?",
+      "may i see an id",
+      "may i see an id?"
     ],
     "ask_age": [
       "how old are you",
@@ -267,6 +269,21 @@
       "hand them over",
       "you must hand them over",
       "please give them to me"
+    ],
+    "deny_temporarily": [
+      "not yet",
+      "not yet.",
+      "not yet!",
+      "please wait",
+      "please wait."
+    ],
+    "ask_enter_now": [
+      "can i go in now",
+      "can i go in now?",
+      "can i enter now",
+      "can i enter now?",
+      "am i allowed in now",
+      "am i allowed in now?"
     ]
   }
 }

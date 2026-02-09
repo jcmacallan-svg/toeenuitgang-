@@ -387,6 +387,26 @@ function listPhotoFiles(){
   return files;
 }
 
+
+function buildAboutDetail(card){
+  const topic = (card.about || "").toLowerCase();
+  const purpose = (card.purpose || "").toLowerCase();
+
+  if(topic.includes("it") || topic.includes("audit") || purpose.includes("it")){
+    return "I'm here for an IT audit meeting because last week several systems crashed and the base asked us to review the network and security settings.";
+  }
+  if(topic.includes("fire") || topic.includes("safety") || purpose.includes("inspection")){
+    return "I'm here for a fire safety inspection because the last report showed a few issues, and I'm here to verify the corrective actions were completed.";
+  }
+  if(purpose.includes("delivery") || purpose.includes("deliver")){
+    return "I'm here to deliver equipment that was requested earlier this week. I have a delivery note and I was told to report to the gate first.";
+  }
+  if(purpose.includes("maintenance") || purpose.includes("repair")){
+    return "I'm here to repair and test a faulty system that was reported yesterday. The unit asked me to come in as soon as possible.";
+  }
+  return "I'm here for a meeting about scheduled coordination with the unit. I was asked to come today to discuss next steps.";
+}
+
 function generateVisitorCard(seed){
   // Deterministic selection based on seed so students can replay same run if needed
   const idx = (seed >>> 0) % VISITORS.length;
@@ -409,6 +429,7 @@ function generateVisitorCard(seed){
   return {
     ...base,
     headshot: base.photo || base.headshot || "",
+    aboutDetail: buildAboutDetail(base),
     twist,
     id: {
       id_no,
@@ -529,7 +550,7 @@ function visitorResponseForIntent(state, intent, userText, card){
         markAsked(state, "time");
       return card.twist==="vague_time" ? "I think it's sometime this afternoon… I'm not sure." : `It's at ${card.time}.`;
     case "ask_topic":
-      return `It's about ${card.topic}.`;
+      return (card && card.aboutDetail ? card.aboutDetail : `It's about ${card.topic}.`);
     case "request_id":
         markAsked(state, "request_id");
         updateIdVisibility(state);
@@ -543,6 +564,7 @@ function visitorResponseForIntent(state, intent, userText, card){
           }
           updateIdVisibility(state);
         }catch(e){}
+        try{ const st=currentStep(state); if(st && st.key==="gate"){ goToStep(state,"id_check"); } updateIdVisibility(state);}catch(e){}
         return "Sure, here is my ID.";
     case "control_question":
       return responseForControlQuestion(userText, card, state);
@@ -1144,6 +1166,24 @@ function finishRun(state){
 (async function init(){
   const state = buildState();
   initSpeechRecognition(state);
+
+  // BIND_CRITICAL_BUTTONS
+  const denyBtn = $("#btnDenyEntrance");
+  if(denyBtn){
+    denyBtn.addEventListener("click", () => { try{ denyEntrance(state); }catch(e){} });
+  }
+  const goBtn = $("#btnGoToPersonSearch") || $("#btnGoPersonSearch");
+  if(goBtn){
+    goBtn.addEventListener("click", () => {
+      try{
+        goToStep(state, "person_search");
+        updateIdVisibility(state);
+        showVisitor("Please follow me to the person search area.");
+        setTimeout(focusQuestion, 50);
+      }catch(e){}
+    });
+  }
+
 
   // Preload heavy assets so Start feels instant
   const preloadPhrasebankPromise = (async () => {
@@ -1867,9 +1907,11 @@ function denyEntrance(state){
   // disable input
   const inp = $("#studentInput");
   const btn = $("#btnSend");
+  const micBtn = $("#btnMicHold");
   const mic = $("#btnMicHold");
   if(inp) inp.disabled = true;
   if(btn) btn.disabled = true;
+  if(micBtn) micBtn.disabled = true;
   if(mic) mic.disabled = true;
 }
 
@@ -1896,4 +1938,17 @@ function denyEntrance(state){
   const inp = $("#studentInput"); const btn = $("#btnSend");
   if(inp) inp.disabled = true;
   if(btn) btn.disabled = true;
+  if(micBtn) micBtn.disabled = true;
 }
+
+// CLOSE_ACTS_AS_RETURN: make closing supervisor modal also continue the flow
+(function(){
+  const closeBtn = $("#btnCloseSupervisor");
+  if(closeBtn){
+    closeBtn.addEventListener("click", () => {
+      if(window.__state && window.__state.supervisorDone){
+        // already handled
+      }
+    });
+  }
+})();
