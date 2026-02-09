@@ -41,7 +41,11 @@
       "what time is your delivery",
       "what time is that delivery?",
       "what time is your appointment",
-      "what time is your appointment?"
+      "what time is your appointment?",
+      "what time is your meeting",
+      "what time is your meeting?",
+      "what time",
+      "what time?"
     ],
     "ask_purpose": [
       "what are you here for",
@@ -63,7 +67,17 @@
       "with who is the meeting",
       "with who is the meeting?",
       "who is the meeting with",
-      "who is the meeting with?"
+      "who is the meeting with?",
+      "who is the appointment with",
+      "who is the appointment with?",
+      "with whom is the appointment",
+      "with whom is the appointment?",
+      "with who is your appointment",
+      "with who is your appointment?",
+      "who with",
+      "who with?",
+      "who are you here to see",
+      "who are you here to see?"
     ],
     "ask_appointment": [
       "do you have a meeting",
@@ -89,7 +103,13 @@
       "do you have an id card",
       "do you have an id card?",
       "can you show me your id",
-      "can you show me your id?"
+      "can you show me your id?",
+      "can i see an id",
+      "can i see an id?",
+      "can i see your id card",
+      "can i see your id card?",
+      "can you show me an id",
+      "can you show me an id?"
     ],
     "ask_age": [
       "how old are you",
@@ -175,6 +195,78 @@
       "do you have any prohibited items?",
       "do you have any weapons drugs alcohol or sharp objects",
       "do you have any weapons drugs alcohol or sharp objects?"
+    ],
+    "ask_identity": [
+      "who are you",
+      "who are you?",
+      "what is your name",
+      "what is your name?",
+      "what's your name",
+      "what's your name?",
+      "can you tell me your name",
+      "can you tell me your name?",
+      "can you tell me your name please",
+      "can you tell me your name please?",
+      "may i have your name",
+      "may i have your name?",
+      "your name please",
+      "name please"
+    ],
+    "ask_topic": [
+      "what is the appointment about",
+      "what is the appointment about?",
+      "what is the meeting about",
+      "what is the meeting about?",
+      "what is it about",
+      "what is it about?",
+      "what's it about",
+      "what's it about?"
+    ],
+    "control_question": [
+      "how old are you",
+      "how old are you?",
+      "what is your age",
+      "what is your age?",
+      "are you 42",
+      "are you 42?",
+      "what is your date of birth",
+      "what is your date of birth?",
+      "dob",
+      "dob?",
+      "date of birth",
+      "date of birth?",
+      "when is your birthday",
+      "when is your birthday?",
+      "when were you born",
+      "when were you born?"
+    ],
+    "prohibited_items": [
+      "do you have anything illegal",
+      "do you have anything illegal?",
+      "do you have any prohibited items",
+      "do you have any prohibited items?",
+      "do you have any weapons",
+      "do you have any weapons?",
+      "do you have drugs",
+      "do you have drugs?",
+      "do you have alcohol",
+      "do you have alcohol?",
+      "do you have any sharp objects",
+      "do you have any sharp objects?",
+      "do you have any illegal items such as weapons drugs or alcohol",
+      "do you have any illegal items such as weapons drugs or alcohol?"
+    ],
+    "inform_search_threat": [
+      "due to an increased threat level everyone is searched",
+      "everyone is searched",
+      "you will be searched",
+      "you will be searched because of an increased threat"
+    ],
+    "request_surrender": [
+      "please hand them over",
+      "hand them over",
+      "you must hand them over",
+      "please give them to me"
     ]
   }
 }

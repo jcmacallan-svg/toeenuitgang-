@@ -43,7 +43,7 @@ function updateIdVisibility(state){
   const panel = $("#idPanel") || $("#idCardPanel");
   const grid = $("#trainGrid");
   const step = currentStep(state);
-  const show = (step && step.key !== "gate") || (state.asked && state.asked["request_id"]);
+  const show = (step && step.key !== "gate") || (state.done && state.done["request_id"]);
   if(panel) panel.style.display = show ? "" : "none";
   if(grid){
     if(show) grid.classList.remove("trainGridOneCol");
@@ -273,6 +273,27 @@ function similarity(a,b){
   }
   const dist = dp[m][n];
   return 1 - dist / Math.max(m,n);
+}
+
+
+function bestIntentMatch(userText, intentPhrases, threshold){
+  let best = null;
+  let bestScore = 0;
+  const t = norm(userText);
+  for(const [intent, phrases] of Object.entries(intentPhrases || {})){
+    for(const p of (phrases||[])){
+      const p2 = norm(p);
+      if(!p2) continue;
+      let score = 0;
+      if(t.includes(p2)) score = 1;
+      else score = similarity(t, p2);
+      if(score >= threshold && score > bestScore){
+        bestScore = score;
+        best = intent;
+      }
+    }
+  }
+  return best;
 }
 
 function fuzzyIntentMatch(userText, phrases, threshold){
@@ -1037,6 +1058,17 @@ function processUserLine(state, userText){
   }
     renderIdCard(state);
   } else {
+  // If not one of the remaining required questions, try recognizing any known intent (e.g., asking for ID early)
+  const anyMatch = bestIntentMatch(userText, state.intentPhrases || {}, threshold);
+  if(anyMatch){
+    // mark completion if it's part of this step
+    if(step.required.includes(anyMatch)) state.done[anyMatch] = true;
+    reveal(anyMatch, state);
+    const answer2 = visitorResponseForIntent(state, anyMatch, userText, state.card);
+    showVisitor(answer2);
+    return;
+  }
+
     // Log unknown questions (optional)
     if(window.APP_CONFIG && window.APP_CONFIG.logUnknownQuestions){
       logEvent({
@@ -1714,4 +1746,13 @@ function bindGoToPersonSearch(state){
       focusQuestion();
     });
   }
+}
+
+function denyEntrance(state){
+  state.finished = true;
+  showVisitor("You are denied entry. Please step aside and wait.");
+  try{ logEvent(state, "deny_entrance", {reason:"manual"}); }catch(e){}
+  const inp = $("#studentInput"); const btn = $("#btnSend");
+  if(inp) inp.disabled = true;
+  if(btn) btn.disabled = true;
 }
