@@ -1,2373 +1,1279 @@
+;(() => {
+  "use strict";
 
-function renderMood(state){
-  const el = $("#visitorMood");
-  if(!el) return;
-  el.textContent = (state && state.card && state.card.moodLine) ? state.card.moodLine : "";
-}
+  /***********************
+   * VEVA app.js — WhatsApp-style + Voice (2026-02-09)
+   * - WhatsApp-like UI (bubbles + wallpaper + composer)
+   * - Hold-to-talk voice input (Web Speech API)
+   * - NO supervisor button in UI
+   * - Supervisor modal only via text trigger
+   * - Born-year confirm uses actual ID year (or claimed/lie)
+   * - Deny always works + finish run
+   * - Person search always works
+   * - Logging uses no-cors to avoid Apps Script CORS/preflight issues
+   ***********************/
 
-// VEVA Entry Control Trainer — GitHub Pages (static)
-//
-// Notes:
-// - No server-side Python. Everything runs client-side.
-// - Recognition uses phrase patterns + simple fuzzy similarity.
-// - For central "who practiced / how often", configure APP_CONFIG.logEndpoint in config.js.
-//
-// Privacy mode (writing practice):
-// - Only the latest visitor answer is shown.
-// - It auto-hides after a short delay.
-// - Students should write answers in their notebook.
+  const APP_VERSION = "veva-stable-v3-wa-voice-2026-02-09";
+  console.log("[VEVA]", APP_VERSION, "loaded");
 
-const $ = (sel) => document.querySelector(sel);
+  /***********************
+   * CONFIG + UTIL
+   ***********************/
+  const CONFIG = (window.APP_CONFIG || {});
+  const LOG_ENDPOINT = CONFIG.logEndpoint || "";
+  const LOG_UNKNOWN = CONFIG.logUnknownQuestions !== false;
 
-function escapeHtml(s){
-  return (s||"").replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-}
+  // Voice config (optional)
+  const VOICE_LANG = CONFIG.voiceLang || "en-US";        // or "en-GB"
+  const VOICE_AUTO_SEND = CONFIG.voiceAutoSend === true; // default false
 
-function safeOn(el, evt, fn){ if(el) el.addEventListener(evt, fn); }
+  const $ = (sel, root = document) => root.querySelector(sel);
 
-function parseHotkey(str){
-  const s = (str||"").toLowerCase().replace(/\s+/g,"");
-  const parts = s.split("+").filter(Boolean);
-  return {
-    ctrl: parts.includes("ctrl") || parts.includes("control"),
-    alt: parts.includes("alt") || parts.includes("option"),
-    shift: parts.includes("shift"),
-    meta: parts.includes("meta") || parts.includes("cmd") || parts.includes("command"),
-    key: parts.find(p => !["ctrl","control","alt","option","shift","meta","cmd","command"].includes(p)) || ""
-  };
-}
+  const nowIso = () => new Date().toISOString();
+  const uid = () => Math.random().toString(16).slice(2) + "-" + Date.now().toString(16);
 
+  function clamp(n, a, b) { return Math.max(a, Math.min(b, n)); }
+  function safeLower(s) { return (s || "").toString().trim().toLowerCase(); }
 
-// --- ID panel visibility (declared early) ---
-function updateIdVisibility(state){
-  const panel = $("#idPanel") || $("#idCardPanel");
-  const grid = $("#trainGrid");
-  const step = currentStep(state);
-  const show = (step && step.key !== "gate") || (state.done && state.done["request_id"]);
-  if(panel) panel.style.display = show ? "" : "none";
-  if(grid){
-    if(show) grid.classList.remove("trainGridOneCol");
-    else grid.classList.add("trainGridOneCol");
+  function escapeHtml(str) {
+    return (str || "").toString()
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
   }
-}
-window.updateIdVisibility = updateIdVisibility;
 
+  function sleep(ms) { return new Promise(res => setTimeout(res, ms)); }
 
-function matchesHotkey(e, hk){
-  if(!hk) return false;
-  const key = (e.key || "").toLowerCase();
-  return (!!hk.ctrl === !!e.ctrlKey) &&
-         (!!hk.alt === !!e.altKey) &&
-         (!!hk.shift === !!e.shiftKey) &&
-         (!!hk.meta === !!e.metaKey) &&
-         (hk.key === key);
-}
-
-function deepClone(obj){ return JSON.parse(JSON.stringify(obj)); }
-
-function downloadJson(filename, obj){
-  const text = JSON.stringify(obj, null, 2);
-  const blob = new Blob([text], { type:"application/json;charset=utf-8" });
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-}
-
-const DIFFICULTY = {
-  Basic:    { threshold: 0.68 },
-  Standard: { threshold: 0.72 },
-  Advanced: { threshold: 0.78 },
-};
-
-const EXAMPLE_BY_INTENT = {
-  ask_identity: "Could you tell me your name, please?",
-  ask_purpose: "What are you doing here today?",
-  ask_appointment: "Do you have an appointment?",
-  ask_host: "With whom do you have an appointment?",
-  ask_time: "What time is your appointment?",
-  ask_topic: "What is the appointment about?",
-  request_id: "May I see your ID, please?",
-  control_question: "Can you tell me your date of birth, please?",
-  contact_supervisor: "One moment, I will contact my supervisor.",
-  inform_search_threat: "Due to an increased threat level, you will be searched before entry.",
-  prohibited_items: "You are not allowed to bring weapons, drugs, or alcohol onto the base.",
-  request_surrender: "If you have any prohibited items, please hand them over now.",
-  explain_patdown: "I will conduct a security search (a pat-down).",
-  ask_sharp: "Do you have any sharp objects on you?",
-  empty_pockets: "Please empty your pockets and place the items in the tray.",
-  remove_jacket: "Please remove your jacket/coat.",
-  announce_armpits: "I am searching under your armpits.",
-  announce_waist: "I am searching around your waist.",
-  announce_private: "I am searching around your private parts.",
-  leg_instruction: "Please place your foot on your knee.",
-  issue_visitor_pass_rule: "Here is your visitor pass. Wear it visibly at all times.",
-  return_pass_rule: "Please return the visitor pass at the end of your visit.",
-  alarm_rally_point: "If the alarm sounds, go to the assembly area (rally point).",
-  closing_time: "The base is closed to visitors after 16:00. All visitors must have left by then.",
-};
-
-const INTENT_PRIORITY = [
-  "ask_identity","ask_purpose","ask_appointment","ask_host","ask_time","ask_topic",
-  "request_id","control_question","contact_supervisor",
-  "inform_search_threat","prohibited_items","request_surrender",
-  "explain_patdown","ask_sharp","empty_pockets","remove_jacket",
-  "announce_armpits","announce_waist","announce_private","leg_instruction",
-  "issue_visitor_pass_rule","return_pass_rule","alarm_rally_point","closing_time",
-];
-
-const PURPOSE_TO_TOPICS = {
-  "a delivery": ["equipment delivery","spare parts delivery","package delivery"],
-  "maintenance work": ["network maintenance","equipment repair","HVAC maintenance"],
-  "an inspection": ["fire safety inspection","vehicle inspection","safety compliance inspection"],
-  "a briefing": ["training coordination","security briefing","project briefing"],
-  "a meeting": ["IT audit meeting","contractor meeting","planning meeting"],
-};
-
-const DATA = {
-  FIRST: ["Mark","Tom","James","Lucas","Daan","Pieter","Ahmed","Omar","Robert","Kevin","Hassan","Marco"],
-  LAST:  ["Jensen","Bakker","Williams","De Vries","Khan","Smit","Brown","Visser","Johnson","Martens"],
-  ORG:   ["NetSecure BV","NorthRail","TriCom Systems","BlueShield Contractors","AeroTech Services","MedLogistics"],
-  HOST:  ["Captain De Vries","Lt. Van Dijk","Major Jansen","Sgt. De Boer","Captain Smit"],
-  TIME:  ["09:00","10:30","13:00","14:30","15:15"],
-  NAT:   ["Dutch","German","Belgian","British","French","Spanish","Polish","Italian"],
-  MOOD: [
-    "The visitor looks relaxed and confident.",
-    "The visitor looks slightly nervous and fidgets with his hands.",
-    "The visitor seems impatient and keeps checking his watch.",
-    "The visitor looks uneasy and keeps glancing around.",
-    "The visitor looks tired but cooperative.",
-    "The visitor looks annoyed but stays polite."
-  ],
-  STREET:["Oak Street","Main Street","Station Road","Maple Avenue","Church Lane","Parkstraat","Wilhelminastraat"],
-  CITY:  ["Ede","Arnhem","Utrecht","Apeldoorn","Zwolle","Amersfoort"],
-  PC:    ["6711 AB","6811 CD","3511 EF","7311 GH","8011 JK","3811 LM"],
-  TWISTS: [
-    ["vague_time","The visitor is vague about the appointment time unless asked clearly."],
-    ["no_appointment","The visitor says they have no appointment."],
-    ["annoyed","The visitor is annoyed and short in responses."],
-    ["typo_name","The visitor gives a name that is easy to misspell."],
-    ["sharp_object","The visitor has a small sharp object and must surrender it."],
-    ["alcohol","The visitor has alcohol and must surrender it."],
-  ]
-};
-
-
-
-const VISITORS = [
-  { photo:"assets/photos/headshot_01.png", name:"Mark Visser", org:"MedLogistics", role:"courier",
-    purpose:"a delivery", topic:"spare parts delivery", host:"Sgt. De Boer", time: computeMeetingTime(), nationality:"Dutch" },
-  { photo:"assets/photos/headshot_02.png", name:"Tom Bakker", org:"AeroTech Services", role:"technical inspector",
-    purpose:"an inspection", topic:"fire safety inspection", host:"Captain Smit", time: computeMeetingTime(), nationality:"Dutch" },
-  { photo:"assets/photos/headshot_03.png", name:"James Khan", org:"BlueShield Contractors", role:"contractor electrician",
-    purpose:"maintenance work", topic:"equipment repair", host:"Lt. Van Dijk", time: computeMeetingTime(), nationality:"British" },
-  { photo:"assets/photos/headshot_04.png", name:"Lucas Jansen", org:"NetSecure BV", role:"security vendor",
-    purpose:"a meeting", topic:"security briefing", host:"Major Jansen", time: computeMeetingTime(), nationality:"Dutch" },
-  { photo:"assets/photos/headshot_05.png", name:"Daan Martens", org:"NorthRail", role:"mechanic",
-    purpose:"maintenance work", topic:"vehicle inspection", host:"Sgt. De Boer", time: computeMeetingTime(), nationality:"Belgian" },
-  { photo:"assets/photos/headshot_06.png", name:"Pieter Smit", org:"TriCom Systems", role:"it specialist",
-    purpose:"a meeting", topic:"IT audit meeting", host:"Captain De Vries", time: computeMeetingTime(), nationality:"Dutch" },
-  { photo:"assets/photos/headshot_07.png", name:"Ahmed Omar", org:"MedLogistics", role:"driver",
-    purpose:"a delivery", topic:"equipment delivery", host:"Lt. Van Dijk", time: computeMeetingTime(), nationality:"German" },
-  { photo:"assets/photos/headshot_08.png", name:"Robert Brown", org:"AeroTech Services", role:"briefing attendee",
-    purpose:"a briefing", topic:"training coordination", host:"Captain Smit", time: computeMeetingTime(), nationality:"British" },
-  { photo:"assets/photos/headshot_09.png", name:"Kevin Johnson", org:"BlueShield Contractors", role:"contractor",
-    purpose:"maintenance work", topic:"HVAC maintenance", host:"Major Jansen", time: computeMeetingTime(), nationality:"French" },
-  { photo:"assets/photos/headshot_10.png", name:"Hassan De Vries", org:"NetSecure BV", role:"supplier",
-    purpose:"a delivery", topic:"package delivery", host:"Captain De Vries", time: computeMeetingTime(), nationality:"Dutch" }
-];
-
-
-
-function stepIndexByKey(key){
-  try{
-    for(let i=0;i<STEPS.length;i++){
-      if(STEPS[i].key === key) return i;
-    }
-  }catch(e){}
-  return -1;
-}
-function setStepByKey(state, key){
-  const idx = stepIndexByKey(key);
-  if(idx >= 0){
-    state.stepIndex = idx;
-    updatePage(state);
-    updateActionButtons(state);
-    return true;
+  function parseYear(text) {
+    const m = (text || "").match(/\b(19\d{2}|20\d{2})\b/);
+    return m ? Number(m[1]) : null;
   }
-  return false;
-}
-function goToPersonSearch(state){
-  if(setStepByKey(state, "person_search")) return;
-  if(setStepByKey(state, "pat_down")) return;
-  if(setStepByKey(state, "search")) return;
-  if(typeof advanceStep === "function") advanceStep(state);
-}
 
-const STEPS = [
-  { key:"gate", title:"1) Poort (intake)",
-    opening:["Good morning.","I need to enter the base."],
-    required:["ask_identity","ask_purpose","ask_appointment","ask_host","ask_time","ask_topic"],
-    hint:"Ask: name, purpose, appointment, who with, what time, and what it is about."
-  },
-  { key:"id_check", title:"2) ID-check + controlevraag + contact leidinggevende",
-    opening:["Sure. Where do you want me to go?"],
-    required:["request_id","control_question","contact_supervisor"],
-    hint:"Request ID, ask one control question, then contact supervisor."
-  },
-  { key:"threat_rules", title:"3) Toelaten + dreiging + verboden items",
-    opening:["Can I go in now?"],
-    required:["inform_search_threat","prohibited_items","request_surrender"],
-    hint:"Explain search due to threat. State prohibited items. Ask to surrender them."
-  },
-  { key:"patdown", title:"4) Fouilleren / zoekinstructies",
-    opening:["Alright. What do I need to do?"],
-    required:["explain_patdown","ask_sharp","empty_pockets","remove_jacket","announce_armpits","announce_waist","announce_private","leg_instruction"],
-    hint:"Explain pat-down, ask sharp objects, empty pockets, remove jacket, announce areas, leg instruction."
-  },
-  { key:"registration_rules", title:"5) Registratie + kazerne regels",
-    opening:["Okay. Am I good to go?"],
-    required:["issue_visitor_pass_rule","return_pass_rule","alarm_rally_point","closing_time"],
-    hint:"Visitor pass rules, return rule, rally point, and closing time."
-  },
-];
-
-const INTENT_PHRASES_BASE = {
-  ask_identity: ["who are you","what is your name","your name please","identify yourself","may i have your name","can you tell me your name"],
-  ask_purpose: ["what are you doing here","what is the purpose","why are you here","reason for your visit","what brings you here","what is your reason for visiting"],
-  ask_appointment: ["do you have an appointment","have you got an appointment","do you have a meeting scheduled","do you have an appointment scheduled","are you expected","do you have a booking"],
-  ask_host: ["who are you meeting","who do you have an appointment with","with whom do you have a meeting","who is your host","who is expecting you"],
-  ask_time: ["what time is the appointment","what time is your meeting","appointment time","when is the appointment","what time is it scheduled",
-             "what time is that","what time is that delivery","what time is the delivery","what time is your delivery","what time is your inspection",
-             "what time is that inspection","what time is that meeting","what time is that appointment"],
-  ask_topic: ["what is the appointment about","what is the meeting about","topic of the appointment","what is it regarding","what is the purpose of the meeting"],
-  request_id: ["can i see your id","show me your id","id please","identification please","may i see your identification","could you show your id"],
-  control_question: ["date of birth","what is your date of birth","what is your birthday","what is your address","what is your postcode","what is your zip code",
-                     "nationality","how old are you","what is your age","where do you live","dob","what is your dob","what's your dob","when is your birthday","when were you born","you are","you're","confirm your age","confirm your date of birth"],
-  contact_supervisor: ["i will contact my supervisor","i will call my supervisor","one moment i will contact my supervisor","please wait i will contact","i will check with my supervisor"],
-  inform_search_threat: ["heightened threat","increased threat","security level","you will be searched","for security reasons you will be searched","due to a higher threat level"],
-  prohibited_items: ["no weapons","no drugs","no alcohol","prohibited items","weapons drugs or alcohol","you are not allowed to bring weapons","you are not allowed to bring drugs","you are not allowed to bring alcohol"],
-  request_surrender: ["please hand them over","you must surrender","give them to me","you have to hand it over","hand it over"],
-  explain_patdown: ["i will pat you down","i am going to search you","i will frisk you","i will conduct a security search","i will perform a pat-down"],
-  ask_sharp: ["sharp objects","anything sharp","needles","anything that can hurt","do you have anything sharp","any sharp items"],
-  empty_pockets: ["empty your pockets","take everything out of your pockets","put your items on the table","place your belongings in the tray"],
-  remove_jacket: ["remove your jacket","take off your jacket","remove your coat","remove your outerwear"],
-  announce_armpits: ["under your armpits","armpits"],
-  announce_waist: ["around your waist","waistline"],
-  announce_private: ["private parts","groin area","around your private parts"],
-  leg_instruction: ["place your foot on your knee","rest your ankle on your knee","lift your leg and place it","put your foot on your knee"],
-  issue_visitor_pass_rule: ["here is your visitor pass","visitor badge","wear it visibly","visible at all times","you must wear it","keep it visible"],
-  return_pass_rule: ["return it at the end","hand it in at the end","give it back when you leave","return the pass","return the badge"],
-  alarm_rally_point: ["if the alarm sounds","assembly area","rally point","muster point","go to the assembly area","go to the rally point"],
-  closing_time: ["we close at four","closing time is 16:00","visitors must leave by 4 pm","the base closes for visitors at 4","all visitors must leave by four"],
-};
-
-function computeMeetingTime(){
-  const now = new Date();
-  const addMin = 10 + Math.floor(Math.random()*16); // 10-25
-  const d = new Date(now.getTime() + addMin*60000);
-  // round to nearest 5 minutes
-  const mins = d.getMinutes();
-  const rounded = Math.round(mins/5)*5;
-  d.setMinutes(rounded);
-  d.setSeconds(0); d.setMilliseconds(0);
-  const hh = String(d.getHours()).padStart(2,'0');
-  const mm = String(d.getMinutes()).padStart(2,'0');
-  return `${hh}:${mm}`;
-}
-
-
-// SUPERVISOR_TRIGGER_V42
-function isSupervisorTrigger(raw){
-  const t = norm(raw || "");
-  // normalize common contractions
-  const tt = t.replace(/i['’]ll/g, "ill").replace(/i['’]d/g, "id");
-  return (
-    /\bill\s+(contact|call)\s+(my\s+)?supervisor\b/.test(tt) ||
-    /\bid\s+like\s+to\s+(contact|call)\s+(my\s+)?supervisor\b/.test(tt) ||
-    /\bi\s+will\s+(contact|call)\s+(my\s+)?supervisor\b/.test(tt) ||
-    /\bi\s+would\s+like\s+to\s+(contact|call)\s+(my\s+)?supervisor\b/.test(tt) ||
-    /\bcontact\s+(my\s+)?supervisor\b/.test(tt) ||
-    /\bcall\s+(my\s+)?supervisor\b/.test(tt)
-  );
-}
-function triggerSupervisorFlow(state){
-  // jump to ID/control step and open the 5W modal
-  try{ state.idVisible = true; }catch(e){}
-  try{
-    // best-effort: switch to id_check step
-    if(typeof setStepByKey === "function"){
-      setStepByKey(state, "id_check");
-    }
-  }catch(e){}
-  try{ showVisitor("Okay, I'll wait."); }catch(e){}
-  setTimeout(() => { try { openSupervisorModal(state); } catch(e) {} }, 150);
-  try{ updatePage(state); updateActionButtons(state); }catch(e){}
-}
-
-function norm(s){
-  return String(s ?? "").toLowerCase().trim().replace(/\s+/g," ");
-}
-
-// Normalized Levenshtein similarity
-function similarity(a,b){
-  a = norm(a); b = norm(b);
-  if (!a || !b) return 0;
-  if (a === b) return 1;
-  const m = a.length, n = b.length;
-  const dp = Array.from({length:m+1}, () => new Array(n+1).fill(0));
-  for(let i=0;i<=m;i++) dp[i][0]=i;
-  for(let j=0;j<=n;j++) dp[0][j]=j;
-  for(let i=1;i<=m;i++){
-    for(let j=1;j<=n;j++){
-      const cost = a[i-1] === b[j-1] ? 0 : 1;
-      dp[i][j] = Math.min(dp[i-1][j]+1, dp[i][j-1]+1, dp[i-1][j-1]+cost);
-    }
+  function formatDob({ yyyy, mm, dd }) {
+    const z2 = (n) => (n < 10 ? "0" + n : "" + n);
+    return `${yyyy}-${z2(mm)}-${z2(dd)}`;
   }
-  const dist = dp[m][n];
-  return 1 - dist / Math.max(m,n);
-}
 
-
-function bestIntentMatch(userText, intentPhrases, threshold){
-  let best = null;
-  let bestScore = 0;
-  const t = norm(userText);
-  for(const [intent, phrases] of Object.entries(intentPhrases || {})){
-    for(const p of (phrases||[])){
-      const p2 = norm(p);
-      if(!p2) continue;
-      let score = 0;
-      if(t.includes(p2)) score = 1;
-      else score = similarity(t, p2);
-      if(score >= threshold && score > bestScore){
-        bestScore = score;
-        best = intent;
-      }
-    }
-  }
-  return best;
-}
-
-function fuzzyIntentMatch(userText, phrases, threshold){
-  const t = norm(userText);
-  for(const p of (phrases||[])){
-    const p2 = norm(p);
-    if (!p2) continue;
-    if (t.includes(p2)) return true;
-    if (similarity(t, p2) >= threshold) return true;
-  }
-  return false;
-}
-
-function pbMatch(text, entries){
-  const t = norm(text);
-  for(const e of (entries||[])){
-    for(const p of (e.patterns||[])){
-      const p2 = norm(p);
-      if (p2 && t.includes(p2)) return e;
-    }
-  }
-  return null;
-}
-
-function offScriptReflect(userText, phrasebank){
-  const cleaned = (userText||"").trim();
-  if(!cleaned) return "Sorry—what exactly do you need to know?";
-  const tpl = (phrasebank.off_script && phrasebank.off_script.reflect_question_template) || "Just to confirm: are you asking '{q}'?";
-  const q = cleaned.endsWith("?") ? cleaned : cleaned + "?";
-  return tpl.replace("{q}", q);
-}
-
-function randChoice(arr, rnd){
-  const r = (typeof rnd === "function") ? rnd : Math.random;
-  return arr[Math.floor(r()*arr.length)];
-}
-
-function makeIdNumber(rnd){
-  const a = Math.floor(100000 + rnd()*900000);
-  const b = Math.floor(10 + rnd()*90);
-  return `ID-${a}-${b}`;
-}
-
-function makeDob(rnd){
-  const now = new Date();
-  const year = (now.getFullYear()-60) + Math.floor(rnd()*43); // 18..60
-  const month = 1 + Math.floor(rnd()*12);
-  const day = 1 + Math.floor(rnd()*28);
-  const d = new Date(Date.UTC(year, month-1, day));
-  return d.toLocaleDateString("en-GB", { day:"2-digit", month:"short", year:"numeric" }).replace(",", "");
-}
-
-function computeAge(dobStr){
-  try{
-    const parts = dobStr.split(" ");
-    if(parts.length !== 3) return null;
-    const day = parseInt(parts[0],10);
-    const monthStr = parts[1].toLowerCase();
-    const year = parseInt(parts[2],10);
-    const months = {jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11};
-    const month = months[monthStr.slice(0,3)];
-    const dob = new Date(year, month, day);
+  function calcAgeFromDob(dobObj) {
     const today = new Date();
-    let age = today.getFullYear() - dob.getFullYear();
-    const m = today.getMonth() - dob.getMonth();
-    if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) age--;
+    const y = today.getFullYear();
+    let age = y - dobObj.yyyy;
+    const m = today.getMonth() + 1;
+    const d = today.getDate();
+    if (m < dobObj.mm || (m === dobObj.mm && d < dobObj.dd)) age -= 1;
     return age;
-  }catch(_){ return null; }
-}
-
-function makeAddress(rnd){
-  const street = randChoice(DATA.STREET, rnd);
-  const nr = 1 + Math.floor(rnd()*199);
-  const pc = randChoice(DATA.PC, rnd);
-  const city = randChoice(DATA.CITY, rnd);
-  return `${street} ${nr}, ${pc} ${city}`;
-}
-
-function makeExpiry(rnd){
-  const now = new Date();
-  const year = now.getFullYear() + (1 + Math.floor(rnd()*8));
-  const month = 1 + Math.floor(rnd()*12);
-  const day = 1 + Math.floor(rnd()*28);
-  const d = new Date(Date.UTC(year, month-1, day));
-  return d.toLocaleDateString("en-GB", { day:"2-digit", month:"short", year:"numeric" }).replace(",", "");
-}
-
-function listPhotoFiles(){
-  // We know our assets are named headshot_01.png..headshot_10.png
-  const files = [];
-  for(let i=1;i<=10;i++){
-    files.push(`assets/photos/headshot_${String(i).padStart(2,"0")}.png`);
   }
-  return files;
-}
 
+  function chance(p) { return Math.random() < clamp(p, 0, 1); }
 
-
-function getDobFromCard(card){
-  try{
-    return (card && card.id && card.id.dob) ? card.id.dob : (card && card.dob ? card.dob : null);
-  }catch(e){ return null; }
-}
-function computeAgeFromDob(dobStr){
-  try{
-    const dob = new Date(dobStr);
-    if(isNaN(dob.getTime())) return null;
-    const now = new Date();
-    let age = now.getFullYear() - dob.getFullYear();
-    const m = now.getMonth() - dob.getMonth();
-    if(m < 0 || (m === 0 && now.getDate() < dob.getDate())) age--;
-    return age;
-  }catch(e){ return null; }
-}
-
-function getDobISO(card){
-  // Return ISO yyyy-mm-dd if possible, else null.
-  try{
-    if(!card) return null;
-    // common fields
-    let v = card.dob || card.dateOfBirth || (card.id && (card.id.dob || card.id.dateOfBirth));
-    if(!v && card.fields && card.fields.dob) v = card.fields.dob;
-    if(!v) return null;
-    if(typeof v !== "string") v = String(v);
-    v = v.trim();
-    // already ISO
-    if(/^\d{4}-\d{2}-\d{2}$/.test(v)) return v;
-    // formats like "04 Jul 1982"
-    const m = v.match(/^(\d{1,2})\s+([A-Za-z]{3,})\s+(\d{4})$/);
-    if(m){
-      const day = parseInt(m[1],10);
-      const mon = m[2].slice(0,3).toLowerCase();
-      const year = parseInt(m[3],10);
-      const map = {jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12};
-      const mm = map[mon];
-      if(mm){
-        return `${year}-${String(mm).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
-      }
-    }
-    // formats like "27 Nov 1978" or "27/11/1978" or "27-11-1978"
-    const m2 = v.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
-    if(m2){
-      const day = parseInt(m2[1],10); const mm = parseInt(m2[2],10); const year = parseInt(m2[3],10);
-      if(year && mm && day) return `${year}-${String(mm).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
-    }
-  }catch(e){}
-  return null;
-}
-function formatDob(iso){
-  // iso: yyyy-mm-dd -> "13 Jul 1992"
-  try{
-    if(!iso || typeof iso !== "string") return "";
-    const m = iso.trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
-    if(!m) return iso;
-    const y = parseInt(m[1],10); const mm = parseInt(m[2],10); const d = parseInt(m[3],10);
-    const mons = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-    const mon = mons[Math.max(0, Math.min(11, mm-1))];
-    return `${String(d).padStart(2,"0")} ${mon} ${y}`;
-  }catch(e){ return iso; }
-}
-
-
-function safeAgeFromCard(card){
-  try{
-    if(card && card.id && typeof card.id.age === "number") return card.id.age;
-    const dob = getDobISO(card);
-    if(dob){
-      const a = computeAgeFromDob(dob);
-      if(typeof a === "number" && isFinite(a)) return a;
-    }
-    // fallback: plausible adult age
-    return 30 + Math.floor(Math.random()*25);
-  }catch(e){
-    return 30 + Math.floor(Math.random()*25);
+  function teacherModeEnabled() {
+    const qp = new URLSearchParams(location.search);
+    if (qp.get("teacher") === "1") return true;
+    return localStorage.getItem("veva_teacher_mode") === "1";
   }
-}
 
-function moodMistakeRate(state){
-  try{
-    const mood = (state && state.card && state.card.mood) ? String(state.card.mood).toLowerCase() : "";
-    if(mood.includes("relaxed") || mood.includes("confident")) return 0.08;
-    if(mood.includes("tired") && mood.includes("cooperative")) return 0.14;
-    if(mood.includes("impatient")) return 0.22;
-    if(mood.includes("uneasy") || mood.includes("nervous") || mood.includes("glancing")) return 0.35;
-  }catch(e){}
-  return 0.18;
-}
-function rememberClaim(state, kind, value, truthy){
-  if(!state) return;
-  state.lastClaim = { kind: kind, value: value, truthy: truthy, ts: Date.now() };
-}
-function excuseLine(){
-  const lines = [
-    "Sorry, I must have misheard you.",
-    "Sorry, I misspoke.",
-    "Apologies, I got that wrong.",
-    "Sorry, I wasn’t listening properly."
+  /***********************
+   * STATE
+   ***********************/
+  const STEPS = {
+    INTAKE: "intake",
+    ID_CHECK: "id_check",
+    THREAT_ITEMS: "threat_items",
+    PERSON_SEARCH: "person_search",
+    FINISHED: "finished"
+  };
+
+  const REQUIRED = [
+    { key: "asked_name", label: "You didn’t ask the visitor’s name.", example: "What is your name, please?" },
+    { key: "asked_purpose", label: "You didn’t ask the purpose of the visit.", example: "What is the purpose of your visit today?" },
+    { key: "asked_appointment", label: "You didn’t confirm the appointment.", example: "Do you have an appointment?" },
+    { key: "asked_who", label: "You didn’t ask who they are meeting.", example: "Who are you here to see?" },
+    { key: "asked_time", label: "You didn’t confirm the time.", example: "What time is your appointment?" },
+    { key: "asked_where", label: "You didn’t confirm where they are going.", example: "Where are you going on base?" },
+    { key: "asked_subject", label: "You didn’t ask what the meeting is about.", example: "What is the meeting about?" },
+    { key: "asked_id", label: "You didn’t ask to see an ID.", example: "Can I see your ID, please?" },
+    { key: "asked_dob", label: "You didn’t verify date of birth (DOB).", example: "What is your date of birth?" },
+    { key: "asked_age", label: "You didn’t verify age.", example: "How old are you?" },
+    { key: "asked_nationality", label: "You didn’t verify nationality.", example: "What is your nationality?" },
+    { key: "supervisor_contacted", label: "You didn’t contact a supervisor when needed.", example: "I’ll contact my supervisor for approval." },
+    { key: "explained_threat", label: "You didn’t mention threat level / security measures.", example: "We are on a higher threat level today, so I will ask a few extra questions." },
+    { key: "explained_items", label: "You didn’t explain prohibited items.", example: "Do you have any weapons, sharp objects, or prohibited items?" },
+    { key: "did_person_search", label: "You didn’t complete the person search step.", example: "I’m going to do a quick pat-down search. Is that okay?" }
   ];
-  return lines[Math.floor(Math.random()*lines.length)];
-}
 
-function buildAboutDetail(card){
-  const topic = (card.about || "").toLowerCase();
-  const purpose = (card.purpose || "").toLowerCase();
-
-  if(topic.includes("it") || topic.includes("audit") || purpose.includes("it")){
-    return "I'm here for an IT audit meeting because last week several systems crashed and the base asked us to review the network and security settings.";
-  }
-  if(topic.includes("fire") || topic.includes("safety") || purpose.includes("inspection")){
-    return "I'm here for a fire safety inspection because the last report showed a few issues, and I'm here to verify the corrective actions were completed.";
-  }
-  if(purpose.includes("delivery") || purpose.includes("deliver")){
-    return "I'm here to deliver equipment that was requested earlier this week. I have a delivery note and I was told to report to the gate first.";
-  }
-  if(purpose.includes("maintenance") || purpose.includes("repair")){
-    return "I'm here to repair and test a faulty system that was reported yesterday. The unit asked me to come in as soon as possible.";
-  }
-  return "I'm here for a meeting about scheduled coordination with the unit. I was asked to come today to discuss next steps.";
-}
-
-function generateVisitorCard(seed){
-  // Deterministic selection based on seed so students can replay same run if needed
-  const idx = (seed >>> 0) % VISITORS.length;
-  const base = deepClone(VISITORS[idx]);
-
-  // Deterministic RNG for the remaining fields (DOB/ID/expiry + mood)
-  let s = (seed ^ 0xA5A5A5A5) >>> 0;
-  const rnd = () => (s = (s*1664525 + 1013904223) >>> 0) / 4294967296;
-
-  const dob = makeDob(rnd);
-  const id_no = makeIdNumber(rnd);
-  const expiry = makeExpiry(rnd);
-
-  // Mood line (shown below visitor text)
-  const moodLine = randChoice(DATA.MOOD, rnd);
-
-  // Optional twist (kept coherent: a delivery/inspection/meeting/briefing/maintenance still stays same)
-  const twist = randChoice(DATA.TWISTS, rnd)[0];
-
-  return {
-    ...base,
-    headshot: base.photo || base.headshot || "",
-    aboutDetail: buildAboutDetail(base),
-    twist,
-    id: {
-      id_no,
-      dob,
-      nationality: base.nationality,
-      address: makeAddress(rnd), // kept internally for 'where do you live' questions, but NOT displayed on ID
-      expiry
-    },
-    moodLine
-  };
-}
-
-function responseForControlQuestion(userText, card, state){
-  const t = (userText || "").toLowerCase();
-
-  // If the student challenges after we previously accepted a wrong value, apologize + give correct.
-  if(state && state.lastWrongAccepted && (t.includes("but your id") || t.includes("that's not correct") || t.includes("that is not correct") || t.includes("it says") || t.includes("your id says"))){
-    const correct = state.lastWrongAccepted.correct;
-    state.lastWrongAccepted = null;
-    return randChoice([
-      `Sorry, I must have misheard you. The correct information is ${correct}.`,
-      `Sorry, I got confused for a moment. The correct information is ${correct}.`,
-      `My apologies — I misspoke. The correct information is ${correct}.`
-    ], Math.random);
-  }
-
-  // Detect control questions about DOB / age / nationality / spelling name
-  const wantsDob = t.includes("date of birth") || t.includes("birth date") || t.includes("birthday") || t.includes("dob") || t.includes("born");
-  const wantsAge = t.includes("how old") || t.includes("age") || t.includes("years old") || /are you\s+\d{1,3}\b/.test(t);
-  const wantsNationality = t.includes("nationality") || t.includes("citizen") || t.includes("from which country");
-  const wantsSpell = t.includes("spell") && t.includes("name");
-
-  // If the student proposes a wrong value, sometimes correct, sometimes accept (then allow challenge)
-  const correctChance = (typeof moodMistakeRate === "function" && state) ? Math.max(0.55, 1 - moodMistakeRate(state)) : 0.7;
-
-  if(wantsDob && card){
-    const dobIso = (typeof getDobISO === "function") ? getDobISO(card) : (card.id && card.id.dob ? card.id.dob : null);
-    if(dobIso){
-      const correctDob = formatDob(dobIso);
-      const hasYear = /\b(19|20)\d{2}\b/.test(t);
-      const year = (dobIso || "").slice(0,4);
-      if(hasYear && year && !t.includes(year)){
-        if(Math.random() < correctChance){
-          return `No, my date of birth is ${correctDob}.`;
-        }
-        if(state){
-          state.lastWrongAccepted = { type:"dob", correct: correctDob };
-        }
-        return "Yes, that's right.";
-      }
-      return `My date of birth is ${correctDob}.`;
-    }
-  }
-
-  if(wantsAge && card){
-    const dobIso = (typeof getDobISO === "function") ? getDobISO(card) : null;
-    const computed = (typeof safeAgeFromCard === "function") ? safeAgeFromCard(card) : null;
-    const correctAge = (card.id && card.id.age != null && String(card.id.age).trim() !== "") ? String(card.id.age).trim() : (computed != null ? String(computed) : null);
-    if(correctAge){
-      const n = (t.match(/\b(\d{2,3})\b/)||[])[1];
-      if(n && n !== correctAge){
-        if(Math.random() < correctChance){
-          return `No, I'm actually ${correctAge}.`;
-        }
-        if(state){
-          state.lastWrongAccepted = { type:"age", correct: correctAge };
-        }
-        return "Yes, that's right.";
-      }
-      return `I'm ${correctAge} years old.`;
-    }
-  }
-
-  if(wantsNationality && card && card.id && card.id.nationality){
-    const nat = card.id.nationality;
-    // if they propose a specific nationality and it's wrong
-    const prop = (t.match(/\b(dutch|belgian|german|french|british|italian|spanish|turkish|danish|norwegian|swedish|polish|moroccan|nigerian)\b/)||[])[1];
-    if(prop && nat && prop.toLowerCase() !== nat.toLowerCase()){
-      if(Math.random() < correctChance){
-        return `No, my nationality is ${nat}.`;
-      }
-      if(state){
-        state.lastWrongAccepted = { type:"nationality", correct: nat };
-      }
-      return "Yes, that's right.";
-    }
-    return `My nationality is ${nat}.`;
-  }
-
-  if(wantsSpell && card && card.name){
-    const spelled = card.name.split("").filter(ch => ch !== " ").join("-").toUpperCase();
-    return `Sure. It's ${spelled}.`;
-  }
-
-  return null;
-}
-
-function visitorResponseForIntent(state, intent, userText, card){
-  const t = norm(userText);
-  if(t.includes("spell") && t.includes("name")){
-    const spelled = card.name.replace(/\s+/g,"").split("").join("-");
-    return `It is spelled: ${spelled}.`;
-  }
-
-  switch(intent){
-    case "ask_identity":
-      return card.twist==="typo_name" ? `My name is ${card.name}… that’s J-e-n-s-e-n.` : `My name is ${card.name}.`;
-    case "ask_purpose":
-        // HOW_CAN_I_HELP_SPECIAL
-        if(norm(userText) === "how can i help" || norm(userText) === "how can i help?"){
-          markAsked(state, "purpose");
-          return "I would like to get on the base, please.";
-        }
-        markAsked(state, "purpose");
-      return `I'm here for ${card.purpose}.`;
-    case "ask_appointment":
-        markAsked(state, "appointment");
-      return card.twist==="no_appointment" ? "No, I don't have an appointment." : "Yes, I have an appointment.";
-    case "ask_host":
-        markAsked(state, "host");
-      return card.twist==="no_appointment" ? "Uh… I don't actually have an appointment. I was told I could come by." : `I'm meeting ${card.host}.`;
-    case "ask_time":
-        markAsked(state, "time");
-      return card.twist==="vague_time" ? "I think it's sometime this afternoon… I'm not sure." : `It's at ${card.time}.`;
-    case "ask_topic":
-      return (card && card.aboutDetail ? card.aboutDetail : `It's about ${card.topic}.`);
-    case "request_id":
-        markAsked(state, "request_id");
-        updateIdVisibility(state);
-        updateIdVisibility(state);
-        updateVisitorAvatar(state);
-      // If still in gate, move into ID check step automatically
-        try{
-          const step = currentStep(state);
-          if(step && step.key === "gate"){
-            goToStep(state, "id_check");
-          }
-          updateIdVisibility(state);
-        }catch(e){}
-        try{ const st=currentStep(state); if(st && st.key==="gate"){ goToStep(state,"id_check"); } updateIdVisibility(state);}catch(e){}
-        return "Sure, here is my ID.";
-    case "control_question":
-      return responseForControlQuestion(userText, card, state);
-    case "contact_supervisor":
-      return "Okay, I'll wait.";
-    case "inform_search_threat":
-      return card.twist==="annoyed" ? "Fine. Let's just get this over with." : "Understood.";
-    case "prohibited_items":
-      if(card.twist==="sharp_object") return "I do have a small pocket knife in my bag.";
-      if(card.twist==="alcohol") return "I have a bottle of wine as a gift.";
-      return "I don't have any of those.";
-    case "request_surrender":
-      return (card.twist==="sharp_object" || card.twist==="alcohol") ? "Alright, I will hand it over." : "Okay.";
-    case "ask_sharp":
-      return card.twist==="sharp_object" ? "I already mentioned the pocket knife—nothing else." : "No.";
-    case "ask_age":
-        {
-          const realAge = safeAgeFromCard(state.card);
-          const rate = moodMistakeRate(state);
-          if(realAge !== null){
-            if(Math.random() < rate){
-              const wrong = (Math.random() < 0.5) ? (realAge + 1) : Math.max(18, realAge - 1);
-              rememberClaim(state, "age", wrong, false);
-              return "I'm " + wrong + " years old.";
-            }
-            rememberClaim(state, "age", realAge, true);
-            return "I'm " + realAge + " years old.";
-          }
-          rememberClaim(state, "age", 37, true);
-          return "I'm 37 years old.";
-        }
-      case "ask_dob":
-        {
-          const dobIso = getDobISO(state.card);
-          const rate = moodMistakeRate(state);
-          if(dobIso){
-            if(Math.random() < rate){
-              const d = new Date(dobIso);
-              d.setDate(d.getDate() + (Math.random()<0.5 ? -1 : 1));
-              const wrong = d.toISOString().slice(0,10);
-              rememberClaim(state, "dob", wrong, false);
-              return "My date of birth is " + formatDob(wrong) + ".";
-            }
-            rememberClaim(state, "dob", dobIso, true);
-            return "My date of birth is " + formatDob(dobIso) + ".";
-          }
-          rememberClaim(state, "dob", "1987-04-18", true);
-          return "My date of birth is 18 Apr 1987.";
-        }
-      case "challenge":
-        // Mood can shift when challenged
-        if(state.card){
-          state.card.mood = "uneasy";
-          renderMood(state);
-        }
-        return randChoice([
-          "I'm just tired from a long drive, that's all.",
-          "Sorry, it's been a long day. I'm fine.",
-          "I'm a bit stressed because I'm running late, but everything is in order."
-        ]);
-
-      case "ask_who":
-        markAsked(state, "who");
-        return "My name is " + state.card.name + ".";
-
-      case "spell_name":
-        {
-          const nm = (state.card && state.card.name) ? state.card.name : "Mark";
-          const letters = nm.replace(/[^A-Za-z]/g,"").toUpperCase().split("").join("-");
-          return "It is " + letters + ".";
-        }
-
-      default:
-      return "Understood.";
-  }
-}
-
-const REVEAL_BY_INTENT = {
-  ask_identity: ["name","org"],
-  ask_purpose: ["purpose"],
-  ask_host: ["host"],
-  ask_time: ["time"],
-  ask_topic: ["topic"],
-  request_id: ["id"], // makes card appear
-};
-
-function reveal(intent, state){
-  const fields = REVEAL_BY_INTENT[intent] || [];
-  for(const f of fields){
-    if(f==="id") { state.revealed.id = true; state.revealed.name = true; state.revealed.dob = true; state.revealed.nationality = true; state.revealed.address = true; state.revealed.age = true; }
-    else state.revealed[f] = true;
-  }
-  // Additional reveals for control questions based on what they asked
-  if(intent==="control_question"){
-    const q = norm(state.lastStudentText||"");
-    if(q.includes("date of birth")||q.includes("birthday")||q.includes("birth")) state.revealed.dob = true;
-    if(q.includes("nationality")) state.revealed.nationality = true;
-    if(q.includes("address") || (q.includes("where") && q.includes("live"))) state.revealed.address = true;
-    if(q.includes("age") || q.includes("how old")) state.revealed.age = true;
-  }
-}
-
-async function loadPhrasebank(){
-  // Base phrasebank from repo
-  let base = null;
-  try{
-    const res = await fetch("phrasebank.json", { cache:"no-store" });
-    base = await res.json();
-  }catch(err){
-    console.error("Failed to load phrasebank.json", err);
-    base = { smalltalk: [], off_script: { reflect_question_template: "Just to confirm: are you asking '{q}'?" }, intents: {} };
-  }
-
-  // Optional local draft (teacher use)
-  const useDraft = localStorage.getItem("veva_phrasebank_use_draft") === "1";
-  const draftRaw = localStorage.getItem("veva_phrasebank_draft");
-  if(useDraft && draftRaw){
-    try{
-      const draft = JSON.parse(draftRaw);
-      return draft;
-    }catch(err){
-      console.warn("Invalid local phrasebank draft — falling back to base.", err);
-      // Clear broken draft so the app can start normally
-      localStorage.removeItem("veva_phrasebank_draft");
-      localStorage.removeItem("veva_phrasebank_use_draft");
-      try{ showToast("Local phrasebank draft was invalid and has been reset."); }catch(_){}
-    }
-  }
-  return base;
-}
-
-function mergedIntentPhrases(phrasebank){
-  const merged = JSON.parse(JSON.stringify(INTENT_PHRASES_BASE));
-  const extra = (phrasebank.intents || {});
-  for(const [intent, list] of Object.entries(extra)){
-    merged[intent] = merged[intent] || [];
-    if(Array.isArray(list)){
-      for(const p of list){
-        if(typeof p === "string" && p.trim()) merged[intent].push(p.trim());
-      }
-    }
-  }
-  return merged;
-}
-
-function setScreen(id){
-  ["#screen-login","#screen-train","#screen-feedback"].forEach(s => $(s).classList.add("hidden"));
-  $(id).classList.remove("hidden");
-}
-
-function showVisitor(text){
-  if(text === undefined || text === null) text = "";
-// Primary UI bubble
-  const bubble = $("#visitorBubble");
-  if(bubble) bubble.textContent = text;
-
-  // Legacy area (if present)
-  const box = $("#visitorAnswer");
-  if(box) box.textContent = text;
-
-  // Optional chat log (if present in future)
-  try{ addChatMessage(window.__state || null, "visitor", text); 
-}catch(e){}
-}
-
-
-function updateMeta(state){
-  const meta = $("#meta");
-  meta.innerHTML = state.student ? `Student: <b>${escapeHtml(state.student)}</b> <span class="runId">• Run: ${escapeHtml(state.runId)}</span>` : "";
-}
-
-function currentStep(state){ return STEPS[state.stepIndex]; }
-
-function ensureOpenings(state){
-  const step = currentStep(state);
-  if(state.openedSteps.has(step.key)) return;
-  step.opening.forEach(line => showVisitor(line));
-  state.openedSteps.add(step.key);
-}
-
-function buildCsv(state){
-  // Build a simple CSV of run summary + per-intent completion
-  const lines = [];
-  const header = ["runId","student","className","difficulty","startedAt","finishedAt","event","step","intent","completed"];
-  lines.push(header.join(","));
-
-  const startedAt = state.startedAt;
-  const finishedAt = state.finishedAt || "";
-  for(const step of STEPS){
-    for(const intent of step.required){
-      const row = [
-        state.runId,
-        escapeCsv(state.student),
-        escapeCsv(state.className||""),
-        state.difficulty,
-        startedAt,
-        finishedAt,
-        "check",
-        step.key,
-        intent,
-        state.done[intent] ? "1" : "0"
-      ];
-      lines.push(row.join(","));
-    }
-  }
-  return lines.join("\n");
-}
-
-function escapeCsv(s){
-  s = (s ?? "").toString();
-  if(/[",\n]/.test(s)){
-    return `"${s.replace(/"/g,'""')}"`;
-  }
-  return s;
-}
-
-function top3Misses(state){
-  const missing = [];
-  for(const step of STEPS){
-    for(const intent of step.required){
-      if(!state.done[intent] && !missing.includes(intent)) missing.push(intent);
-    }
-  }
-  const idx = new Map(INTENT_PRIORITY.map((k,i)=>[k,i]));
-  missing.sort((a,b)=>(idx.get(a)??999)-(idx.get(b)??999));
-  return missing.slice(0,3);
-}
-
-function allMissesByStep(state){
-  const blocks = [];
-  for(const step of STEPS){
-    const miss = step.required.filter(i => !state.done[i]);
-    if(miss.length){
-      blocks.push({ title: step.title, intents: miss });
-    }
-  }
-  return blocks;
-}
-
-async function logEvent(payload){
-  const ep = (window.APP_CONFIG && window.APP_CONFIG.logEndpoint) || "";
-  if(!ep) return;
-  try{
-    await fetch(ep, {
-      method:"POST",
-      // Apps Script Web Apps often do not return CORS headers. Use a simple request.
-      mode:"no-cors",
-      headers:{ "Content-Type":"text/plain;charset=utf-8" },
-      body: JSON.stringify(payload)
-    });
-  }catch(_){}
-}
-
-function renderIdCard(state){
-  const canvas = $("#idCanvas");
-  const ctx = canvas.getContext("2d");
-  const W = canvas.width, H = canvas.height;
-
-  // background
-  ctx.fillStyle = "#f5f5f5"; ctx.fillRect(0,0,W,H);
-  ctx.strokeStyle = "#282828"; ctx.lineWidth = 4; ctx.strokeRect(10,10,W-20,H-20);
-
-  // header
-  ctx.fillStyle = "rgb(30,60,120)";
-  ctx.fillRect(10,10,W-20,100);
-  ctx.fillStyle = "#fff";
-  ctx.font = "bold 42px system-ui";
-  ctx.fillText("TRAINING ID CARD", 30, 60);
-  ctx.fillStyle = "rgba(210,220,245,1)";
-  ctx.font = "22px system-ui";
-  ctx.fillText("Fictional document for classroom practice", 30, 90);
-
-  // photo box
-  const box = {x:30,y:140,w:230,h:270};
-  ctx.fillStyle = "#e6e6e6";
-  ctx.fillRect(box.x,box.y,box.w,box.h);
-  ctx.strokeStyle = "#282828"; ctx.lineWidth = 3;
-  ctx.strokeRect(box.x,box.y,box.w,box.h);
-
-  // draw photo if available
-  const img = new Image();
-  img.onload = () => {
-    ctx.drawImage(img, box.x, box.y, box.w, box.h);
-    drawFields();
-  };
-  img.onerror = () => {
-    // placeholder
-    ctx.strokeStyle = "#5a5a5a"; ctx.lineWidth = 5;
-    ctx.beginPath(); ctx.arc(145,235,55,0,Math.PI*2); ctx.stroke();
-    ctx.strokeRect(105,285,80,95);
-    drawFields();
-  };
-  img.src = state.card.photo;
-
-  function field(label, value, y){
-    ctx.fillStyle = "#000"; ctx.font = "bold 28px system-ui";
-    ctx.fillText(label+":", 300, y);
-    ctx.font = "28px system-ui";
-    ctx.fillText(value, 510, y);
-  }
-
-  function drawFields(){
-    // Card footer (no instructional/reminder text)
-    ctx.fillStyle = "#f0f0f0"; ctx.fillRect(10,H-70,W-20,60);
-
-    const card = state.card;
-    const id = card.id;
-    const name = state.revealed.name ? card.name : "—";
-    const org  = state.revealed.org ? card.org : "—";
-    const nat  = (state.revealed.id || state.revealed.nationality) ? id.nationality : "—";
-    const dob  = (state.revealed.id || state.revealed.dob) ? id.dob : "—";
-    const age  = (state.revealed.id || state.revealed.age) ? ((computeAge(id.dob) ?? "—").toString()) : "—";
-
-    field("Name", name, 170);
-    field("Nationality", nat, 274);
-    field("Date of birth", dob, 326);
-    field("Age", age, 378);
-    field("ID No.", id.id_no, 490);
-    field("Expiry", id.expiry, 520);
-  }
-}
-
-function buildState(){
-  const seed = (Math.random()*1e9) >>> 0;
-  return {
-    runId: `run_${seed}`,
-    student: "",
-    className: "",
-    difficulty: "Standard",
-    startedAt: new Date().toISOString(),
-    finishedAt: "",
-    phrasebank: null,
-    intentPhrases: null,
-    card: generateVisitorCard(seed),
-    revealed: { id:false },
-    stepIndex: 0,
-    openedSteps: new Set(),
-    done: {},
-    lastStudentText: "",
-    pendingReflect: null,
-    asked: {},
-    gateComplete: false,
-    supervisorComplete: false,
-    threatRulesComplete: false,
-
-    supervisorApproved: false,
-    supervisorModalUsed: false,
-    pendingReturnToVisitor: false,
-
-  };
-}
-
-
-function goToStep(state, stepKey){
-  const idx = STEPS.findIndex(s => s.key === stepKey);
-  if(idx >= 0){
-    state.stepIndex = idx;
-    state.stepKey = stepKey;
-    setStepUI(state);
-    updateVisitorAvatar(state);
-    updateIdVisibility(state);
-    if(typeof updateActionButtons === 'function') updateActionButtons(state);
-    updateIdVisibility(state);
-  }
-}
-
-function setStepUI(state){
-  const step = currentStep(state);
-  $("#stepTitle").textContent = step.title;
-  $("#stepHelp").textContent = "";
-  ensureOpenings(state);
-  renderMood(state);
-  renderIdCard(state);
-
-    // If this step is now complete, auto-advance (except where a button is required)
-    const stepNow = currentStep(state);
-    const complete = stepNow.required.every(i => state.done[i]);
-    if(complete){
-      // Special case: in ID-check we require a supervisor-return flow
-      if(stepNow.key === "id_check"){
-        $("#stepHelp").textContent = "Use the button: Contact supervisor → fill 5W → then Return to visitor.";
-        state.pendingReturnToVisitor = true;
-        if(typeof updateActionButtons === 'function') updateActionButtons(state);
-        showVisitor("✅ ID-check complete. Next: contact supervisor (button), then return to the visitor.");
-      } else if(stepNow.key === "threat_rules"){
-        $("#stepHelp").textContent = "Press “Go to person search” to proceed to the pat-down.";
-        if(typeof updateActionButtons === 'function') updateActionButtons(state);
-        showVisitor("✅ Step complete. Press “Go to person search” to continue to the pat-down.");
-      } else {
-        const nextStep = (state.stepIndex < STEPS.length - 1) ? STEPS[state.stepIndex + 1] : null;
-        const msg = nextStep ? `✅ Step complete. Moving to: ${nextStep.title}` : "✅ Step complete. Finishing run.";
-        showVisitor(msg);
-        if(nextStep){
-          // advance after a short delay so the student can read the message
-          window.setTimeout(() => {
-            state.stepIndex++;
-            $("#stepHelp").textContent = "";
-            setStepUI(state);
-            showVisitor(nextStep.opening[0] || "Okay.");
-          }, 1200);
-        } else {
-          window.setTimeout(() => finishRun(state), 800);
-        }
-      }
-    }
-
-
-function updateActionButtons(state){
-  const step = currentStep(state);
-  const btnContact = $("#btnContactSupervisor");
-  if(btnContact) btnContact.style.display = 'none';
-  const btnReturn = $("#btnReturnVisitor");
-  const btnGo = $("#btnGoPersonSearch");
-
-  // defaults: hidden
-  [btnContact, btnReturn, btnGo].forEach(b => { if(b) { b.style.display = "none"; b.disabled = false; } });
-
-  if(step.key === "id_check"){
-    // Show contact supervisor after ID requested + control question done (or anytime, if teacher wants)
-    if(btnContact) btnContact.style.display = "none";
-    if(state.supervisorApproved && btnReturn){
-      btnReturn.style.display = "inline-flex";
-    }
-  }
-
-  // After supervisor approved, we want an explicit return step before moving to threat_rules
-  if(state.pendingReturnToVisitor && btnReturn){
-    btnReturn.style.display = "inline-flex";
-    if(btnContact) btnContact.style.display = "none";
-  }
-
-  // Gate to person search: after threat_rules complete show button to proceed (optional)
-  if(step.key === "threat_rules"){
-    if(btnGo) btnGo.style.display = "inline-flex";
-  }
-  if(step.key === "patdown"){
-    // no special buttons
-  }
-}
-}
-
-function smalltalkResponse(text, phrasebank){
-  const hit = pbMatch(text, phrasebank.smalltalk || []);
-  return hit ? hit.response : null;
-}
-
-
-function markAsked(state, key){
-  if(!state.asked) state.asked = {};
-  state.asked[key] = true;
-}
-
-function hasAsked(state, keys){
-  return keys.every(k => state.asked && state.asked[k]);
-}
-
-function maybeAutoAdvanceFromGate(state){
-  // Required for gate: who, purpose, appointment, host, time, about
-  const req = ["who","purpose","appointment","host","time","about"];
-  if(state.stepKey === "gate" && hasAsked(state, req)){
-    state.gateComplete = true;
-    // Move to ID step
-    goToStep(state, "id_check");
-    showVisitor("Okay. Please show me your ID for verification.");
-    renderMood(state);
-    return true;
-  }
-  return false;
-}
-
-function maybeAutoAdvanceAfterSupervisor(state){
-  if(state.stepKey === "id_check" && state.supervisorComplete){
-    goToStep(state, "threat_rules");
-    showVisitor("Everything checks out. Before you enter: no weapons, no drugs, and no alcohol. Due to an increased threat level, everyone is searched.");
-    renderMood(state);
-    return true;
-  }
-  return false;
-}
-
-function maybeAutoAdvanceAfterThreatRules(state){
-  if(state.stepKey === "threat_rules" && state.threatRulesComplete){
-    goToStep(state, "person_search");
-    showVisitor("Please follow me to the person search area.");
-    renderMood(state);
-    return true;
-  }
-  return false;
-}
-
-function processUserLine(state, userText){
-  // SUPERVISOR_TRIGGER_HOOK_V42
-  if(isSupervisorTrigger(userText)){
-    triggerSupervisorFlow(state);
-    return;
-  }
-
-  // threat rules completion (simple)
-  if(state.stepKey === "threat_rules"){
-
-  // HAND_BACK_ID_V41: hide ID after handing it back
-  if(t.includes("here is your id back") || t.includes("here's your id back") || t.includes("have your id back") || t.includes("giving you your id back")){
-    state.idVisible = false;
-    showSoldier("Here is your ID back. Everything checks out.");
-    updatePage(state);
-    return;
-  }
-
-
-  // AUTOTRIGGERS_V40: supervisor popup + go to person search
-  if(t.includes("contact my supervisor") || t.includes("call my supervisor") || t.includes("i'll contact my supervisor") || t.includes("i will contact my supervisor") || t.includes("i'll call my supervisor") || t.includes("i will call my supervisor")){
-    showVisitor("Okay, I'll wait.");
-    setTimeout(() => { try { openSupervisorModal(state); } catch(e) {} }, 300);
-    return;
-  }
-
-  if(t.includes("person search") || t.includes("pat down") || t.includes("pat-down")){
-    if(t.includes("follow") || t.includes("go to") || t.includes("proceed") || t.includes("let's go")){
-      goToPersonSearch(state);
-      return;
-    }
-  }
-
-  // LASTCLAIM_CHALLENGE_V37: handle "are you sure" / "but you said" challenges
-  if((t.includes("are you sure") || t.includes("but you said") || t.includes("you said")) && state.lastClaim){
-    const rate = moodMistakeRate(state);
-    if(state.lastClaim.truthy === false){
-      if(Math.random() > rate){
-        if(state.lastClaim.kind === "age"){
-          const realAge = computeAgeFromDob(getDobFromCard(state.card));
-          if(realAge !== null){
-            state.lastClaim = null;
-            return showVisitor("Sorry — I'm " + realAge + ".");
-          }
-        }
-        if(state.lastClaim.kind === "dob"){
-          const dob = getDobFromCard(state.card);
-          if(dob){
-            state.lastClaim = null;
-            return showVisitor("Sorry — my date of birth is " + formatDob(dob) + ".");
-          }
-        }
-      }
-      return showVisitor(excuseLine());
-    } else {
-      return showVisitor("Yes.");
-    }
-  }
-
-
-  // AGE_VERIFICATION_V36: handle questions like "are you 35?"
-  const ageMatch = t.match(/\bare you\s+(\d{1,3})\b/);
-  if(ageMatch){
-    const guess = parseInt(ageMatch[1],10);
-    const dob = getDobFromCard(state.card);
-    const realAge = computeAgeFromDob(dob);
-    if(realAge !== null){
-      if(guess === realAge) return showVisitor("Yes, that's correct.");
-      // sometimes correct the student
-      if(Math.random() < 0.75) return showVisitor("No, I'm " + realAge + ".");
-      return showVisitor("Sorry, I might have misheard you.");
-    }
-  }
-
-
-  // Auto-open supervisor popup when the student says they will contact/call the supervisor
-  // Examples: "I'll contact my supervisor", "I will call my supervisor", "Contact supervisor"
-  if(t.includes("contact my supervisor") || t.includes("call my supervisor") || t.includes("contact supervisor") || t.includes("call supervisor") || t.includes("phone my supervisor")){
+  /***********************
+   * PHRASEBANK (optional)
+   ***********************/
+  async function loadPhrasebank() {
     try {
-      setTimeout(() => { try { openSupervisorModal(state); } catch(e) {} }, 900);
-    } catch(e) {}
-  }
-
-    if(t.includes("no weapons") || t.includes("no drugs") || t.includes("no alcohol") || t.includes("prohibited") || t.includes("searched") || t.includes("search") || t.includes("pat-down") || t.includes("due to") ){
-      state.threatRulesComplete = true;
+      const res = await fetch("phrasebank.json", { cache: "no-store" });
+      if (!res.ok) return null;
+      return await res.json();
+    } catch {
+      return null;
     }
   }
 
-  // handle reflect yes/no
-  if(state.pendingReflect){
-    const t = norm(userText);
-    if(["yes","yeah","yep","correct","that's right","right","affirmative","sure"].includes(t)){
-      state.pendingReflect = null;
-      showVisitor("Okay. What do you want to know?");
-      return;
-    }
-    if(["no","nope","negative","not really"].includes(t)){
-      state.pendingReflect = null;
-      showVisitor("No problem. Please ask your security questions.");
-      return;
-    }
-  }
+  function compilePatterns(extra) {
+    const base = {
+      ask_id: [
+        /\b(can i|could i|may i|let me)\s+(see|check)\s+(your|ur)\s+(id|identification)\b/i,
+        /\bshow\s+me\s+(your|ur)\s+(id|identification)\b/i,
+        /\bdo\s+you\s+have\s+an?\s+id\b/i,
+        /\bid\s+please\b/i
+      ],
+      return_id: [
+        /\bhere('?s|\s+is)\s+your\s+id\s+back\b/i,
+        /\b(return|give)\s+(it|the\s+id)\s+back\b/i,
+        /\breturn\s+to\s+visitor\b/i
+      ],
+      contact_supervisor: [
+        /\b(i\s+(will|’ll|'ll)\s+)?(please\s+)?(contact|call|ring|phone)\s+(my\s+)?(supervisor|boss|officer|team\s*leader|manager)\b/i,
+        /\b(contact|call)\s+(a\s+)?(supervisor|team\s*leader|manager)\b/i
+      ],
+      ask_name: [
+        /\bwhat('?s|\s+is)\s+your\s+name\b/i,
+        /\bname\s*,?\s+please\b/i,
+        /\bcan\s+i\s+have\s+your\s+name\b/i
+      ],
+      ask_purpose: [
+        /\b(what('?s|\s+is)\s+the\s+purpose|why\s+are\s+you\s+here|reason\s+for\s+your\s+visit)\b/i,
+        /\bwhat\s+brings\s+you\s+here\b/i
+      ],
+      ask_appointment: [
+        /\bdo\s+you\s+have\s+an?\s+appointment\b/i,
+        /\bare\s+you\s+expected\b/i
+      ],
+      ask_who: [
+        /\bwho\s+are\s+you\s+(here\s+to\s+see|meeting|visiting)\b/i,
+        /\bwho\s+is\s+your\s+appointment\s+with\b/i
+      ],
+      ask_time: [
+        /\bwhat\s+time\s+is\s+your\s+appointment\b/i,
+        /\bwhen\s+is\s+your\s+appointment\b/i
+      ],
+      ask_where: [
+        /\bwhere\s+are\s+you\s+going\b/i,
+        /\bwhich\s+(building|unit|office)\b/i
+      ],
+      ask_subject: [
+        /\bwhat\s+is\s+it\s+about\b/i,
+        /\bwhat\s+is\s+the\s+meeting\s+about\b/i
+      ],
+      ask_age: [
+        /\bhow\s+old\s+are\s+you\b/i,
+        /\bwhat\s+is\s+your\s+age\b/i
+      ],
+      ask_dob: [
+        /\b(what('?s|\s+is)\s+your\s+(date\s+of\s+birth|dob)|date\s+of\s+birth|dob)\b/i,
+        /\bwhen\s+were\s+you\s+born\b/i
+      ],
+      confirm_born_year: [
+        /\bwere\s+you\s+born\s+in\s+(19\d{2}|20\d{2})\b/i,
+        /\byou\s+were\s+born\s+in\s+(19\d{2}|20\d{2})\s*\?\s*$/i
+      ],
+      ask_nationality: [
+        /\bwhat\s+is\s+your\s+nationality\b/i,
+        /\bwhere\s+are\s+you\s+from\b/i,
+        /\byour\s+citizenship\b/i
+      ],
+      go_person_search: [
+        /\b(go\s+to|start|begin)\s+(the\s+)?(person\s+search|pat\s*down|frisk)\b/i,
+        /\b(i\s+need\s+to|we\s+need\s+to)\s+(search|pat\s*down)\b/i
+      ],
+      deny: [
+        /\bdeny\s+(entrance|entry|access)\b/i,
+        /\byou\s+cannot\s+enter\b/i,
+        /\bnot\s+allowed\s+to\s+enter\b/i,
+        /\bi\s+am\s+refusing\s+entry\b/i
+      ],
+      smalltalk: [ /\bhello\b/i, /\bhi\b/i, /\bgood\s+(morning|afternoon|evening)\b/i ]
+    };
 
-  state.lastStudentText = userText;
-  const pb = state.phrasebank;
-  const step = currentStep(state);
-  const threshold = DIFFICULTY[state.difficulty].threshold;
+    const merged = { ...base };
 
-  const stResp = smalltalkResponse(userText, pb);
-  if(stResp){
-    showVisitor(stResp);
-    return;
-  }
+    // Optional merge phrasebank
+    if (extra) {
+      const intentsObj = extra.intents && typeof extra.intents === "object" ? extra.intents : null;
 
-  const remaining = step.required.filter(i => !state.done[i]);
-  let matched = null;
-  for(const intent of remaining){
-    const phrases = state.intentPhrases[intent] || [];
-    if(fuzzyIntentMatch(userText, phrases, threshold)){
-      matched = intent;
-      break;
-    }
-  }
-
-  if(matched){
-    state.done[matched] = true;
-    reveal(matched, state);
-    const answer = visitorResponseForIntent(state, matched, userText, state.card);
-    showVisitor(answer);
-  // Auto-advance from gate to ID-check when all required questions have been asked
-  const step = currentStep(state);
-  if(step && step.key === "threat_rules" && threatComplete(state)){
-    showVisitor("Alright. Due to an increased threat level, everyone is searched. Please follow me to the pat-down.");
-    // allow moving on
-    updateActionButtons && updateActionButtons(state);
-  }
-
-  if(step && step.key === "gate" && gateComplete(state)){
-    showVisitor("Thank you. Please show me your ID. (Ask: \"Can I see your ID?\" )");
-    goToStep(state, "id_check");
-    updateIdVisibility(state);
-  }
-    renderIdCard(state);
-  } else {
-  // If not one of the remaining required questions, try recognizing any known intent (e.g., asking for ID early)
-  const anyMatch = bestIntentMatch(userText, state.intentPhrases || {}, threshold);
-  if(anyMatch){
-    // mark completion if it's part of this step
-    if(step.required.includes(anyMatch)) state.done[anyMatch] = true;
-    reveal(anyMatch, state);
-    const answer2 = visitorResponseForIntent(state, anyMatch, userText, state.card);
-    showVisitor(answer2);
-    return;
-  }
-
-    // Log unknown questions (optional)
-    if(window.APP_CONFIG && window.APP_CONFIG.logUnknownQuestions){
-      logEvent({
-        event: "unknown_question",
-        student: state.student,
-        className: state.className,
-        runId: state.runId,
-        ts: new Date().toISOString(),
-        stats: {
-          difficulty: state.difficulty,
-          step: currentStep(state).key,
-          text: userText,
-          userAgent: navigator.userAgent
+      const addPatterns = (key, arr) => {
+        if (!arr || !Array.isArray(arr)) return;
+        merged[key] = merged[key] || [];
+        for (const p of arr) {
+          if (!p) continue;
+          if (p instanceof RegExp) merged[key].push(p);
+          else if (typeof p === "string") {
+            try { merged[key].push(new RegExp(p, "i")); } catch {}
+          }
         }
-      });
-    }
-    state.pendingReflect = userText;
-    const reflect = state.difficulty === "Advanced"
-      ? "Could you be more specific, please?"
-      : offScriptReflect(userText, pb);
-    showVisitor(reflect);
-  }
-}
+      };
 
-function finishRun(state){
-  state.finishedAt = new Date().toISOString();
-  // feedback UI
-  const top3 = top3Misses(state);
-  const ul = $("#top3");
-  ul.innerHTML = "";
-  if(top3.length === 0){
-    ul.innerHTML = "<li>✅ No misses — well done.</li>";
-  } else {
-    for(const intent of top3){
-      const ex = EXAMPLE_BY_INTENT[intent] || "";
-      const li = document.createElement("li");
-      li.textContent = ex ? `${intent} — e.g., “${ex}”` : intent;
-      ul.appendChild(li);
-    }
-  }
-
-  const blocks = allMissesByStep(state);
-  const all = $("#allMisses");
-  all.innerHTML = "";
-  if(blocks.length === 0){
-    all.innerHTML = "<p>✅ No missed items.</p>";
-  } else {
-    for(const b of blocks){
-      const h = document.createElement("h3");
-      h.textContent = b.title;
-      all.appendChild(h);
-      const u = document.createElement("ul");
-      for(const intent of b.intents){
-        const ex = EXAMPLE_BY_INTENT[intent] || "";
-        const li = document.createElement("li");
-        li.textContent = ex ? `${intent} — e.g., “${ex}”` : intent;
-        u.appendChild(li);
-      }
-      all.appendChild(u);
-    }
-  }
-
-  // local counter (no backend)
-  const key = "veva_practice_counter";
-  const counter = JSON.parse(localStorage.getItem(key) || "{}");
-  const who = (state.student || "unknown").trim();
-  counter[who] = (counter[who] || 0) + 1;
-  localStorage.setItem(key, JSON.stringify(counter));
-
-  setScreen("#screen-feedback");
-  updateMeta(state);
-}
-
-(async function init(){
-  const state = buildState();
-  window.__state = state;
-  clearChat();
-  window.__state = state;
-  initSpeechRecognition(state);
-
-  // BIND_CRITICAL_BUTTONS
-  const denyBtn = $("#btnDenyEntrance");
-  if(denyBtn){
-    denyBtn.addEventListener("click", () => { try{ denyEntrance(state); }catch(e){} });
-  }
-  const goBtn = $("#btnGoToPersonSearch") || $("#btnGoPersonSearch");
-  if(goBtn){
-    goBtn.addEventListener("click", () => {
-      try{
-        goToStep(state, "person_search");
-        updateIdVisibility(state);
-        showVisitor("Please follow me to the person search area.");
-        setTimeout(focusQuestion, 50);
-      }catch(e){}
-    });
-  }
-
-
-  // Preload heavy assets so Start feels instant
-  const preloadPhrasebankPromise = (async () => {
-    const pb = await loadPhrasebank();
-    state.phrasebank = pb;
-    state.intentPhrases = mergedIntentPhrases(pb);
-    if(typeof teacherRefreshOnLoad === 'function') teacherRefreshOnLoad();
-    return pb;
-  })();
-
-
-  // UI hooks
-  $("#btnResetLocal").addEventListener("click", () => {
-    localStorage.removeItem("veva_practice_counter");
-    alert("Lokale telling gereset (alleen op dit apparaat).");
-  
-    localStorage.removeItem("veva_phrasebank_draft");
-    localStorage.removeItem("veva_phrasebank_use_draft");
-});
-
-  
-  $("#btnStart").addEventListener("click", async () => {
-    const name = $("#studentName").value.trim();
-    if(!name){
-      alert("Vul eerst je naam in.");
-      return;
-    }
-
-    state.student = name;
-    state.className = $("#className").value.trim();
-    state.difficulty = $("#difficulty").value;
-
-    // Option 2: switch screens immediately (feels fast)
-    setScreen("#screen-train");
-    updateMeta(state);
-    setStepUI(state);
-
-    // Temporary loading message while we finalize preloads
-    showVisitor("Loading scenario…");
-
-    // Await preloaded phrasebank (Option 1)
-    await preloadPhrasebankPromise;
-
-    // Fire-and-forget start log (don't block UI)
-    logEvent({
-      event: "start",
-      student: state.student,
-      className: state.className,
-      runId: state.runId,
-      ts: new Date().toISOString(),
-      stats: { difficulty: state.difficulty, userAgent: navigator.userAgent }
-    }).catch(() => {});
-
-    // Now begin
-    updateIdVisibility(state);
-    updateVisitorAvatar(state);
-    updateIdVisibility(state);
-    updateVisitorAvatar(state);
-    showVisitor("Good morning.");
-    setTimeout(focusQuestion, 50);
-    renderMood(state);
-  });
-
-  // Enter-to-start (login screen)
-  ["#studentName","#className"].forEach(sel => {
-    const el = $(sel);
-    if(el){
-      el.addEventListener("keydown", (e) => {
-        if(e.key === "Enter"){
-          e.preventDefault();
-          $("#btnStart").click();
+      if (intentsObj) {
+        for (const [k, v] of Object.entries(intentsObj)) {
+          if (v && Array.isArray(v.patterns)) addPatterns(k, v.patterns);
         }
-      });
-    }
-  });
-$("#btnHint").addEventListener("click", () => {
-    const step = currentStep(state);
-    $("#stepHelp").textContent = step.hint;
-  });
-
-  $("#btnSend").addEventListener("click", () => {
-
-// WIRE_PERSONSEARCH_V40
-try{
-  const b = $("#btnPersonSearch") || $("#btnGoPersonSearch") || $("#btnGoToPersonSearch") || $("#btnPatDown") || $("#btnGoPerson");
-  if(b){
-    b.addEventListener("click", () => { goToPersonSearch(state); });
-  }
-}catch(e){}
-
-    const inp = $("#studentInput");
-    const text = inp.value.trim();
-    if(!text) return;
-    // Show student's last message bubble
-    const sb = $("#studentBubble");
-    if(sb){ sb.style.display = "block"; sb.textContent = text; }
-    inp.value = "";
-    processUserLine(state, text);
-  });
-
-  $("#studentInput").addEventListener("keydown", (e) => {
-    if(e.key === "Enter"){
-      e.preventDefault();
-      $("#btnSend").click();
-    }
-  });
-
-  
-
-  // Main action buttons
-  $("#btnDenyEntrance")?.addEventListener("click", () => denyEntrance(state));
-  $("#btnGoPersonSearch")?.addEventListener("click", () => {
-    goToStep(state, "person_search");
-    updateIdVisibility(state);
-    focusQuestion();
-  });
-  // Return to visitor (after supervisor). If supervisor hasn't approved yet, open supervisor modal.
-  $("#btnReturnVisitor")?.addEventListener("click", () => {
-    if(state.supervisorApproved){
-      showVisitor("Alright, everything checks out. Here is your ID back. Before I let you on the base: prohibited items include weapons, drugs, alcohol, and sharp objects. Do you have any prohibited items?");
-      goToStep(state, "threat_rules");
-      updateIdVisibility(state);
-      focusQuestion();
-    } else {
-      openSupervisorModal(state);
-    }
-  });
-
-  // Supervisor modal buttons
-  $("#btnContactSupervisor")?.addEventListener("click", () => openSupervisorModal(state));
-  $("#btnCloseModal")?.addEventListener("click", () => closeSupervisorModal());
-  $("#btnSendSupervisor")?.addEventListener("click", () => sendToSupervisor(state));
-  $("#btnBackToVisitor")?.addEventListener("click", () => {
-    state.supervisorComplete = true;
-    closeSupervisorModal();
-    showVisitor("Alright, everything checks out. Here is your ID back. Before I let you on the base: prohibited items include weapons, drugs, alcohol, and sharp objects. Do you have any prohibited items?");
-    goToStep(state, "threat_rules");
-    updateIdVisibility(state);
-    focusQuestion();
-  });
-  // Return to visitor
-  $("#btnReturnVisitor")?.addEventListener("click", () => {
-    state.supervisorComplete = true;
-
-    closeSupervisorModal();
-    showVisitor("Alright. Everything checks out. You are allowed on the base.");
-    state.pendingReturnToVisitor = false;
-    if(typeof updateActionButtons === 'function') updateActionButtons(state);
-  
-    // Auto-advance to threat rules (you will return to visitor next)
-    goToStep(state, "threat_rules");
-});
-$("#btnDoneStep").addEventListener("click", () => {
-    const step = currentStep(state);
-    if(step.key === "id_check"){
-      $("#stepHelp").textContent = "Use Contact supervisor → fill 5W → Return to visitor.";
-      showVisitor("Use the supervisor flow buttons in this step.");
-      if(typeof updateActionButtons === 'function') updateActionButtons(state);
-      return;
-    }
-    if(step.key === "threat_rules"){
-      $("#stepHelp").textContent = "Press “Go to person search” to proceed to the pat-down.";
-      if(typeof updateActionButtons === 'function') updateActionButtons(state);
-      showVisitor("Press “Go to person search” to continue.");
-      return;
-    }
-    if(state.stepIndex < STEPS.length - 1){
-      state.stepIndex++;
-      $("#stepHelp").textContent = "";
-      setStepUI(state);
-      showVisitor(currentStep(state).opening[0] || "Okay.");
-    } else {
-      finishRun(state);
-    }
-  });
-
-  $("#btnNewScenario").addEventListener("click", () => {
-    const seed = (Math.random()*1e9) >>> 0;
-    state.runId = `run_${seed}`;
-    state.card = generateVisitorCard(seed);
-    
-  state.idVisible = false;
-updateVisitorAvatar(state);
-    updateIdVisibility(state);
-    state.revealed = { id:false };
-    state.stepIndex = 0;
-    state.stepKey = STEPS[0].key;
-    state.openedSteps = new Set();
-    state.done = {};
-    state.startedAt = new Date().toISOString();
-    state.finishedAt = "";
-    $("#stepHelp").textContent = "";
-    updateMeta(state);
-    setStepUI(state);
-    updateIdVisibility(state);
-    updateVisitorAvatar(state);
-    updateIdVisibility(state);
-    updateVisitorAvatar(state);
-    showVisitor("Good morning.");
-    setTimeout(focusQuestion, 50);
-  });
-
-  // Teacher button (visible for now)
-  safeOn($("#btnTeacher"), "click", () => { openTeacher(); });
-
-
-  $("#btnFinishRun").addEventListener("click", async () => {
-    finishRun(state);
-    await logEvent({
-      event: "finish",
-      student: state.student,
-      className: state.className,
-      runId: state.runId,
-      ts: new Date().toISOString(),
-      stats: {
-        difficulty: state.difficulty,
-        top3: top3Misses(state),
-        userAgent: navigator.userAgent
-      }
-    });
-  });
-
-  $("#btnBackToStart").addEventListener("click", () => {
-    location.reload();
-  });
-
-  $("#btnDownloadCsv").addEventListener("click", () => {
-    const csv = buildCsv(state);
-    const blob = new Blob([csv], { type:"text/csv;charset=utf-8" });
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = `veva_${state.student || "student"}_${state.runId}.csv`.replace(/\s+/g,"_");
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-  });
-
-
-  // ---------- Teacher mode (hidden phrasebank editor) ----------
-  const teacherModal = $("#teacherModal");
-  const btnTeacherOpen = $("#btnTeacherOpen");
-  const teacherClose = $("#btnTeacherClose");
-  const teacherUnlockBox = $("#teacherUnlockBox");
-  const teacherPinInput = $("#teacherPinInput");
-  const teacherUnlockBtn = $("#btnTeacherUnlock");
-  const teacherUnlockStatus = $("#teacherUnlockStatus");
-
-  const TABS = Array.from(document.querySelectorAll(".tab"));
-  const PANELS = Array.from(document.querySelectorAll(".tabPanel"));
-
-  const intentSelect = $("#intentSelect");
-  const intentNewPattern = $("#intentNewPattern");
-  const intentPatternList = $("#intentPatternList");
-  const btnAddIntentPattern = $("#btnAddIntentPattern");
-  const btnDeleteIntentPattern = $("#btnDeleteIntentPattern");
-  const intentStatus = $("#intentStatus");
-
-  const stName = $("#stName");
-  const stResponse = $("#stResponse");
-  const stPatterns = $("#stPatterns");
-  const smalltalkList = $("#smalltalkList");
-  const btnAddSmalltalk = $("#btnAddSmalltalk");
-  const btnDeleteSmalltalk = $("#btnDeleteSmalltalk");
-  const smalltalkStatus = $("#smalltalkStatus");
-
-  const btnExportPhrasebank = $("#btnExportPhrasebank");
-  const btnUseDraftNow = $("#btnUseDraftNow");
-  const btnDiscardDraft = $("#btnDiscardDraft");
-  const fileInput = $("#phrasebankFile");
-  const btnImportPhrasebank = $("#btnImportPhrasebank");
-  const exportStatus = $("#exportStatus");
-
-  let teacherUnlocked = false;
-
-  function hasTeacherPin(){
-    return (window.APP_CONFIG && window.APP_CONFIG.teacherPin && window.APP_CONFIG.teacherPin.length > 0);
-  }
-
-  function isTypingTarget(e){
-    const t = e.target;
-    if(!t) return false;
-    const tag = (t.tagName || "").toUpperCase();
-    return tag === "INPUT" || tag === "TEXTAREA" || t.isContentEditable;
-  }
-
-  
-function openSupervisorModal(state){
-  const modal = $("#supervisorModal");
-  if(!modal) return;
-  modal.classList.remove("hidden");
-  // clear fields
-  ["wWho","wWhat","wWithWhom","wTime","wWhy"].forEach(id => { const el = $("#"+id); if(el) el.value = ""; });
-  const resp = $("#supervisorResponse"); if(resp) resp.textContent = "";
-  state.supervisorModalUsed = true;
-}
-
-function closeSupervisorModal(){
-  const modal = $("#supervisorModal");
-  if(modal) modal.classList.add("hidden");
-}
-
-function sendToSupervisor(state){
-  const who = ($("#wWho")?.value || "").trim();
-  const what = ($("#wWhat")?.value || "").trim();
-  const withWhom = ($("#wWithWhom")?.value || "").trim();
-  const time = ($("#wTime")?.value || "").trim();
-  const why = ($("#wWhy")?.value || "").trim();
-
-  const resp = $("#supervisorResponse");
-  if(resp){
-    resp.textContent = "Supervisor: Approved. Allow the visitor to proceed to the next check.";
-  }
-
-  state.supervisorApproved = true;
-  // Log event (non-blocking)
-  logEvent({
-    event: "supervisor_briefing",
-    student: state.student,
-    className: state.className,
-    runId: state.runId,
-    ts: new Date().toISOString(),
-    stats: { who, what, withWhom, time, why, difficulty: state.difficulty, userAgent: navigator.userAgent }
-  }).catch(()=>{});
-
-  updateActionButtons(state);
-}
-function openTeacher(){
-    if(!teacherModal) return;
-    teacherModal.classList.remove("hidden");
-    exportStatus.textContent = "";
-    intentStatus.textContent = "";
-    smalltalkStatus.textContent = "";
-
-    if(hasTeacherPin()){
-      teacherUnlockBox.open = true;
-      teacherUnlockStatus.textContent = teacherUnlocked ? "Unlocked" : "Locked";
-    } else {
-      teacherUnlockBox.open = false;
-      teacherUnlocked = true;
-      teacherUnlockStatus.textContent = "Unlocked";
-    }
-
-    refreshTeacherUI();
-    setTeacherEditingEnabled();
-  }
-
-  function closeTeacher(){
-    if(!teacherModal) return;
-    teacherModal.classList.add("hidden");
-  }
-
-  function setTeacherEditingEnabled(){
-    const locked = hasTeacherPin() && !teacherUnlocked;
-    [
-      btnAddIntentPattern, btnDeleteIntentPattern,
-      btnAddSmalltalk, btnDeleteSmalltalk,
-      btnExportPhrasebank, btnUseDraftNow, btnDiscardDraft, btnImportPhrasebank
-    ].forEach(el => { if(el) el.disabled = locked; });
-    [intentSelect, intentNewPattern, intentPatternList, stName, stResponse, stPatterns, smalltalkList, fileInput]
-      .forEach(el => { if(el) el.disabled = locked; });
-  }
-
-  function getDraftOrBase(){
-    const raw = localStorage.getItem("veva_phrasebank_draft");
-    if(raw){
-      try{ return JSON.parse(raw); }catch(_){}
-    }
-    return state.phrasebank ? deepClone(state.phrasebank) : null;
-  }
-
-  function saveDraft(pb){
-    localStorage.setItem("veva_phrasebank_draft", JSON.stringify(pb));
-  }
-
-  function refreshTeacherUI(){
-    let pb = getDraftOrBase();
-    if(!pb){
-      exportStatus.textContent = "Phrasebank not loaded yet — start a run once, or refresh.";
-      return;
-    }
-    pb.intents = pb.intents || {};
-    pb.smalltalk = pb.smalltalk || [];
-    pb.off_script = pb.off_script || { reflect_question_template: "Just to confirm: are you asking '{q}'?" };
-
-    const intentKeys = Object.keys(INTENT_PHRASES_BASE).sort();
-    intentSelect.innerHTML = "";
-    for(const k of intentKeys){
-      const opt = document.createElement("option");
-      opt.value = k; opt.textContent = k;
-      intentSelect.appendChild(opt);
-    }
-    const prev = intentSelect.dataset.prev;
-    if(prev && intentKeys.includes(prev)) intentSelect.value = prev;
-
-    intentSelect.dataset.prev = intentSelect.value;
-    const sel = intentSelect.value;
-    const patterns = Array.isArray(pb.intents[sel]) ? pb.intents[sel] : [];
-    intentPatternList.innerHTML = "";
-    patterns.forEach((p, idx) => {
-      const opt = document.createElement("option");
-      opt.value = String(idx);
-      opt.textContent = p;
-      intentPatternList.appendChild(opt);
-    });
-
-    smalltalkList.innerHTML = "";
-    pb.smalltalk.forEach((e, idx) => {
-      const opt = document.createElement("option");
-      opt.value = String(idx);
-      opt.textContent = `${e.name || "smalltalk"} — ${((e.patterns||[])[0]||"pattern…")} → ${e.response||""}`;
-      smalltalkList.appendChild(opt);
-    });
-  }
-
-  // Tabs
-  TABS.forEach(btn => {
-    btn.addEventListener("click", () => {
-      TABS.forEach(b => b.classList.remove("active"));
-      btn.classList.add("active");
-      const id = btn.dataset.tab;
-      PANELS.forEach(p => p.classList.add("hidden"));
-      document.getElementById(id).classList.remove("hidden");
-    });
-  });
-
-  safeOn(intentSelect, "change", () => {
-    intentSelect.dataset.prev = intentSelect.value;
-    refreshTeacherUI();
-  });
-
-  safeOn(btnAddIntentPattern, "click", () => {
-    const pattern = (intentNewPattern.value || "").trim();
-    if(!pattern){ intentStatus.textContent = "Enter a pattern first."; return; }
-    let pb = getDraftOrBase(); if(!pb) return;
-    pb.intents = pb.intents || {};
-    const key = intentSelect.value;
-    pb.intents[key] = Array.isArray(pb.intents[key]) ? pb.intents[key] : [];
-    if(pb.intents[key].map(norm).includes(norm(pattern))){
-      intentStatus.textContent = "Pattern already exists.";
-      return;
-    }
-    pb.intents[key].push(pattern);
-    saveDraft(pb);
-    intentNewPattern.value = "";
-    intentStatus.textContent = "Added to local draft.";
-    refreshTeacherUI();
-  });
-
-  safeOn(btnDeleteIntentPattern, "click", () => {
-    const selIdx = intentPatternList.value;
-    if(selIdx === "" || selIdx == null){ intentStatus.textContent = "Select a pattern to delete."; return; }
-    let pb = getDraftOrBase(); if(!pb) return;
-    const key = intentSelect.value;
-    const arr = Array.isArray(pb.intents[key]) ? pb.intents[key] : [];
-    const idx = parseInt(selIdx, 10);
-    if(Number.isNaN(idx) || idx < 0 || idx >= arr.length) return;
-    arr.splice(idx, 1);
-    pb.intents[key] = arr;
-    saveDraft(pb);
-    intentStatus.textContent = "Deleted from local draft.";
-    refreshTeacherUI();
-  });
-
-  safeOn(btnAddSmalltalk, "click", () => {
-    const name = (stName.value || "").trim() || "smalltalk";
-    const resp = (stResponse.value || "").trim();
-    const pats = (stPatterns.value || "").split(",").map(s => s.trim()).filter(Boolean);
-    if(!resp || pats.length === 0){
-      smalltalkStatus.textContent = "Provide patterns and a response.";
-      return;
-    }
-    let pb = getDraftOrBase(); if(!pb) return;
-    pb.smalltalk = pb.smalltalk || [];
-    pb.smalltalk.push({ name, patterns: pats, response: resp });
-    saveDraft(pb);
-    stName.value = ""; stResponse.value = ""; stPatterns.value = "";
-    smalltalkStatus.textContent = "Added to local draft.";
-    refreshTeacherUI();
-  });
-
-  safeOn(btnDeleteSmalltalk, "click", () => {
-    const selIdx = smalltalkList.value;
-    if(selIdx === "" || selIdx == null){ smalltalkStatus.textContent = "Select an entry to delete."; return; }
-    let pb = getDraftOrBase(); if(!pb) return;
-    const idx = parseInt(selIdx, 10);
-    if(Number.isNaN(idx) || idx < 0 || idx >= pb.smalltalk.length) return;
-    pb.smalltalk.splice(idx, 1);
-    saveDraft(pb);
-    smalltalkStatus.textContent = "Deleted from local draft.";
-    refreshTeacherUI();
-  });
-
-  safeOn(btnExportPhrasebank, "click", () => {
-    let pb = getDraftOrBase(); if(!pb) return;
-    pb.off_script = pb.off_script || { reflect_question_template: "Just to confirm: are you asking '{q}'?" };
-    downloadJson("phrasebank.json", pb);
-    exportStatus.textContent = "Downloaded. Replace repo file and commit to GitHub.";
-  });
-
-  safeOn(btnUseDraftNow, "click", async () => {
-    const raw = localStorage.getItem("veva_phrasebank_draft");
-    if(!raw){ exportStatus.textContent = "No local draft found."; return; }
-    localStorage.setItem("veva_phrasebank_use_draft", "1");
-    state.phrasebank = await loadPhrasebank();
-    state.intentPhrases = mergedIntentPhrases(state.phrasebank);
-    if(typeof teacherRefreshOnLoad === 'function') teacherRefreshOnLoad();
-    exportStatus.textContent = "Draft enabled for recognition in this browser.";
-  });
-
-  safeOn(btnDiscardDraft, "click", () => {
-    localStorage.removeItem("veva_phrasebank_draft");
-    localStorage.removeItem("veva_phrasebank_use_draft");
-    exportStatus.textContent = "Local draft discarded.";
-    refreshTeacherUI();
-  });
-
-  safeOn(btnImportPhrasebank, "click", async () => {
-    const f = fileInput.files && fileInput.files[0];
-    if(!f){ exportStatus.textContent = "Choose a file first."; return; }
-    try{
-      const text = await f.text();
-      const pb = JSON.parse(text);
-      saveDraft(pb);
-      exportStatus.textContent = "Imported into local draft.";
-      refreshTeacherUI();
-    }catch(err){
-      exportStatus.textContent = "Import failed: " + String(err);
-    }
-  });
-
-  safeOn(teacherUnlockBtn, "click", () => {
-    if(!hasTeacherPin()){
-      teacherUnlocked = true;
-      teacherUnlockStatus.textContent = "Unlocked";
-      setTeacherEditingEnabled();
-      return;
-    }
-    const pin = (teacherPinInput.value || "").trim();
-    if(pin && pin === window.APP_CONFIG.teacherPin){
-      teacherUnlocked = true;
-      teacherUnlockStatus.textContent = "Unlocked";
-    } else {
-      teacherUnlocked = false;
-      teacherUnlockStatus.textContent = "Wrong PIN";
-    }
-    setTeacherEditingEnabled();
-  });
-
-  safeOn(teacherClose, "click", closeTeacher);
-  safeOn(teacherModal, "click", (e) => { if(e.target === teacherModal) closeTeacher(); });
-
-  window.addEventListener("keydown", (e) => {
-    if(isTypingTarget(e)) return;
-    if(e.ctrlKey && e.shiftKey && (e.key.toLowerCase() === "t")){
-      e.preventDefault();
-      if(teacherModal.classList.contains("hidden")) openTeacher();
-      else closeTeacher();
-    }
-  }, true);
-
-  // F2 quick open teacher mode
-  window.addEventListener("keydown", (e) => {
-    if(e.key === "F2"){
-      e.preventDefault();
-      openTeacher();
-    }
-  }, true);
-
-  function teacherRefreshOnLoad(){
-    try{ refreshTeacherUI(); setTeacherEditingEnabled(); }catch(_){}
-  }
-
-  // Enter-to-send (question box)  // Enter-to-send
-  const q = $("#typedInput") || $("#userInput");
-  if(q){
-    q.addEventListener("keydown", (e) => {
-      if(e.key === "Enter" && !e.shiftKey){
-        e.preventDefault();
-        $("#btnSend").click();
-      }
-    });
-  }
-
-})();
-
-function updateVisitorAvatar(state){
-  const img = $("#visitorAvatar");
-  if(!img) return;
-  const src = (state && state.card && state.card.headshot) ? state.card.headshot : "";
-  img.onerror = () => {
-    if(src && src.includes("assets/photos/")) {
-      setAvatarSrc(img, src.replace("assets/photos/","assets/photos/"));
-    } else {
-      setAvatarSrc(img, "data:image/svg+xml;charset=utf-8,<svg xmlns=%27http://www.w3.org/2000/svg%27 width=%2764%27 height=%2764%27> <rect width=%27100%%27 height=%27100%%27 fill=%27%231b2a44%27/> <circle cx=%2732%27 cy=%2726%27 r=%2714%27 fill=%27%237aa2d6%27/> <rect x=%2714%27 y=%2742%27 width=%2736%27 height=%2718%27 rx=%279%27 fill=%27%237aa2d6%27/> </svg>");
-    }
-  };
-  setAvatarSrc(img, src || "data:image/svg+xml;charset=utf-8,<svg xmlns=%27http://www.w3.org/2000/svg%27 width=%2764%27 height=%2764%27> <rect width=%27100%%27 height=%27100%%27 fill=%27%231b2a44%27/> <circle cx=%2732%27 cy=%2726%27 r=%2714%27 fill=%27%237aa2d6%27/> <rect x=%2714%27 y=%2742%27 width=%2736%27 height=%2718%27 rx=%279%27 fill=%27%237aa2d6%27/> </svg>");
-}
-
-function setAvatarSrc(img, src){
-  if(!img) return;
-  img.onerror = null;
-  img.src = src || "data:image/svg+xml;charset=utf-8,<svg xmlns=%27http://www.w3.org/2000/svg%27 width=%2764%27 height=%2764%27> <rect width=%27100%%27 height=%27100%%27 fill=%27%231b2a44%27/> <circle cx=%2732%27 cy=%2726%27 r=%2714%27 fill=%27%237aa2d6%27/> <rect x=%2714%27 y=%2742%27 width=%2736%27 height=%2718%27 rx=%279%27 fill=%27%237aa2d6%27/> </svg>";
-}
-
-
-// --- Push-to-talk speech-to-text (browser) ---
-function initSpeechRecognition(state){
-  const btn = $("#btnMicHold");
-  const status = $("#micStatus");
-  const input = $("#studentInput");
-  if(!btn) return;
-
-  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if(!SR){
-    btn.disabled = true;
-    if(status) status.textContent = "Speech-to-text not supported in this browser.";
-    return;
-  }
-
-  const rec = new SR();
-  rec.lang = "en-US";
-  rec.continuous = false;
-  rec.interimResults = true;
-  rec.maxAlternatives = 1;
-
-  let isHolding = false;
-  let finalText = "";
-  let interimText = "";
-  let pendingSend = false;
-
-  function setStatus(t){
-    if(status) status.textContent = t || "";
-  }
-
-  function start(){
-    if(isHolding) return;
-    isHolding = true;
-    pendingSend = false;
-    finalText = "";
-    interimText = "";
-    btn.classList.add("listening");
-    setStatus("Listening…");
-    try{
-      rec.start();
-    }catch(e){
-      // Some browsers throw if called too quickly
-    }
-  }
-
-  function stop(){
-    if(!isHolding) return;
-    isHolding = false;
-    pendingSend = true; // auto-send on release
-    btn.classList.remove("listening");
-    setStatus("Processing…");
-    try{
-      rec.stop();
-    }catch(e){
-      // Some browsers throw if stop is called too quickly; fall back to abort.
-      try{ rec.abort(); }catch(_e){}
-    }
-    // Safety: clear "Processing…" even if onend doesn't fire (browser quirks)
-    setTimeout(() => {
-      try{
-        if(status && status.textContent && status.textContent.toLowerCase().includes("processing")){
-          setStatus("");
+      } else {
+        for (const [k, v] of Object.entries(extra)) {
+          if (Array.isArray(v)) addPatterns(k, v);
         }
-      }catch(e){}
-    }, 1600);
-  }
-
-rec.onresult = (e) => {
-    interimText = "";
-    for(let i = e.resultIndex; i < e.results.length; i++){
-      const r = e.results[i];
-      const t = (r[0] && r[0].transcript) ? r[0].transcript : "";
-      if(r.isFinal) finalText += t;
-      else interimText += t;
-    }
-    const display = (finalText + " " + interimText).trim();
-    if(input) input.value = display;
-  };
-
-  rec.onerror = (e) => {
-    btn.classList.remove("listening");
-    setStatus("Mic error: " + (e && e.error ? e.error : "unknown"));
-    pendingSend = false;
-    isHolding = false;
-  };
-
-  rec.onend = () => {
-    btn.classList.remove("listening");
-    const text = (finalText || interimText || "").trim();
-    if(input) input.value = text;
-    setStatus("");
-    if(pendingSend && text){
-      pendingSend = false;
-      // Auto-send the recognized question
-      const sendBtn = $("#btnSend");
-      if(sendBtn) sendBtn.click();
-    }else{
-      pendingSend = false;
-    }
-  };
-
-  // Pointer events for mouse + touch
-  btn.addEventListener("pointerdown", (e) => { e.preventDefault(); start(); });
-  btn.addEventListener("pointerup",   (e) => { e.preventDefault(); stop(); });
-  btn.addEventListener("pointerleave",(e) => { if(isHolding) stop(); });
-  btn.addEventListener("pointercancel",(e)=> { if(isHolding) stop(); });
-
-  // Keyboard accessibility: hold Space/Enter
-  btn.addEventListener("keydown", (e) => {
-    if(e.code === "Space" || e.code === "Enter"){
-      e.preventDefault();
-      start();
-    }
-  });
-  btn.addEventListener("keyup", (e) => {
-    if(e.code === "Space" || e.code === "Enter"){
-      e.preventDefault();
-      stop();
-    }
-  });
-}
-
-
-function resolveVisitorAvatar(state){
-  // Prefer current visitor headshot if available
-  try{
-    const card = state && state.card ? state.card : null;
-    if(card && card.headshot){
-      // Most repos store photos under assets/photos/
-      return "assets/photos/" + card.headshot;
-    }
-  }catch(e){}
-  return null;
-}
-function resolveStudentAvatar(){
-  // User-provided soldier avatar (place soldier.png in assets/photos/)
-  return "assets/photos/soldier.png";
-}
-function addChatMessage(state, who, text){
-  const log = $("#chatLog");
-  if(!log) return;
-  const row = document.createElement("div");
-  row.className = "msgRow" + (who === "me" ? " me" : "");
-  const img = document.createElement("img");
-  img.className = "msgAvatar";
-  img.alt = (who === "me") ? "student" : "visitor";
-  const src = (who === "me") ? resolveStudentAvatar() : (resolveVisitorAvatar(state) || "");
-  if(src){
-    img.src = src;
-    img.onerror = () => { img.style.display = "none"; };
-  }else{
-    img.style.display = "none";
-  }
-  const bubble = document.createElement("div");
-  bubble.className = "msgBubble";
-  bubble.textContent = text || "";
-  row.appendChild(img);
-  row.appendChild(bubble);
-  log.appendChild(row);
-  // autoscroll
-  log.parentElement.scrollTop = log.parentElement.scrollHeight;
-}
-function clearChat(){
-  const log = $("#chatLog");
-  if(log) log.innerHTML = "";
-}
-
-function focusQuestion(){
-  const el = $("#studentInput");
-  if(el){ el.focus(); el.select && el.select(); }
-}
-
-function gateComplete(state){
-  const a = state.asked || {};
-  return a.who && a.purpose && a.appointment && a.host && a.time && a.about;
-}
-
-function threatComplete(state){
-  return state.asked && state.asked["threat_rules"];
-}
-
-function denyEntrance(state){
-  state.denied = true;
-  try{ logEvent(state, "deny_entrance"); }catch(e){}
-  // Show message as the soldier/student
-  const msg = "You are denied entry. Please step aside and wait.";
-  const sb = $("#studentBubble");
-  if(sb){ sb.style.display="block"; sb.textContent = msg; }
-  try{ addChatMessage(state, "me", msg); }catch(e){}
-  const vb = $("#visitorBubble");
-  if(vb) vb.textContent = "";
-  // disable inputs
-  const btn = $("#btnSend"); if(btn) btn.disabled = true;
-  const inp = $("#studentInput"); if(inp) inp.disabled = true;
-  const micBtn = $("#btnMicHold"); if(micBtn) micBtn.disabled = true;
-
-  // auto-finish after short delay
-  setTimeout(()=>{ try{ finishRun(state); }catch(e){} }, 3000);
-}
-
-function idCheckComplete(state){
-  const a = state.asked || {};
-  return !!a.request_id && !!a.control_question;
-}
-
-function bindGoToPersonSearch(state){
-  const a = $("#btnGoToPersonSearch") || $("#btnGoPersonSearch");
-  if(a){
-    a.addEventListener("click", () => {
-      goToStep(state, "person_search");
-      updateIdVisibility(state);
-      focusQuestion();
-    });
-  }
-}
-
-function denyEntrance(state){
-  state.finished = true;
-  showVisitor("You are denied entry. Please step aside and wait.");
-  try{ logEvent(state, "deny_entrance", {reason:"manual"}); }catch(e){}
-  const inp = $("#studentInput"); const btn = $("#btnSend");
-  if(inp) inp.disabled = true;
-  if(btn) btn.disabled = true;
-  if(micBtn) micBtn.disabled = true;
-}
-
-// CLOSE_ACTS_AS_RETURN: make closing supervisor modal also continue the flow
-(function(){
-  const closeBtn = $("#btnCloseSupervisor");
-  if(closeBtn){
-    closeBtn.addEventListener("click", () => {
-      if(window.__state && window.__state.supervisorDone){
-        // already handled
       }
-    });
+    }
+
+    const compiled = {};
+    for (const [k, arr] of Object.entries(merged)) compiled[k] = (text) => arr.some(rx => rx.test(text));
+    compiled._raw = merged;
+    return compiled;
   }
-})();
 
-// Ensure student avatar always points to soldier.png (if present)
-(function(){
-  const sa = $("#studentAvatar");
-  if(sa){
-    sa.onerror = () => { sa.style.display = "none"; };
+  /***********************
+   * VISITOR GENERATION
+   ***********************/
+  const MOODS = [
+    { name: "relaxed", lieBoost: 0.02, inconsBoost: 0.02 },
+    { name: "tired but cooperative", lieBoost: 0.05, inconsBoost: 0.05 },
+    { name: "uneasy", lieBoost: 0.10, inconsBoost: 0.12 },
+    { name: "nervous", lieBoost: 0.18, inconsBoost: 0.20 },
+    { name: "irritated", lieBoost: 0.12, inconsBoost: 0.10 }
+  ];
+
+  const NATIONALITIES = [
+    "Dutch","German","Belgian","French","Spanish","Italian",
+    "Polish","Romanian","Turkish","British","American","Canadian"
+  ];
+
+  const NAMES = [
+    "David","Michael","James","Robert","Daniel","Thomas",
+    "Mark","Lucas","Noah","Adam","Omar","Yusuf","Mateusz","Julien","Marco"
+  ];
+
+  function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+  function randomDob() {
+    const today = new Date();
+    const year = today.getFullYear() - (18 + Math.floor(Math.random() * 38)); // 18..55
+    const mm = 1 + Math.floor(Math.random() * 12);
+    const dd = 1 + Math.floor(Math.random() * 28);
+    return { yyyy: year, mm, dd };
   }
-})()
 
-// Equalize avatar sizes (visitor + soldier) for consistent chat look
-(function(){
-  try{
-    const va = $("#visitorAvatar");
-    const sa = $("#studentAvatar");
-    const size = "44px";
-    [va, sa].forEach(img => {
-      if(img){
-        img.style.width = size;
-        img.style.height = size;
-        img.style.borderRadius = "50%";
-        img.style.objectFit = "cover";
-      }
-    });
-  }catch(e){}
-})();
-;
+  function randomIdNumber() {
+    const a = Math.floor(100000 + Math.random() * 900000);
+    const b = Math.floor(1000 + Math.random() * 9000);
+    return `ID-${a}-${b}`;
+  }
 
-;
-/*CHAT_ALIGN_FIX_V47*/
-(function(){
-  try{
+  function randomExpiry() {
+    const today = new Date();
+    const y = today.getFullYear() + (1 + Math.floor(Math.random() * 8));
+    const mm = 1 + Math.floor(Math.random() * 12);
+    const dd = 1 + Math.floor(Math.random() * 28);
+    return { yyyy: y, mm, dd };
+  }
+
+  function buildVisitor() {
+    const mood = pick(MOODS);
+    const dob = randomDob();
+    const nat = pick(NATIONALITIES);
+    const name = pick(NAMES) + " " + (["Johnson","Miller","Brown","Davis","Martinez","Kowalski","Nowak","Schmidt","Dubois","Rossi","Yilmaz"][Math.floor(Math.random() * 11)]);
+    const age = calcAgeFromDob(dob);
+
+    const id = { name, nationality: nat, dob, age, idNumber: randomIdNumber(), expiry: randomExpiry() };
+
+    const idx = 1 + Math.floor(Math.random() * 12);
+    // YOU confirmed this folder is correct:
+    const headshot = `assets/photos/headshot_${String(idx).padStart(2, "0")}.png`;
+
+    const purpose = pick(["delivery", "maintenance", "meeting", "visit", "contract work"]);
+    const appointment = chance(0.7);
+    const apptTime = appointment ? pick(["09:30", "10:00", "13:15", "14:00", "15:45"]) : null;
+    const meetingWith = appointment ? pick(["Captain Lewis", "Sgt. van Dijk", "Mr. Peters", "Lt. Schmidt"]) : null;
+    const goingWhere = pick(["HQ building", "Logistics office", "Barracks admin", "Workshop"]);
+    const subject = pick(["paperwork", "equipment handover", "maintenance report", "security briefing", "contract discussion"]);
+
+    return {
+      mood,
+      headshot,
+      id,
+      intake: { purpose, appointment, apptTime, meetingWith, goingWhere, subject },
+      claims: { age: null, dob: null, nationality: null, name: null },
+      inconsistencies: []
+    };
+  }
+
+  /***********************
+   * UI — WhatsApp-ish
+   ***********************/
+  function injectUi() {
+    $("#veva-app")?.remove();
+
+    const root = document.createElement("div");
+    root.id = "veva-app";
+    root.innerHTML = `
+      <div class="wa-shell">
+        <header class="wa-top">
+          <div class="wa-brand">
+            <div class="wa-title">VEVA – Ingang/Uitgang Trainer</div>
+            <div class="wa-sub">English checkpoint conversation practice</div>
+          </div>
+
+          <div class="wa-actions">
+            <button class="wa-btn wa-btn-danger" id="btn-deny">Deny entrance</button>
+          </div>
+        </header>
+
+        <div class="wa-body">
+          <div class="wa-chat">
+            <div class="wa-chat-bg" aria-hidden="true"></div>
+
+            <div class="wa-chatlog" id="chatlog" aria-live="polite"></div>
+
+            <div class="wa-sidebar">
+              <div class="wa-card">
+                <div class="wa-card-title">Visitor</div>
+                <div class="wa-visitor">
+                  <img id="visitor-img" class="wa-avatar" alt="Visitor headshot" />
+                  <div class="wa-vmeta">
+                    <div><b>Mood:</b> <span id="visitor-mood"></span></div>
+                    <div><b>Run ID:</b> <span id="runid"></span></div>
+                    <div><b>Step:</b> <span id="stepname"></span></div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="wa-card" id="idcard" style="display:none;">
+                <div class="wa-card-title">ID card</div>
+                <div class="wa-id">
+                  <div><b>Name:</b> <span id="id-name"></span></div>
+                  <div><b>Nationality:</b> <span id="id-nat"></span></div>
+                  <div><b>DOB:</b> <span id="id-dob"></span></div>
+                  <div><b>Age:</b> <span id="id-age"></span></div>
+                  <div><b>ID nr:</b> <span id="id-nr"></span></div>
+                  <div><b>Expiry:</b> <span id="id-exp"></span></div>
+                </div>
+                <div class="wa-row wa-row-tight">
+                  <button class="wa-btn wa-btn-subtle" id="btn-return-id">Return to visitor</button>
+                </div>
+              </div>
+
+              <div class="wa-card wa-teacher" id="teacher-card" style="display:none;">
+                <div class="wa-card-title">Teacher</div>
+                <div class="wa-small" id="teacher-debug"></div>
+              </div>
+            </div>
+
+            <div class="wa-composer">
+              <div class="wa-hint" id="hintline"></div>
+              <div class="wa-row">
+                <input id="chatinput" type="text" autocomplete="off" placeholder="Type your question in English…" />
+                <button class="wa-btn wa-btn-send" id="btn-send">Send</button>
+                <button class="wa-btn wa-btn-mic" id="btn-mic" type="button" title="Hold to talk">🎙</button>
+              </div>
+              <div class="wa-micstatus" id="micStatus" aria-live="polite"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Supervisor Modal -->
+        <div class="wa-modal-backdrop" id="sup-backdrop" style="display:none;">
+          <div class="wa-modal" role="dialog" aria-modal="true" aria-label="Supervisor contact">
+            <div class="wa-modal-head">
+              <div class="wa-modal-title">Contact supervisor</div>
+              <button class="wa-btn wa-btn-subtle" id="sup-close">Close</button>
+            </div>
+
+            <div class="wa-modal-body">
+              <div class="wa-small">Fill in the 5W/5WH details before requesting approval.</div>
+              <div class="wa-grid">
+                <label>Who (visitor name)<input id="sup-who" type="text" /></label>
+                <label>Why (purpose)<input id="sup-why" type="text" /></label>
+                <label>What (subject)<input id="sup-what" type="text" /></label>
+                <label>Where (destination)<input id="sup-where" type="text" /></label>
+                <label>When (time)<input id="sup-when" type="text" /></label>
+                <label>With whom (appointment with)<input id="sup-with" type="text" /></label>
+              </div>
+
+              <div class="wa-row wa-row-wrap">
+                <button class="wa-btn" id="sup-request">Request approval</button>
+                <button class="wa-btn wa-btn-danger" id="sup-deny">Supervisor denies</button>
+                <button class="wa-btn wa-btn-ok" id="sup-approve">Supervisor approves</button>
+              </div>
+
+              <div class="wa-small" id="sup-status"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    const mount = $("#app") || document.body;
+    mount.innerHTML = "";
+    mount.appendChild(root);
+
     const style = document.createElement("style");
     style.textContent = `
-      /* Ensure "me" (soldier) bubbles align to the right */
-      .chatRow.me{justify-content:flex-end;}
-      .chatRow.me .msgBubble{margin-left:auto;}
-      /* Equal avatar sizes everywhere */
-      #visitorAvatar, #studentAvatar, .msgAvatar{width:72px;height:72px;border-radius:999px;object-fit:cover;flex:0 0 72px;}
-      /* If any legacy avatar classes exist */
-      .chatAvatar.me, .chatAvatar.visitor{width:72px;height:72px;border-radius:999px;object-fit:cover;flex:0 0 72px;}
+      :root{
+        --wa-bg: #e5ddd5;
+        --wa-wall: rgba(0,0,0,.04);
+        --wa-header: #075e54;
+        --wa-header2:#128c7e;
+        --wa-out: #dcf8c6;
+        --wa-in: #ffffff;
+        --wa-text: #111;
+        --wa-muted: rgba(0,0,0,.55);
+        --wa-border: rgba(0,0,0,.08);
+      }
+
+      body{margin:0;font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial;background: var(--wa-bg);color:var(--wa-text);}
+
+      .wa-shell{height:100vh;display:flex;flex-direction:column;}
+      .wa-top{
+        padding:10px 14px;
+        background: linear-gradient(90deg, var(--wa-header), var(--wa-header2));
+        color:white;
+        display:flex;align-items:center;justify-content:space-between;
+        box-shadow: 0 2px 10px rgba(0,0,0,.10);
+      }
+      .wa-title{font-weight:900;font-size:16px;line-height:1.15}
+      .wa-sub{opacity:.85;font-size:12px}
+      .wa-actions{display:flex;gap:10px;align-items:center}
+
+      .wa-body{flex:1;min-height:0;display:flex;justify-content:center;}
+      .wa-chat{
+        width:min(1100px, 100%);
+        flex:1;
+        min-height:0;
+        display:grid;
+        grid-template-columns: 1fr 320px;
+        position:relative;
+      }
+
+      .wa-chat-bg{
+        position:absolute; inset:0;
+        background:
+          radial-gradient(circle at 20% 10%, rgba(255,255,255,.25), transparent 45%),
+          radial-gradient(circle at 80% 30%, rgba(255,255,255,.20), transparent 50%),
+          radial-gradient(circle at 30% 70%, rgba(255,255,255,.18), transparent 55%),
+          linear-gradient(0deg, var(--wa-wall), var(--wa-wall));
+        pointer-events:none;
+        z-index:0;
+      }
+
+      .wa-chatlog{
+        grid-column:1/2;
+        position:relative;
+        z-index:1;
+        overflow:auto;
+        padding:14px 14px 120px 14px;
+        min-height:0;
+      }
+
+      .wa-sidebar{
+        grid-column:2/3;
+        position:relative;
+        z-index:1;
+        overflow:auto;
+        padding:14px 14px 120px 10px;
+        min-height:0;
+      }
+
+      .wa-card{
+        background: rgba(255,255,255,.92);
+        border:1px solid var(--wa-border);
+        border-radius:14px;
+        padding:12px;
+        margin-bottom:12px;
+      }
+      .wa-card-title{font-weight:900;margin-bottom:8px}
+      .wa-visitor{display:flex;gap:10px;align-items:center}
+      .wa-avatar{width:44px;height:44px;border-radius:50%;object-fit:cover;border:1px solid var(--wa-border);background:#f2f2f2}
+      .wa-vmeta{font-size:12px;color:rgba(0,0,0,.75)}
+      .wa-id{font-size:12px;color:rgba(0,0,0,.80);display:flex;flex-direction:column;gap:4px}
+      .wa-small{font-size:12px;color:rgba(0,0,0,.70)}
+      .wa-teacher{opacity:.95}
+
+      .wa-bubble{
+        max-width:min(74%, 680px);
+        padding:10px 12px;
+        border-radius:14px;
+        margin:8px 0;
+        border:1px solid var(--wa-border);
+        box-shadow: 0 1px 1px rgba(0,0,0,.06);
+        position:relative;
+        display:flex;
+        gap:10px;
+        align-items:flex-end;
+      }
+      .wa-bubble .txt{white-space:pre-wrap;word-wrap:break-word}
+      .wa-bubble .meta{font-size:11px;color:var(--wa-muted);margin-top:6px}
+      .wa-bubble.in{background: var(--wa-in); margin-right:auto;}
+      .wa-bubble.out{background: var(--wa-out); margin-left:auto; flex-direction: row-reverse;}
+      .wa-bubble .ava{width:28px;height:28px;border-radius:50%;object-fit:cover;border:1px solid var(--wa-border);background:#eee;flex:0 0 auto}
+
+      .wa-composer{
+        position:absolute;
+        left:0; right:0; bottom:0;
+        grid-column:1/3;
+        z-index:2;
+        padding:10px 10px 12px 10px;
+        backdrop-filter: blur(6px);
+        background: rgba(229,221,213,.80);
+        border-top:1px solid rgba(0,0,0,.10);
+      }
+      .wa-hint{font-size:12px;color:rgba(0,0,0,.65);margin-bottom:8px}
+
+      .wa-row{display:flex;gap:8px;align-items:center}
+      .wa-row-tight{margin-top:10px}
+      .wa-row-wrap{flex-wrap:wrap}
+
+      #chatinput{
+        flex:1;
+        padding:12px 12px;
+        border-radius:999px;
+        border:1px solid rgba(0,0,0,.14);
+        background:white;
+        font-size:14px;
+        outline:none;
+      }
+      #chatinput:focus{border-color: rgba(18,140,126,.55); box-shadow:0 0 0 3px rgba(18,140,126,.12);}
+
+      .wa-btn{
+        padding:10px 14px;
+        border-radius:999px;
+        border:1px solid rgba(0,0,0,.14);
+        background:white;
+        cursor:pointer;
+        font-weight:800;
+      }
+      .wa-btn:hover{filter:brightness(.98)}
+      .wa-btn-send{background:#128c7e;color:white;border-color: rgba(0,0,0,.10)}
+      .wa-btn-mic{width:46px;display:flex;align-items:center;justify-content:center}
+      .wa-btn-danger{background:#ffe8e8;border-color: rgba(200,0,0,.18)}
+      .wa-btn-ok{background:#e9fff1;border-color: rgba(0,140,70,.22)}
+      .wa-btn-subtle{opacity:.9}
+
+      .wa-micstatus{margin-top:6px;font-size:12px;color:rgba(0,0,0,.6);min-height:16px}
+
+      .wa-modal-backdrop{position:fixed; inset:0; background:rgba(0,0,0,.45); display:flex;align-items:center;justify-content:center; padding:16px; z-index:9999}
+      .wa-modal{width:min(760px, 96vw); background:white; border-radius:16px; border:1px solid rgba(0,0,0,.12); overflow:hidden}
+      .wa-modal-head{display:flex; align-items:center; justify-content:space-between; padding:12px 12px; border-bottom:1px solid rgba(0,0,0,.10)}
+      .wa-modal-title{font-weight:900}
+      .wa-modal-body{padding:12px; display:flex; flex-direction:column; gap:10px}
+      .wa-grid{display:grid; grid-template-columns:1fr 1fr; gap:10px}
+      .wa-grid label{font-size:12px;color:rgba(0,0,0,.75);display:flex;flex-direction:column;gap:6px}
+      .wa-grid input{padding:10px 10px;border-radius:12px;border:1px solid rgba(0,0,0,.14);background:white}
+
+      @media (max-width: 980px){
+        .wa-chat{grid-template-columns:1fr}
+        .wa-sidebar{display:none}
+        .wa-composer{grid-column:1/2}
+      }
     `;
     document.head.appendChild(style);
+  }
 
-    // Also force inline sizes in case CSS is overridden elsewhere
-    const va = document.getElementById("visitorAvatar");
-    const sa = document.getElementById("studentAvatar");
-    [va, sa].forEach(el => {
-      if(!el) return;
-      el.style.width = "72px";
-      el.style.height = "72px";
-      el.style.objectFit = "cover";
-      el.style.borderRadius = "999px";
+  /***********************
+   * LOGGING (no-cors)
+   ***********************/
+  function logEvent(type, payload = {}) {
+    if (!LOG_ENDPOINT) return Promise.resolve();
+    const body = JSON.stringify({ ts: nowIso(), type, ...payload });
+    try {
+      return fetch(LOG_ENDPOINT, { method: "POST", mode: "no-cors", body }).catch(() => {});
+    } catch {
+      return Promise.resolve();
+    }
+  }
+
+  /***********************
+   * APP CORE STATE
+   ***********************/
+  const app = {
+    runId: uid(),
+    visitor: null,
+    step: STEPS.INTAKE,
+    flags: {
+      asked_name: false,
+      asked_purpose: false,
+      asked_appointment: false,
+      asked_who: false,
+      asked_time: false,
+      asked_where: false,
+      asked_subject: false,
+      asked_id: false,
+      asked_age: false,
+      asked_dob: false,
+      asked_nationality: false,
+      supervisor_contacted: false,
+      explained_threat: false,
+      explained_items: false,
+      did_person_search: false
+    },
+    idVisible: false,
+    processing: false,
+    finished: false,
+    intents: null,
+    phrasebank: null,
+    unknowns: 0,
+    messages: [],
+    speech: {
+      supported: false,
+      recognizing: false,
+      finalTranscript: ""
+    }
+  };
+
+  function setStep(step) {
+    app.step = step;
+    const el = $("#stepname");
+    if (el) el.textContent = step;
+  }
+
+  function setHint(text) {
+    const el = $("#hintline");
+    if (el) el.textContent = text || "";
+  }
+
+  function addBubble(side, text, meta = "") {
+    const log = $("#chatlog");
+    if (!log) return;
+
+    const div = document.createElement("div");
+    const cls = (side === "out") ? "wa-bubble out" : "wa-bubble in";
+    div.className = cls;
+
+    const avatarSrc = side === "out"
+      ? "assets/photos/soldier.png"
+      : (app.visitor?.headshot || "assets/photos/headshot_01.png");
+
+    div.innerHTML = `
+      <img class="ava" alt="${side === "out" ? "student" : "visitor"}" src="${escapeHtml(avatarSrc)}" />
+      <div class="content">
+        <div class="txt">${escapeHtml(text)}</div>
+        ${meta ? `<div class="meta">${escapeHtml(meta)}</div>` : ""}
+      </div>
+    `;
+
+    // If visitor image missing, fallback without crashing
+    const img = div.querySelector("img.ava");
+    if (img) img.onerror = () => { img.src = "assets/photos/headshot_01.png"; };
+
+    log.appendChild(div);
+    log.scrollTop = log.scrollHeight;
+  }
+
+  function soldierSay(text, meta) {
+    app.messages.push({ from: "soldier", text, ts: nowIso() });
+    addBubble("out", text, meta);
+  }
+
+  function visitorSay(text, meta) {
+    app.messages.push({ from: "visitor", text, ts: nowIso() });
+    addBubble("in", text, meta);
+  }
+
+  function showIdCard() {
+    const card = $("#idcard");
+    if (!card) return;
+    app.idVisible = true;
+    card.style.display = "";
+    const v = app.visitor;
+    $("#id-name").textContent = v.id.name;
+    $("#id-nat").textContent = v.id.nationality;
+    $("#id-dob").textContent = formatDob(v.id.dob);
+    $("#id-age").textContent = String(v.id.age);
+    $("#id-nr").textContent = v.id.idNumber;
+    $("#id-exp").textContent = formatDob(v.id.expiry);
+  }
+
+  function hideIdCard() {
+    const card = $("#idcard");
+    if (!card) return;
+    app.idVisible = false;
+    card.style.display = "none";
+  }
+
+  function openSupervisorModal(prefill = {}) {
+    const back = $("#sup-backdrop");
+    if (!back) return;
+    $("#sup-status").textContent = "";
+
+    const v = app.visitor;
+    const fill = (id, val) => { const el = $(id); if (el) el.value = val || ""; };
+
+    fill("#sup-who", prefill.who ?? v?.id?.name ?? "");
+    fill("#sup-why", prefill.why ?? v?.intake?.purpose ?? "");
+    fill("#sup-what", prefill.what ?? v?.intake?.subject ?? "");
+    fill("#sup-where", prefill.where ?? v?.intake?.goingWhere ?? "");
+    fill("#sup-when", prefill.when ?? v?.intake?.apptTime ?? "");
+    fill("#sup-with", prefill.with ?? v?.intake?.meetingWith ?? "");
+
+    back.style.display = "flex";
+    const who = $("#sup-who");
+    if (who) setTimeout(() => who.focus(), 0);
+  }
+
+  function closeSupervisorModal() {
+    const back = $("#sup-backdrop");
+    if (!back) return;
+    back.style.display = "none";
+    const input = $("#chatinput");
+    if (input) setTimeout(() => input.focus(), 0);
+  }
+
+  function supervisorPayloadFromModal() {
+    return {
+      who: ($("#sup-who")?.value || "").trim(),
+      why: ($("#sup-why")?.value || "").trim(),
+      what: ($("#sup-what")?.value || "").trim(),
+      where: ($("#sup-where")?.value || "").trim(),
+      when: ($("#sup-when")?.value || "").trim(),
+      with: ($("#sup-with")?.value || "").trim()
+    };
+  }
+
+  function validateSupervisorFields(p) {
+    const missing = [];
+    for (const k of ["who", "why", "what", "where", "when"]) if (!p[k]) missing.push(k);
+    return missing;
+  }
+
+  function makeFakeControl(kind) {
+    const v = app.visitor;
+    if (kind === "age") {
+      const delta = pick([-2, -1, 1, 2, 3]);
+      return String(clamp(v.id.age + delta, 18, 70));
+    }
+    if (kind === "dob") {
+      const dob = { ...v.id.dob };
+      if (chance(0.5)) dob.dd = clamp(dob.dd + pick([-2, -1, 1, 2]), 1, 28);
+      else dob.mm = clamp(dob.mm + pick([-1, 1]), 1, 12);
+      return formatDob(dob);
+    }
+    if (kind === "nationality") return pick(NATIONALITIES.filter(n => n !== v.id.nationality));
+    if (kind === "name") return pick(NAMES) + " " + pick(["Johnson", "Miller", "Brown", "Davis", "Rossi", "Schmidt"]);
+    return "";
+  }
+
+  function visitorControlAnswer(kind) {
+    const v = app.visitor;
+    const mood = v.mood;
+    const lieP = 0.04 + mood.lieBoost;
+    const inconsP = 0.05 + mood.inconsBoost;
+
+    const truth = (() => {
+      if (kind === "age") return String(v.id.age);
+      if (kind === "dob") return formatDob(v.id.dob);
+      if (kind === "nationality") return v.id.nationality;
+      if (kind === "name") return v.id.name;
+      return "";
+    })();
+
+    const prev = v.claims[kind];
+    if (prev) {
+      if (chance(inconsP)) {
+        const fake = makeFakeControl(kind);
+        if (fake !== prev) {
+          v.inconsistencies.push({ kind, prev, next: fake, ts: nowIso() });
+          v.claims[kind] = fake;
+          return { value: fake, lied: true, inconsistent: true };
+        }
+      }
+      return { value: prev, lied: prev !== truth, inconsistent: false };
+    }
+
+    if (chance(lieP)) {
+      const fake = makeFakeControl(kind);
+      v.claims[kind] = fake;
+      return { value: fake, lied: fake !== truth, inconsistent: false };
+    }
+
+    v.claims[kind] = truth;
+    return { value: truth, lied: false, inconsistent: false };
+  }
+
+  function ensureStepProgression() {
+    if (app.step === STEPS.INTAKE && app.flags.asked_id) setStep(STEPS.ID_CHECK);
+    if (app.step === STEPS.ID_CHECK && app.flags.supervisor_contacted) setStep(STEPS.THREAT_ITEMS);
+  }
+
+  function visitorReplyForIntakeQuestion(kind) {
+    const v = app.visitor;
+    const a = v.intake;
+    if (kind === "name") return `My name is ${v.id.name}.`;
+    if (kind === "purpose") return `I’m here for ${a.purpose}.`;
+    if (kind === "appointment") return a.appointment ? "Yes, I have an appointment." : "No, I don’t have an appointment.";
+    if (kind === "who") return a.meetingWith ? `I’m meeting ${a.meetingWith}.` : "I’m not meeting anyone specific.";
+    if (kind === "time") return a.apptTime ? `It’s at ${a.apptTime}.` : "I don’t have a specific time.";
+    if (kind === "where") return `I’m going to the ${a.goingWhere}.`;
+    if (kind === "subject") return `It’s about ${a.subject}.`;
+    return "Okay.";
+  }
+
+  function handleBornYearConfirm(userText) {
+    const v = app.visitor;
+    const yearAsked = parseYear(userText);
+    if (!yearAsked) return visitorSay("Sorry, could you repeat the year?");
+
+    const claim = visitorControlAnswer("dob");     // may be truth or lie
+    const claimYear = parseYear(claim.value) || v.id.dob.yyyy;
+    const trueYear = v.id.dob.yyyy;
+
+    if (yearAsked === claimYear) {
+      visitorSay("Yes, that’s correct.");
+      if (claim.lied) visitorSay("Sorry… I’m a bit stressed.", "mood");
+      return;
+    }
+
+    visitorSay("No, that’s not correct.");
+
+    if (yearAsked === trueYear && claim.lied) {
+      visitorSay(`Actually… you’re right. I was born in ${trueYear}. Sorry.`, "correction");
+      v.claims.dob = formatDob(v.id.dob);
+      return;
+    }
+
+    visitorSay(`I was born in ${claimYear}.`);
+  }
+
+  function explainThreatAndItems() {
+    app.flags.explained_threat = true;
+    app.flags.explained_items = true;
+    soldierSay("Thanks. Due to a higher threat level today, I’ll apply extra security checks.", "threat");
+    soldierSay("Do you have any weapons, sharp objects, drugs, or other prohibited items with you?", "prohibited items");
+    setStep(STEPS.THREAT_ITEMS);
+  }
+
+  function beginPersonSearch() {
+    if (app.finished) return;
+    app.flags.did_person_search = true;
+    setStep(STEPS.PERSON_SEARCH);
+    soldierSay("I’m going to do a quick pat-down search (person search). Is that okay?", "person search");
+    visitorSay("Yes, that’s okay.");
+    soldierSay("Thank you. Please keep your hands visible and follow my instructions.", "rules");
+    soldierSay("You may enter. Follow site rules and stay with your escort if required.", "completion");
+    endRun("completed");
+  }
+
+  function endRun(reason = "finished") {
+    if (app.finished) return;
+    app.finished = true;
+    setStep(STEPS.FINISHED);
+
+    const input = $("#chatinput");
+    const send = $("#btn-send");
+    if (input) input.disabled = true;
+    if (send) send.disabled = true;
+
+    const deny = $("#btn-deny");
+    if (deny) deny.disabled = true;
+
+    hideIdCard();
+
+    logEvent("finish", {
+      runId: app.runId,
+      reason,
+      step: app.step,
+      unknowns: app.unknowns,
+      inconsistencies: app.visitor?.inconsistencies || []
     });
-  }catch(e){}
+
+    const misses = REQUIRED.filter(r => !app.flags[r.key]).slice(0, 3);
+    if (misses.length) {
+      soldierSay("Run finished. Here are your top 3 improvements:", "feedback");
+      misses.forEach((m, i) => soldierSay(`${i + 1}) ${m.label}`, `Example: ${m.example}`));
+    } else {
+      soldierSay("Run finished. Nice work — you covered all key checkpoints.", "feedback");
+    }
+  }
+
+  async function denyEntranceFlow(source = "button") {
+    if (app.finished) return;
+    soldierSay("I’m denying entry. You cannot enter the site.", "deny");
+    logEvent("deny", { runId: app.runId, source, step: app.step });
+    await sleep(900);
+    endRun("denied");
+  }
+
+  function matchIntent(text) {
+    const t = text || "";
+    const I = app.intents;
+
+    const map = [
+      ["deny", "deny"],
+      ["ask_id", "ask_id"],
+      ["return_id", "return_id"],
+      ["contact_supervisor", "contact_supervisor"],
+      ["go_person_search", "go_person_search"],
+      ["ask_name", "ask_name"],
+      ["ask_purpose", "ask_purpose"],
+      ["ask_appointment", "ask_appointment"],
+      ["ask_who", "ask_who"],
+      ["ask_time", "ask_time"],
+      ["ask_where", "ask_where"],
+      ["ask_subject", "ask_subject"],
+      ["ask_age", "ask_age"],
+      ["ask_dob", "ask_dob"],
+      ["confirm_born_year", "confirm_born_year"],
+      ["ask_nationality", "ask_nationality"],
+      ["smalltalk", "smalltalk"]
+    ];
+
+    for (const [key, fn] of map) if (I?.[fn] && I[fn](t)) return key;
+
+    const low = safeLower(t);
+    if (low.includes("date of birth") || low === "dob") return "ask_dob";
+    if (low.includes("how old")) return "ask_age";
+    return "unknown";
+  }
+
+  async function onUserMessage(text) {
+    const input = $("#chatinput");
+    const send = $("#btn-send");
+    if (app.processing || app.finished) return;
+
+    const t = (text || "").trim();
+    if (!t) return;
+
+    app.processing = true;
+    if (input) input.disabled = true;
+    if (send) send.disabled = true;
+
+    const hangGuard = setTimeout(() => {
+      app.processing = false;
+      if (!app.finished) {
+        if (input) input.disabled = false;
+        if (send) send.disabled = false;
+        input?.focus();
+        soldierSay("Something got stuck. Please try again.", "system");
+      }
+    }, 7000);
+
+    try {
+      soldierSay(t);
+      logEvent("message", { runId: app.runId, from: "student", text: t, step: app.step });
+
+      const intent = matchIntent(t);
+
+      if (intent === "deny") { await denyEntranceFlow("text"); return; }
+
+      if (intent === "return_id") {
+        hideIdCard();
+        visitorSay("Thank you.");
+        logEvent("return_id", { runId: app.runId, step: app.step });
+        return;
+      }
+
+      if (intent === "ask_id") {
+        app.flags.asked_id = true;
+        visitorSay("Yes. Here you go.");
+        showIdCard();
+        logEvent("show_id", { runId: app.runId, step: app.step });
+        ensureStepProgression();
+        return;
+      }
+
+      // Supervisor via TEXT TRIGGER (no button exists)
+      if (intent === "contact_supervisor") {
+        app.flags.supervisor_contacted = true;
+        logEvent("supervisor_trigger", { runId: app.runId, step: app.step, source: "text" });
+
+        openSupervisorModal({
+          who: app.visitor?.id?.name || "",
+          why: app.visitor?.intake?.purpose || "",
+          what: app.visitor?.intake?.subject || "",
+          where: app.visitor?.intake?.goingWhere || "",
+          when: app.visitor?.intake?.apptTime || "",
+          with: app.visitor?.intake?.meetingWith || ""
+        });
+
+        visitorSay("Okay. Please contact your supervisor.", "supervisor");
+        ensureStepProgression();
+        return;
+      }
+
+      if (intent === "go_person_search") {
+        logEvent("go_person_search", { runId: app.runId, step: app.step, source: "text" });
+        beginPersonSearch();
+        return;
+      }
+
+      if (intent === "ask_name") { app.flags.asked_name = true; visitorSay(visitorReplyForIntakeQuestion("name")); return; }
+      if (intent === "ask_purpose") { app.flags.asked_purpose = true; visitorSay(visitorReplyForIntakeQuestion("purpose")); return; }
+
+      if (intent === "ask_appointment") {
+        app.flags.asked_appointment = true;
+        visitorSay(visitorReplyForIntakeQuestion("appointment"));
+        if (!app.visitor.intake.appointment) {
+          visitorSay("I don’t have an appointment. Is that a problem?");
+          setHint("Tip: try “I’ll contact my supervisor for approval.”");
+        }
+        return;
+      }
+
+      if (intent === "ask_who") { app.flags.asked_who = true; visitorSay(visitorReplyForIntakeQuestion("who")); return; }
+      if (intent === "ask_time") { app.flags.asked_time = true; visitorSay(visitorReplyForIntakeQuestion("time")); return; }
+      if (intent === "ask_where") { app.flags.asked_where = true; visitorSay(visitorReplyForIntakeQuestion("where")); return; }
+      if (intent === "ask_subject") { app.flags.asked_subject = true; visitorSay(visitorReplyForIntakeQuestion("subject")); return; }
+
+      if (intent === "ask_nationality") {
+        app.flags.asked_nationality = true;
+        const a = visitorControlAnswer("nationality");
+        visitorSay(`I’m ${a.value}.`);
+        if (a.inconsistent) visitorSay("Sorry… I meant that.", "mood");
+        logEvent("control_nationality", { runId: app.runId, step: app.step, value: a.value, lied: a.lied });
+        return;
+      }
+
+      if (intent === "ask_age") {
+        app.flags.asked_age = true;
+        const a = visitorControlAnswer("age");
+        visitorSay(`I’m ${a.value} years old.`);
+        if (a.inconsistent) visitorSay("Sorry, I’m tired.", "mood");
+        logEvent("control_age", { runId: app.runId, step: app.step, value: a.value, lied: a.lied });
+        return;
+      }
+
+      if (intent === "ask_dob") {
+        app.flags.asked_dob = true;
+        const a = visitorControlAnswer("dob");
+        visitorSay(`My date of birth is ${a.value}.`);
+        if (a.inconsistent) visitorSay("Sorry… I’m a bit nervous.", "mood");
+        logEvent("control_dob", { runId: app.runId, step: app.step, value: a.value, lied: a.lied });
+        return;
+      }
+
+      if (intent === "confirm_born_year") {
+        app.flags.asked_dob = true;
+        handleBornYearConfirm(t);
+        logEvent("control_born_year", { runId: app.runId, step: app.step, userText: t });
+        return;
+      }
+
+      // Nudge: after ID + supervisor -> threat/items
+      if (app.step === STEPS.ID_CHECK && app.flags.asked_id && app.flags.supervisor_contacted) {
+        explainThreatAndItems();
+        setHint("Tip: type “Go to person search” when ready.");
+        return;
+      }
+
+      if (intent === "smalltalk") { visitorSay("Hello."); return; }
+
+      // Unknown
+      app.unknowns += 1;
+      visitorSay("Sorry, I don’t understand. Can you ask it another way?");
+      if (LOG_UNKNOWN) logEvent("unknown_question", { runId: app.runId, step: app.step, text: t });
+      setHint("Try short clear questions (5W/5WH). Example: “What is the purpose of your visit?”");
+    } finally {
+      clearTimeout(hangGuard);
+      app.processing = false;
+      if (!app.finished) {
+        if (input) input.disabled = false;
+        if (send) send.disabled = false;
+        input?.focus();
+      }
+    }
+  }
+
+  /***********************
+   * VOICE (Hold-to-talk)
+   ***********************/
+  function initVoice() {
+    const micBtn = $("#btn-mic");
+    const micStatus = $("#micStatus");
+    const input = $("#chatinput");
+
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!micBtn || !micStatus || !input || !SR) {
+      if (micBtn) micBtn.disabled = true;
+      if (micStatus) micStatus.textContent = "Voice not supported in this browser.";
+      app.speech.supported = false;
+      return null;
+    }
+
+    app.speech.supported = true;
+
+    const rec = new SR();
+    rec.lang = VOICE_LANG;
+    rec.interimResults = true;
+    rec.continuous = false;
+
+    const setStatus = (t) => { micStatus.textContent = t || ""; };
+
+    rec.onstart = () => {
+      app.speech.recognizing = true;
+      app.speech.finalTranscript = "";
+      setStatus("Listening… (hold)");
+      micBtn.style.filter = "brightness(.95)";
+    };
+
+    rec.onerror = (e) => {
+      setStatus(`Voice error: ${e?.error || "unknown"}`);
+    };
+
+    rec.onresult = (event) => {
+      let interim = "";
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const txt = event.results[i][0]?.transcript || "";
+        if (event.results[i].isFinal) app.speech.finalTranscript += txt;
+        else interim += txt;
+      }
+      const combined = (app.speech.finalTranscript + " " + interim).trim();
+      if (combined) input.value = combined;
+    };
+
+    rec.onend = () => {
+      app.speech.recognizing = false;
+      micBtn.style.filter = "";
+      setStatus(VOICE_AUTO_SEND && input.value.trim() ? "Recognized. Sending…" : "Recognized.");
+      if (VOICE_AUTO_SEND && input.value.trim()) {
+        const val = input.value;
+        input.value = "";
+        onUserMessage(val);
+      }
+      setTimeout(() => setStatus(""), 1200);
+    };
+
+    const start = () => {
+      try {
+        if (!app.speech.recognizing) rec.start();
+      } catch {
+        // Some browsers throw if start called too quickly
+      }
+    };
+    const stop = () => {
+      try {
+        if (app.speech.recognizing) rec.stop();
+      } catch {}
+    };
+
+    // Hold behavior: mouse + touch
+    micBtn.addEventListener("mousedown", (e) => { e.preventDefault(); start(); });
+    window.addEventListener("mouseup", () => stop());
+
+    micBtn.addEventListener("touchstart", (e) => { e.preventDefault(); start(); }, { passive:false });
+    window.addEventListener("touchend", () => stop());
+
+    return rec;
+  }
+
+  /***********************
+   * INIT
+   ***********************/
+  async function init() {
+    injectUi();
+
+    app.visitor = buildVisitor();
+
+    $("#runid").textContent = app.runId;
+    $("#visitor-mood").textContent = app.visitor.mood.name;
+
+    const img = $("#visitor-img");
+    img.src = app.visitor.headshot;
+    img.onerror = () => { img.src = "assets/photos/headshot_01.png"; };
+
+    setStep(STEPS.INTAKE);
+
+    app.phrasebank = await loadPhrasebank();
+    app.intents = compilePatterns(app.phrasebank);
+
+    // Teacher card (optional)
+    const tcard = $("#teacher-card");
+    if (tcard) tcard.style.display = teacherModeEnabled() ? "" : "none";
+    if (teacherModeEnabled()) {
+      $("#teacher-debug").innerHTML = `
+        <div><b>App:</b> ${escapeHtml(APP_VERSION)}</div>
+        <div><b>Patterns loaded:</b> ${escapeHtml(String(Object.keys(app.intents._raw || {}).length))}</div>
+        <div><b>logEndpoint:</b> ${escapeHtml(LOG_ENDPOINT ? "set" : "missing")}</div>
+        <div><b>voiceLang:</b> ${escapeHtml(VOICE_LANG)}</div>
+        <div><b>voiceAutoSend:</b> ${escapeHtml(String(VOICE_AUTO_SEND))}</div>
+      `;
+    }
+
+    // Start messages
+    visitorSay("Hello.");
+    visitorSay(`(Mood: ${app.visitor.mood.name})`, "visitor mood");
+    soldierSay("Good day. Please state your name and the purpose of your visit.", "start");
+    setHint("Start with 5W/5WH (name, purpose, appointment, who, time, where, subject).");
+
+    logEvent("start", { runId: app.runId, mood: app.visitor.mood.name, step: app.step });
+
+    // Composer
+    const input = $("#chatinput");
+    const send = $("#btn-send");
+
+    function submit() {
+      const val = input.value;
+      input.value = "";
+      onUserMessage(val);
+    }
+
+    send?.addEventListener("click", submit);
+    input?.addEventListener("keydown", (e) => { if (e.key === "Enter") submit(); });
+
+    // Deny always
+    $("#btn-deny")?.addEventListener("click", () => denyEntranceFlow("button"));
+
+    // ID controls
+    $("#btn-return-id")?.addEventListener("click", () => {
+      hideIdCard();
+      visitorSay("Thank you.");
+      logEvent("return_id", { runId: app.runId, step: app.step, source: "button" });
+    });
+
+    // Supervisor modal
+    $("#sup-close")?.addEventListener("click", closeSupervisorModal);
+    $("#sup-backdrop")?.addEventListener("click", (e) => {
+      if (e.target && e.target.id === "sup-backdrop") closeSupervisorModal();
+    });
+
+    $("#sup-request")?.addEventListener("click", async () => {
+      const p = supervisorPayloadFromModal();
+      const missing = validateSupervisorFields(p);
+      if (missing.length) {
+        $("#sup-status").textContent = `Missing: ${missing.join(", ")}. Please fill them in.`;
+        logEvent("supervisor_request_invalid", { runId: app.runId, missing, payload: p });
+        return;
+      }
+      $("#sup-status").textContent = "Request sent. Waiting for supervisor decision…";
+      logEvent("supervisor_request", { runId: app.runId, payload: p });
+      setHint("(Teacher) Click Approve/Deny in the popup.");
+    });
+
+    $("#sup-approve")?.addEventListener("click", async () => {
+      $("#sup-status").textContent = "Supervisor approves. Proceed with security measures.";
+      logEvent("supervisor_approve", { runId: app.runId });
+      closeSupervisorModal();
+      visitorSay("Okay.", "supervisor");
+      explainThreatAndItems();
+      setHint("Next: type “Go to person search” when ready. Deny entrance always available.");
+    });
+
+    $("#sup-deny")?.addEventListener("click", async () => {
+      $("#sup-status").textContent = "Supervisor denies. Deny entrance.";
+      logEvent("supervisor_deny", { runId: app.runId });
+      closeSupervisorModal();
+      await denyEntranceFlow("supervisor_deny");
+    });
+
+    // Voice
+    initVoice();
+
+    if (!app.visitor.intake.appointment) {
+      setTimeout(() => {
+        soldierSay("If there is no appointment, you may need supervisor approval.", "hint");
+        setHint("Try: “I’ll contact my supervisor for approval.”");
+      }, 800);
+    }
+
+    // Focus
+    input?.focus();
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", init);
+  } else {
+    init();
+  }
 })();
