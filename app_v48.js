@@ -1,8 +1,10 @@
 /* app.js — VEVA Ingang/Uitgang Trainer (static, GitHub Pages)
-   Focus fixes:
-   (A) Remove supervisor button; reliable text-trigger popup
-   (B) Age/DOB control questions reliable (incl. "born in 1993?")
-   (C) Person-search navigation + Deny flow reliable
+   Clean version with:
+   - No TDZ crash (STEPS defined before app state)
+   - Supervisor button removed (and hard-hidden even if legacy UI exists)
+   - Reliable text-trigger for supervisor modal
+   - Reliable age/DOB questions incl. "Were you born in 1993?"
+   - Reliable person-search + deny flow
 */
 
 (() => {
@@ -22,7 +24,6 @@
   const uid = () => Math.random().toString(16).slice(2) + "-" + Date.now().toString(16);
 
   function clamp(n, a, b) { return Math.max(a, Math.min(b, n)); }
-
   function safeLower(s) { return (s || "").toString().trim().toLowerCase(); }
 
   function escapeHtml(str) {
@@ -34,9 +35,7 @@
       .replaceAll("'", "&#039;");
   }
 
-  function sleep(ms) {
-    return new Promise(res => setTimeout(res, ms));
-  }
+  function sleep(ms) { return new Promise(res => setTimeout(res, ms)); }
 
   function parseYear(text) {
     const m = (text || "").match(/\b(19\d{2}|20\d{2})\b/);
@@ -44,24 +43,17 @@
   }
 
   function parseDateLike(text) {
-    // Accepts: 12/05/1993, 12-05-1993, 1993-05-12, 12 May 1993
     const t = (text || "").trim();
 
     // yyyy-mm-dd
     let m = t.match(/\b(19\d{2}|20\d{2})[-\/.](0?[1-9]|1[0-2])[-\/.](0?[1-9]|[12]\d|3[01])\b/);
-    if (m) {
-      const yyyy = Number(m[1]), mm = Number(m[2]), dd = Number(m[3]);
-      return { yyyy, mm, dd };
-    }
+    if (m) return { yyyy: Number(m[1]), mm: Number(m[2]), dd: Number(m[3]) };
 
-    // dd-mm-yyyy or dd/mm/yyyy
+    // dd-mm-yyyy
     m = t.match(/\b(0?[1-9]|[12]\d|3[01])[-\/.](0?[1-9]|1[0-2])[-\/.](19\d{2}|20\d{2})\b/);
-    if (m) {
-      const dd = Number(m[1]), mm = Number(m[2]), yyyy = Number(m[3]);
-      return { yyyy, mm, dd };
-    }
+    if (m) return { yyyy: Number(m[3]), mm: Number(m[2]), dd: Number(m[1]) };
 
-    // "12 May 1993" / "12th May 1993"
+    // "12 May 1993"
     m = t.match(/\b(0?[1-9]|[12]\d|3[01])(?:st|nd|rd|th)?\s+(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+(19\d{2}|20\d{2})\b/i);
     if (m) {
       const dd = Number(m[1]);
@@ -71,7 +63,6 @@
       const yyyy = Number(m[3]);
       if (mm) return { yyyy, mm, dd };
     }
-
     return null;
   }
 
@@ -81,7 +72,6 @@
   }
 
   function calcAgeFromDob(dobObj) {
-    // Age in years (approx, accurate w/ month/day)
     const today = new Date();
     const y = today.getFullYear();
     let age = y - dobObj.yyyy;
@@ -91,16 +81,43 @@
     return age;
   }
 
-  function chance(p) {
-    return Math.random() < clamp(p, 0, 1);
-  }
+  function chance(p) { return Math.random() < clamp(p, 0, 1); }
 
   function teacherModeEnabled() {
-    // Hidden for students. Enable via ?teacher=1 or localStorage flag
     const qp = new URLSearchParams(location.search);
     if (qp.get("teacher") === "1") return true;
     return localStorage.getItem("veva_teacher_mode") === "1";
   }
+
+  /***********************
+   * STATE MACHINE (DEFINED EARLY -> NO TDZ)
+   ***********************/
+  const STEPS = {
+    INTAKE: "intake",
+    ID_CHECK: "id_check",
+    SUPERVISOR: "supervisor",
+    THREAT_ITEMS: "threat_items",
+    PERSON_SEARCH: "person_search",
+    FINISHED: "finished"
+  };
+
+  const REQUIRED = [
+    { key: "asked_name", label: "You didn’t ask the visitor’s name.", example: "What is your name, please?" },
+    { key: "asked_purpose", label: "You didn’t ask the purpose of the visit.", example: "What is the purpose of your visit today?" },
+    { key: "asked_appointment", label: "You didn’t confirm the appointment.", example: "Do you have an appointment?" },
+    { key: "asked_who", label: "You didn’t ask who they are meeting.", example: "Who are you here to see?" },
+    { key: "asked_time", label: "You didn’t confirm the time.", example: "What time is your appointment?" },
+    { key: "asked_where", label: "You didn’t confirm where they are going.", example: "Where are you going on base?" },
+    { key: "asked_subject", label: "You didn’t ask what the meeting is about.", example: "What is the meeting about?" },
+    { key: "asked_id", label: "You didn’t ask to see an ID.", example: "Can I see your ID, please?" },
+    { key: "asked_dob", label: "You didn’t verify date of birth (DOB).", example: "What is your date of birth?" },
+    { key: "asked_age", label: "You didn’t verify age.", example: "How old are you?" },
+    { key: "asked_nationality", label: "You didn’t verify nationality.", example: "What is your nationality?" },
+    { key: "supervisor_contacted", label: "You didn’t contact a supervisor when needed.", example: "I’ll contact my supervisor for approval." },
+    { key: "explained_threat", label: "You didn’t mention threat level / security measures.", example: "We are on a higher threat level today, so I will ask a few extra questions." },
+    { key: "explained_items", label: "You didn’t explain prohibited items.", example: "Do you have any weapons, sharp objects, or prohibited items?" },
+    { key: "did_person_search", label: "You didn’t complete the person search step.", example: "I’m going to do a quick pat-down search. Is that okay?" }
+  ];
 
   /***********************
    * PHRASEBANK (optional)
@@ -109,19 +126,17 @@
     try {
       const res = await fetch("phrasebank.json", { cache: "no-store" });
       if (!res.ok) return null;
-      const json = await res.json();
-      return json;
+      return await res.json();
     } catch {
       return null;
     }
   }
 
   function compilePatterns(extra) {
-    // Base regex patterns (robust even if phrasebank missing)
     const base = {
       ask_id: [
         /\b(can i|could i|may i|let me)\s+(see|check)\s+(your|ur)\s+(id|identification)\b/i,
-        /\b(show\s+me\s+(your|ur)\s+(id|identification)\b/i,
+        /\bshow\s+me\s+(your|ur)\s+(id|identification)\b/i,
         /\bdo\s+you\s+have\s+an?\s+id\b/i,
         /\bid\s+please\b/i,
         /\bsee\s+your\s+id\b/i
@@ -132,9 +147,8 @@
         /\breturn\s+to\s+visitor\b/i
       ],
       contact_supervisor: [
-        /\b(contact|call|ring|phone)\s+(my\s+)?(supervisor|boss|officer|team\s*leader|manager)\b/i,
-        /\bi('?ll| will)\s+(contact|call|ring|phone)\s+(my\s+)?(supervisor|boss|team\s*leader|manager)\b/i,
-        /\blet\s+me\s+(contact|call)\s+(my\s+)?(supervisor|boss)\b/i
+        /\b(i\s+(will|’ll|'ll)\s+)?(contact|call|ring|phone)\s+(my\s+)?(supervisor|boss|officer|team\s*leader|manager)\b/i,
+        /\blet\s+me\s+(contact|call)\s+(my\s+)?(supervisor|boss|team\s*leader|manager)\b/i
       ],
       ask_name: [
         /\bwhat('?s|\s+is)\s+your\s+name\b/i,
@@ -176,8 +190,7 @@
         /\bwhen\s+were\s+you\s+born\b/i
       ],
       confirm_born_year: [
-        /\bwere\s+you\s+born\s+in\s+(19\d{2}|20\d{2})\b/i,
-        /\byou\s+were\s+born\s+in\s+(19\d{2}|20\d{2})\s*\?\s*$/i
+        /\bwere\s+you\s+born\s+in\s+(19\d{2}|20\d{2})\b/i
       ],
       ask_nationality: [
         /\bwhat\s+is\s+your\s+nationality\b/i,
@@ -185,7 +198,7 @@
         /\byour\s+citizenship\b/i
       ],
       go_person_search: [
-        /\b(go\s+to|start|begin)\s+(the\s+)?(person\s+search|search|pat\s*down|frisk)\b/i,
+        /\b(go\s+to|start|begin)\s+(the\s+)?(person\s+search|pat\s*down|frisk)\b/i,
         /\b(i\s+need\s+to|we\s+need\s+to)\s+(search|pat\s*down)\b/i
       ],
       deny: [
@@ -199,28 +212,22 @@
       ]
     };
 
-    // Merge optional phrasebank patterns if it matches a likely structure.
-    // Supported shapes:
-    // - { intents: { ask_id: { patterns: ["..."] } } }
-    // - { ask_id: ["..."] }
-    // Strings are treated as regex sources.
     const merged = { ...base };
+
+    const addPatterns = (key, arr) => {
+      if (!arr || !Array.isArray(arr)) return;
+      merged[key] = merged[key] || [];
+      for (const p of arr) {
+        if (!p) continue;
+        if (p instanceof RegExp) merged[key].push(p);
+        else if (typeof p === "string") {
+          try { merged[key].push(new RegExp(p, "i")); } catch { /* ignore */ }
+        }
+      }
+    };
 
     if (extra) {
       const intentsObj = extra.intents && typeof extra.intents === "object" ? extra.intents : null;
-
-      const addPatterns = (key, arr) => {
-        if (!arr || !Array.isArray(arr)) return;
-        merged[key] = merged[key] || [];
-        for (const p of arr) {
-          if (!p) continue;
-          if (p instanceof RegExp) merged[key].push(p);
-          else if (typeof p === "string") {
-            try { merged[key].push(new RegExp(p, "i")); } catch { /* ignore */ }
-          }
-        }
-      };
-
       if (intentsObj) {
         for (const [k, v] of Object.entries(intentsObj)) {
           if (v && Array.isArray(v.patterns)) addPatterns(k, v.patterns);
@@ -232,7 +239,6 @@
       }
     }
 
-    // Convert arrays to functions
     const compiled = {};
     for (const [k, arr] of Object.entries(merged)) {
       compiled[k] = (text) => arr.some(rx => rx.test(text));
@@ -265,7 +271,6 @@
   function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
 
   function randomDob() {
-    // Adult (18-55)
     const today = new Date();
     const year = today.getFullYear() - (18 + Math.floor(Math.random() * 38)); // 18..55
     const mm = 1 + Math.floor(Math.random() * 12);
@@ -293,6 +298,7 @@
     const nat = pick(NATIONALITIES);
     const name = pick(NAMES) + " " + (["Johnson", "Miller", "Brown", "Davis", "Martinez", "Kowalski", "Nowak", "Schmidt", "Dubois", "Rossi", "Yilmaz"][Math.floor(Math.random() * 11)]);
     const age = calcAgeFromDob(dob);
+
     const id = {
       name,
       nationality: nat,
@@ -302,12 +308,9 @@
       expiry: randomExpiry()
     };
 
-    // Headshots: expects assets/fotos/headshot_01.png etc.
-    // We’ll pick from 01..12. If missing, fallback.
     const idx = 1 + Math.floor(Math.random() * 12);
     const headshot = `assets/fotos/headshot_${String(idx).padStart(2, "0")}.png`;
 
-    // Scenario fields (intake answers)
     const purpose = pick(["delivery", "maintenance", "meeting", "visit", "contract work"]);
     const appointment = chance(0.7);
     const apptTime = appointment ? pick(["09:30", "10:00", "13:15", "14:00", "15:45"]) : null;
@@ -320,50 +323,64 @@
       headshot,
       id,
       intake: { purpose, appointment, apptTime, meetingWith, goingWhere, subject },
-      // For lie/inconsistency logic:
-      // We’ll store what the visitor already claimed (may diverge from ID).
-      claims: {
-        age: null,
-        dob: null,
-        nationality: null,
-        name: null
-      },
+      claims: { age: null, dob: null, nationality: null, name: null },
       inconsistencies: []
     };
   }
 
   /***********************
-   * STATE MACHINE
+   * LOGGING
    ***********************/
-  const STEPS = {
-    INTAKE: "intake",
-    ID_CHECK: "id_check",
-    SUPERVISOR: "supervisor",
-    THREAT_ITEMS: "threat_items",
-    PERSON_SEARCH: "person_search",
-    FINISHED: "finished"
-  };
-
-  const REQUIRED = [
-    { key: "asked_name", label: "You didn’t ask the visitor’s name.", example: "What is your name, please?" },
-    { key: "asked_purpose", label: "You didn’t ask the purpose of the visit.", example: "What is the purpose of your visit today?" },
-    { key: "asked_appointment", label: "You didn’t confirm the appointment.", example: "Do you have an appointment?" },
-    { key: "asked_who", label: "You didn’t ask who they are meeting.", example: "Who are you here to see?" },
-    { key: "asked_time", label: "You didn’t confirm the time.", example: "What time is your appointment?" },
-    { key: "asked_where", label: "You didn’t confirm where they are going.", example: "Where are you going on base?" },
-    { key: "asked_subject", label: "You didn’t ask what the meeting is about.", example: "What is the meeting about?" },
-    { key: "asked_id", label: "You didn’t ask to see an ID.", example: "Can I see your ID, please?" },
-    { key: "asked_dob", label: "You didn’t verify date of birth (DOB).", example: "What is your date of birth?" },
-    { key: "asked_age", label: "You didn’t verify age.", example: "How old are you?" },
-    { key: "asked_nationality", label: "You didn’t verify nationality.", example: "What is your nationality?" },
-    { key: "supervisor_contacted", label: "You didn’t contact a supervisor when needed.", example: "I’ll contact my supervisor for approval." },
-    { key: "explained_threat", label: "You didn’t mention threat level / security measures.", example: "We are on a higher threat level today, so I will ask a few extra questions." },
-    { key: "explained_items", label: "You didn’t explain prohibited items.", example: "Do you have any weapons, sharp objects, or prohibited items?" },
-    { key: "did_person_search", label: "You didn’t complete the person search step.", example: "I’m going to do a quick pat-down search. Is that okay?" }
-  ];
+  async function logEvent(type, payload = {}) {
+    if (!LOG_ENDPOINT) return;
+    const body = { ts: nowIso(), type, ...payload };
+    try {
+      await fetch(LOG_ENDPOINT, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+        keepalive: true
+      });
+    } catch {
+      // ignore
+    }
+  }
 
   /***********************
-   * UI BOOTSTRAP
+   * APP STATE (NO TDZ)
+   ***********************/
+  const app = {
+    runId: uid(),
+    visitor: null,
+    step: STEPS.INTAKE,
+    flags: {
+      asked_name: false,
+      asked_purpose: false,
+      asked_appointment: false,
+      asked_who: false,
+      asked_time: false,
+      asked_where: false,
+      asked_subject: false,
+      asked_id: false,
+      asked_age: false,
+      asked_dob: false,
+      asked_nationality: false,
+      supervisor_contacted: false,
+      explained_threat: false,
+      explained_items: false,
+      did_person_search: false
+    },
+    idVisible: false,
+    processing: false,
+    finished: false,
+    intents: null,
+    phrasebank: null,
+    unknowns: 0,
+    messages: []
+  };
+
+  /***********************
+   * UI (Chat UI)
    ***********************/
   function injectBaseUiIfMissing() {
     if ($("#veva-app")) return;
@@ -466,11 +483,9 @@
       </div>
     `;
 
-    // Mount
     const mount = $("#app") || document.body;
     mount.appendChild(root);
 
-    // Minimal CSS (so modal works even if styles.css is missing / older)
     const style = document.createElement("style");
     style.textContent = `
       .veva-shell{height:calc(100vh - 10px);display:flex;flex-direction:column;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;}
@@ -518,64 +533,6 @@
     `;
     document.head.appendChild(style);
   }
-
-  /***********************
-   * LOGGING
-   ***********************/
-  async function logEvent(type, payload = {}) {
-    if (!LOG_ENDPOINT) return;
-    const body = {
-      ts: nowIso(),
-      type,
-      ...payload
-    };
-    try {
-      // Apps Script often expects POST; CORS may be permissive.
-      // keepalive helps on unload.
-      await fetch(LOG_ENDPOINT, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-        keepalive: true
-      });
-    } catch {
-      // Silently ignore; don’t break UX
-    }
-  }
-
-  /***********************
-   * APP CORE
-   ***********************/
-  const app = {
-    runId: uid(),
-    visitor: null,
-    step: STEPS.INTAKE,
-    flags: {
-      // checkpoints for feedback
-      asked_name: false,
-      asked_purpose: false,
-      asked_appointment: false,
-      asked_who: false,
-      asked_time: false,
-      asked_where: false,
-      asked_subject: false,
-      asked_id: false,
-      asked_age: false,
-      asked_dob: false,
-      asked_nationality: false,
-      supervisor_contacted: false,
-      explained_threat: false,
-      explained_items: false,
-      did_person_search: false
-    },
-    idVisible: false,
-    processing: false,
-    finished: false,
-    intents: null,
-    phrasebank: null,
-    unknowns: 0,
-    messages: []
-  };
 
   function setStep(step) {
     app.step = step;
@@ -637,7 +594,6 @@
     if (!back) return;
     $("#sup-status").textContent = "";
 
-    // Prefill from known intake or caller
     const v = app.visitor;
     const fill = (id, val) => {
       const el = $(id);
@@ -652,8 +608,6 @@
     fill("#sup-with", prefill.with ?? v?.intake?.meetingWith ?? "");
 
     back.style.display = "flex";
-
-    // Focus first input
     const who = $("#sup-who");
     if (who) setTimeout(() => who.focus(), 0);
   }
@@ -662,7 +616,6 @@
     const back = $("#sup-backdrop");
     if (!back) return;
     back.style.display = "none";
-    // Return focus to main input
     const input = $("#chatinput");
     if (input) setTimeout(() => input.focus(), 0);
   }
@@ -686,13 +639,11 @@
     return missing;
   }
 
-  function visitorControlAnswer(kind, askedValue) {
-    // kind: "age" | "dob" | "nationality" | "name"
-    // Uses mood-based lie/inconsistency chance.
+  function visitorControlAnswer(kind) {
     const v = app.visitor;
     const mood = v.mood;
-    const lieP = 0.04 + mood.lieBoost;       // base lie chance
-    const inconsP = 0.05 + mood.inconsBoost; // base inconsistency chance (if already claimed)
+    const lieP = 0.04 + mood.lieBoost;
+    const inconsP = 0.05 + mood.inconsBoost;
 
     const truth = (() => {
       if (kind === "age") return String(v.id.age);
@@ -702,11 +653,9 @@
       return "";
     })();
 
-    // If already claimed, might stick or contradict
     const prev = v.claims[kind];
     if (prev) {
       if (chance(inconsP)) {
-        // create contradiction
         const fake = makeFakeControl(kind);
         if (fake !== prev) {
           v.inconsistencies.push({ kind, prev, next: fake, ts: nowIso() });
@@ -717,7 +666,6 @@
       return { value: prev, lied: prev !== truth, inconsistent: false };
     }
 
-    // First claim:
     if (chance(lieP)) {
       const fake = makeFakeControl(kind);
       v.claims[kind] = fake;
@@ -735,7 +683,6 @@
       return String(clamp(v.id.age + delta, 18, 70));
     }
     if (kind === "dob") {
-      // shift day/month lightly
       const dob = { ...v.id.dob };
       if (chance(0.5)) dob.dd = clamp(dob.dd + pick([-2, -1, 1, 2]), 1, 28);
       else dob.mm = clamp(dob.mm + pick([-1, 1]), 1, 12);
@@ -746,8 +693,7 @@
       return other;
     }
     if (kind === "name") {
-      const other = pick(NAMES) + " " + pick(["Johnson", "Miller", "Brown", "Davis", "Rossi", "Schmidt"]);
-      return other;
+      return pick(NAMES) + " " + pick(["Johnson", "Miller", "Brown", "Davis", "Rossi", "Schmidt"]);
     }
     return "";
   }
@@ -765,10 +711,8 @@
     const deny = $("#btn-deny");
     if (deny) deny.disabled = true;
 
-    // Hide ID if visible
     hideIdCard();
 
-    // Show finish button
     const fin = $("#btn-finish");
     if (fin) fin.style.display = "";
 
@@ -780,13 +724,10 @@
       inconsistencies: app.visitor?.inconsistencies || []
     });
 
-    // Feedback
     const misses = REQUIRED.filter(r => !app.flags[r.key]).slice(0, 3);
     if (misses.length) {
       soldierSay("Run finished. Here are your top 3 improvements:", "feedback");
-      misses.forEach((m, i) => {
-        soldierSay(`${i + 1}) ${m.label}`, `Example: ${m.example}`);
-      });
+      misses.forEach((m, i) => soldierSay(`${i + 1}) ${m.label}`, `Example: ${m.example}`));
     } else {
       soldierSay("Run finished. Nice work — you covered all key checkpoints.", "feedback");
     }
@@ -796,58 +737,15 @@
     if (app.finished) return;
     soldierSay("I’m denying entry. You cannot enter the site.", "deny");
     await logEvent("deny", { runId: app.runId, source, step: app.step });
-    // short delay then finish
     await sleep(900);
     endRun("denied");
   }
 
-  /***********************
-   * INTENT HANDLER
-   ***********************/
-  function matchIntent(text) {
-    const t = text || "";
-    const I = app.intents;
-
-    const map = [
-      ["deny", "deny"],
-      ["ask_id", "ask_id"],
-      ["return_id", "return_id"],
-      ["contact_supervisor", "contact_supervisor"],
-      ["go_person_search", "go_person_search"],
-      ["ask_name", "ask_name"],
-      ["ask_purpose", "ask_purpose"],
-      ["ask_appointment", "ask_appointment"],
-      ["ask_who", "ask_who"],
-      ["ask_time", "ask_time"],
-      ["ask_where", "ask_where"],
-      ["ask_subject", "ask_subject"],
-      ["ask_age", "ask_age"],
-      ["ask_dob", "ask_dob"],
-      ["confirm_born_year", "confirm_born_year"],
-      ["ask_nationality", "ask_nationality"],
-      ["smalltalk", "smalltalk"]
-    ];
-
-    for (const [key, fn] of map) {
-      if (I?.[fn] && I[fn](t)) return key;
-    }
-
-    // Extra DOB/age heuristics:
-    const low = safeLower(t);
-    if (low.includes("date of birth") || low === "dob") return "ask_dob";
-    if (low.includes("how old")) return "ask_age";
-
-    return "unknown";
-  }
-
   function ensureStepProgression() {
-    // Lightweight progression rules (keeps it predictable)
     if (app.step === STEPS.INTAKE) {
-      // Once they asked ID, move to ID_CHECK
       if (app.flags.asked_id) setStep(STEPS.ID_CHECK);
     }
     if (app.step === STEPS.ID_CHECK) {
-      // If supervisor contacted, allow moving forward
       if (app.flags.supervisor_contacted) setStep(STEPS.THREAT_ITEMS);
     }
   }
@@ -871,7 +769,6 @@
     const yearAsked = parseYear(userText);
     const trueYear = v.id.dob.yyyy;
 
-    // Visitor may lie / be inconsistent about DOB claims
     const claim = visitorControlAnswer("dob");
     const claimYear = parseYear(claim.value) || trueYear;
 
@@ -882,17 +779,14 @@
       return;
     }
 
-    // Not matching:
     visitorSay("No, that’s not correct.");
-    // If the student’s year matches TRUE year but visitor is lying, offer a correction
+
     if (yearAsked === trueYear && claim.lied) {
-      visitorSay("Actually… you’re right. I was born in " + trueYear + ". Sorry.", "correction");
-      // align claim to truth (reduce loops)
+      visitorSay(`Actually… you’re right. I was born in ${trueYear}. Sorry.`, "correction");
       v.claims.dob = formatDob(v.id.dob);
       return;
     }
 
-    // otherwise provide claimed year + maybe apologize
     visitorSay(`I was born in ${claimYear}.`);
   }
 
@@ -915,6 +809,76 @@
     endRun("completed");
   }
 
+  /***********************
+   * SUPERVISOR BUTTON KILL (even if legacy UI exists)
+   ***********************/
+  function supervisorKillStart() {
+    const RX_SUP_BTN = /(contact\s+supervisor|contact\s+leidinggevende)/i;
+
+    function allClickable() {
+      return Array.from(document.querySelectorAll("button, a, [role='button'], input[type='button'], input[type='submit']"));
+    }
+    function findSupervisorButtons() {
+      return allClickable().filter(el => RX_SUP_BTN.test((el.textContent || el.value || "").trim()));
+    }
+    function hide() {
+      const btns = findSupervisorButtons();
+      btns.forEach(btn => {
+        btn.dataset.vevaSupHidden = "1";
+        btn.style.setProperty("display", "none", "important");
+        btn.style.setProperty("visibility", "hidden", "important");
+        btn.style.setProperty("pointer-events", "none", "important");
+        btn.setAttribute("aria-hidden", "true");
+        btn.tabIndex = -1;
+      });
+    }
+    hide();
+    const mo = new MutationObserver(hide);
+    mo.observe(document.documentElement, { childList: true, subtree: true });
+  }
+
+  /***********************
+   * INTENTS
+   ***********************/
+  function matchIntent(text) {
+    const t = text || "";
+    const I = app.intents;
+
+    const order = [
+      ["deny", "deny"],
+      ["ask_id", "ask_id"],
+      ["return_id", "return_id"],
+      ["contact_supervisor", "contact_supervisor"],
+      ["go_person_search", "go_person_search"],
+      ["ask_name", "ask_name"],
+      ["ask_purpose", "ask_purpose"],
+      ["ask_appointment", "ask_appointment"],
+      ["ask_who", "ask_who"],
+      ["ask_time", "ask_time"],
+      ["ask_where", "ask_where"],
+      ["ask_subject", "ask_subject"],
+      ["ask_age", "ask_age"],
+      ["ask_dob", "ask_dob"],
+      ["confirm_born_year", "confirm_born_year"],
+      ["ask_nationality", "ask_nationality"],
+      ["smalltalk", "smalltalk"]
+    ];
+
+    for (const [key, fn] of order) {
+      if (I?.[fn] && I[fn](t)) return key;
+    }
+
+    const low = safeLower(t);
+    if (low.includes("date of birth") || low === "dob") return "ask_dob";
+    if (low.includes("how old")) return "ask_age";
+    if (/\bborn in\b/.test(low) && parseYear(low)) return "confirm_born_year";
+
+    return "unknown";
+  }
+
+  /***********************
+   * MAIN MESSAGE HANDLER
+   ***********************/
   async function onUserMessage(text) {
     const input = $("#chatinput");
     const send = $("#btn-send");
@@ -927,7 +891,6 @@
     if (input) input.disabled = true;
     if (send) send.disabled = true;
 
-    // Safety net: never let processing hang
     const hangGuard = setTimeout(() => {
       app.processing = false;
       if (!app.finished) {
@@ -940,17 +903,17 @@
 
     try {
       soldierSay(t);
-
       await logEvent("message", { runId: app.runId, from: "student", text: t, step: app.step });
 
-      // Always allow DENY in any step
       const intent = matchIntent(t);
+
+      // Deny ALWAYS
       if (intent === "deny") {
         await denyEntranceFlow("text");
         return;
       }
 
-      // Return ID (always)
+      // Return ID ALWAYS
       if (intent === "return_id") {
         hideIdCard();
         visitorSay("Thank you.");
@@ -968,76 +931,43 @@
         return;
       }
 
-      // Contact supervisor (TEXT TRIGGER ONLY) — reliable
+      // Contact supervisor (TEXT trigger)
       if (intent === "contact_supervisor") {
         app.flags.supervisor_contacted = true;
         await logEvent("supervisor_trigger", { runId: app.runId, step: app.step, source: "text" });
 
-        // Open modal immediately (no await before it, so it never “misses”)
-        openSupervisorModal({
-          who: app.visitor?.id?.name || "",
-          why: app.visitor?.intake?.purpose || "",
-          what: app.visitor?.intake?.subject || "",
-          where: app.visitor?.intake?.goingWhere || "",
-          when: app.visitor?.intake?.apptTime || "",
-          with: app.visitor?.intake?.meetingWith || ""
-        });
-
+        // open immediately
+        openSupervisorModal();
         visitorSay("Okay. Please contact your supervisor.", "supervisor");
         ensureStepProgression();
         return;
       }
 
-      // Go to person search
+      // Person search
       if (intent === "go_person_search") {
         await logEvent("go_person_search", { runId: app.runId, step: app.step, source: "text" });
         beginPersonSearch();
         return;
       }
 
-      // 5W/5WH intake questions
-      if (intent === "ask_name") {
-        app.flags.asked_name = true;
-        visitorSay(visitorReplyForIntakeQuestion("name"));
-        return;
-      }
-      if (intent === "ask_purpose") {
-        app.flags.asked_purpose = true;
-        visitorSay(visitorReplyForIntakeQuestion("purpose"));
-        return;
-      }
+      // Intake
+      if (intent === "ask_name") { app.flags.asked_name = true; visitorSay(visitorReplyForIntakeQuestion("name")); return; }
+      if (intent === "ask_purpose") { app.flags.asked_purpose = true; visitorSay(visitorReplyForIntakeQuestion("purpose")); return; }
       if (intent === "ask_appointment") {
         app.flags.asked_appointment = true;
         visitorSay(visitorReplyForIntakeQuestion("appointment"));
-        // If no appointment, supervisor likely needed
         if (!app.visitor.intake.appointment) {
           visitorSay("I don’t have an appointment. Is that a problem?");
           setHint("Tip: try “I’ll contact my supervisor for approval.”");
         }
         return;
       }
-      if (intent === "ask_who") {
-        app.flags.asked_who = true;
-        visitorSay(visitorReplyForIntakeQuestion("who"));
-        return;
-      }
-      if (intent === "ask_time") {
-        app.flags.asked_time = true;
-        visitorSay(visitorReplyForIntakeQuestion("time"));
-        return;
-      }
-      if (intent === "ask_where") {
-        app.flags.asked_where = true;
-        visitorSay(visitorReplyForIntakeQuestion("where"));
-        return;
-      }
-      if (intent === "ask_subject") {
-        app.flags.asked_subject = true;
-        visitorSay(visitorReplyForIntakeQuestion("subject"));
-        return;
-      }
+      if (intent === "ask_who") { app.flags.asked_who = true; visitorSay(visitorReplyForIntakeQuestion("who")); return; }
+      if (intent === "ask_time") { app.flags.asked_time = true; visitorSay(visitorReplyForIntakeQuestion("time")); return; }
+      if (intent === "ask_where") { app.flags.asked_where = true; visitorSay(visitorReplyForIntakeQuestion("where")); return; }
+      if (intent === "ask_subject") { app.flags.asked_subject = true; visitorSay(visitorReplyForIntakeQuestion("subject")); return; }
 
-      // Control questions: nationality / age / DOB
+      // Control questions
       if (intent === "ask_nationality") {
         app.flags.asked_nationality = true;
         const a = visitorControlAnswer("nationality");
@@ -1072,14 +1002,13 @@
         return;
       }
 
-      // Step nudges: after ID + supervisor, push threat/items; then person search
+      // Nudge after ID + supervisor
       if (app.step === STEPS.ID_CHECK && app.flags.asked_id && app.flags.supervisor_contacted) {
         explainThreatAndItems();
         setHint("Tip: type “Go to person search” when ready.");
         return;
       }
 
-      // Smalltalk fallback
       if (intent === "smalltalk") {
         visitorSay("Hello.");
         return;
@@ -1088,11 +1017,8 @@
       // Unknown
       app.unknowns += 1;
       visitorSay("Sorry, I don’t understand. Can you ask it another way?");
-      if (LOG_UNKNOWN) {
-        await logEvent("unknown_question", { runId: app.runId, step: app.step, text: t });
-      }
+      if (LOG_UNKNOWN) await logEvent("unknown_question", { runId: app.runId, step: app.step, text: t });
       setHint("Try short clear questions (5W/5WH). Example: “What is the purpose of your visit?”");
-
     } finally {
       clearTimeout(hangGuard);
       app.processing = false;
@@ -1105,12 +1031,16 @@
   }
 
   /***********************
-   * WIRING
+   * INIT / WIRING
    ***********************/
   async function init() {
+    // Kill any legacy supervisor button UI (if present)
+    supervisorKillStart();
+
+    // Always use our UI (inject if missing)
     injectBaseUiIfMissing();
 
-    // Hide the dev-only ID toggle button in student mode
+    // Hide dev-only ID toggle for students
     const idToggle = $("#btn-toggle-id");
     if (idToggle) idToggle.style.display = teacherModeEnabled() ? "" : "none";
 
@@ -1119,10 +1049,9 @@
     $("#runid").textContent = app.runId;
     $("#visitor-mood").textContent = app.visitor.mood.name;
     $("#visitor-img").src = app.visitor.headshot;
-
     setStep(STEPS.INTAKE);
 
-    // phrasebank optional
+    // Patterns
     app.phrasebank = await loadPhrasebank();
     app.intents = compilePatterns(app.phrasebank);
 
@@ -1142,28 +1071,23 @@
     soldierSay("Good day. Please state your name and the purpose of your visit.", "start");
     setHint("Start with 5W/5WH (name, purpose, appointment, who, time, where, subject).");
 
-    // Logging start
-    logEvent("start", {
-      runId: app.runId,
-      mood: app.visitor.mood.name,
-      step: app.step
-    });
+    // Log start
+    logEvent("start", { runId: app.runId, mood: app.visitor.mood.name, step: app.step });
 
     // Composer
     const input = $("#chatinput");
     const send = $("#btn-send");
 
     function submit() {
-      onUserMessage(input.value);
+      const v = input.value;
       input.value = "";
+      onUserMessage(v);
     }
 
     send?.addEventListener("click", submit);
-    input?.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") submit();
-    });
+    input?.addEventListener("keydown", (e) => { if (e.key === "Enter") submit(); });
 
-    // Autofocus cursor
+    // Autofocus
     if (input) setTimeout(() => input.focus(), 0);
 
     // Deny always
@@ -1198,8 +1122,6 @@
       }
       $("#sup-status").textContent = "Request sent. Waiting for supervisor decision…";
       await logEvent("supervisor_request", { runId: app.runId, payload: p });
-
-      // Nudge user to choose approve/deny buttons (teacher can simulate)
       setHint("Supervisor decision: click Approve/Deny in the popup (teacher) or proceed when instructed.");
     });
 
@@ -1207,7 +1129,6 @@
       $("#sup-status").textContent = "Supervisor approves. Proceed with security measures.";
       await logEvent("supervisor_approve", { runId: app.runId });
       closeSupervisorModal();
-
       visitorSay("Okay.", "supervisor");
       explainThreatAndItems();
       setHint("Next: type “Go to person search” when ready. Deny entrance always available.");
@@ -1220,7 +1141,6 @@
       await denyEntranceFlow("supervisor_deny");
     });
 
-    // If visitor has no appointment, coach supervisor trigger early
     if (!app.visitor.intake.appointment) {
       setTimeout(() => {
         soldierSay("If there is no appointment, you may need supervisor approval.", "hint");
@@ -1230,140 +1150,4 @@
   }
 
   document.addEventListener("DOMContentLoaded", init);
-})();
-/* ============================
-   VEVA PATCH v2: Supervisor Kill + Text Trigger
-   - hides "Contact supervisor" button everywhere (even after rerenders)
-   - typing "I will contact my supervisor" triggers the same popup by clicking the hidden button
-   ============================ */
-(() => {
-  const PATCH_VERSION = "supfix-v2-2026-02-09b";
-  window.__VEVA_SUP_PATCH_VERSION = PATCH_VERSION;
-  console.log("[VEVA]", PATCH_VERSION, "loaded");
-
-  // Detect the button label (EN/NL)
-  const RX_SUP_BTN = /(contact\s+supervisor|contact\s+leidinggevende)/i;
-
-  // Detect typed intent (very tolerant)
-  const RX_SUP_TEXT =
-    /\b(i\s+(will|’ll|'ll)\s+)?(please\s+)?(contact|call|ring|phone)\s+(my\s+)?(supervisor|boss|team\s*leader|manager)\b/i;
-
-  // Your exact phrase too (belt + braces)
-  const RX_SUP_TEXT_EXACT = /\bi\s+will\s+contact\s+my\s+supervisor\b/i;
-
-  function allClickable() {
-    return Array.from(document.querySelectorAll(
-      "button, a, [role='button'], input[type='button'], input[type='submit']"
-    ));
-  }
-
-  function findSupervisorButtons() {
-    return allClickable().filter(el => RX_SUP_BTN.test((el.textContent || el.value || "").trim()));
-  }
-
-  function hideSupervisorButtons() {
-    const btns = findSupervisorButtons();
-    btns.forEach(btn => {
-      // keep it in DOM (so we can click it), but make it invisible & non-interactive
-      btn.dataset.vevaSupHidden = "1";
-      btn.style.setProperty("display", "none", "important");
-      btn.style.setProperty("visibility", "hidden", "important");
-      btn.style.setProperty("pointer-events", "none", "important");
-      btn.setAttribute("aria-hidden", "true");
-      btn.tabIndex = -1;
-    });
-    return btns.length;
-  }
-
-  function clickSupervisorButton() {
-    const btns = findSupervisorButtons();
-    if (!btns.length) return false;
-    try {
-      btns[0].click();
-      return true;
-    } catch (e) {
-      console.warn("[VEVA] Could not click supervisor button:", e);
-      return false;
-    }
-  }
-
-  function findQuestionInput() {
-    const inputs = Array.from(document.querySelectorAll("input[type='text'], textarea, [contenteditable='true']"));
-    // match your UI placeholder: "Type your question in English..."
-    return inputs.find(el => /type your question/i.test(el.placeholder || "")) || inputs[0] || null;
-  }
-
-  function maybeTrigger(text) {
-    const t = (text || "").trim();
-    if (!t) return false;
-    if (RX_SUP_TEXT_EXACT.test(t) || RX_SUP_TEXT.test(t)) {
-      const ok = clickSupervisorButton();
-      console.log("[VEVA] Supervisor text trigger:", t, "=>", ok);
-      return ok;
-    }
-    return false;
-  }
-
-  function interceptSend() {
-    // Capture click on ANY "Send" button so we run before existing listeners
-    const sendButtons = allClickable().filter(el => /^send$/i.test((el.textContent || el.value || "").trim()));
-    sendButtons.forEach(btn => {
-      if (btn.dataset.vevaSupSendHooked === "1") return;
-      btn.dataset.vevaSupSendHooked = "1";
-      btn.addEventListener("click", (e) => {
-        const input = findQuestionInput();
-        const txt = input?.value || "";
-        if (maybeTrigger(txt)) {
-          // prevent normal processing so it doesn't get treated as a regular question
-          e.preventDefault();
-          e.stopImmediatePropagation();
-          if (input) input.value = "";
-        }
-      }, true);
-    });
-
-    // Intercept Enter
-    const input = findQuestionInput();
-    if (input && input.dataset.vevaSupEnterHooked !== "1") {
-      input.dataset.vevaSupEnterHooked = "1";
-      input.addEventListener("keydown", (e) => {
-        if (e.key !== "Enter") return;
-        const txt = input.value || "";
-        if (maybeTrigger(txt)) {
-          e.preventDefault();
-          e.stopImmediatePropagation();
-          input.value = "";
-        }
-      }, true);
-    }
-
-    // Intercept quick-reply chip "I will contact my supervisor" (like your screenshot)
-    const chips = allClickable().filter(el =>
-      /\bi\s+will\s+contact\s+my\s+supervisor\b/i.test((el.textContent || el.value || "").trim())
-    );
-    chips.forEach(chip => {
-      if (chip.dataset.vevaSupChipHooked === "1") return;
-      chip.dataset.vevaSupChipHooked = "1";
-      chip.addEventListener("click", () => {
-        console.log("[VEVA] Supervisor chip clicked");
-        clickSupervisorButton();
-      }, true);
-    });
-  }
-
-  function run() {
-    const hiddenCount = hideSupervisorButtons();
-    interceptSend();
-    // optional: log once when it finds the button
-    if (hiddenCount) console.log("[VEVA] Hidden supervisor buttons:", hiddenCount);
-  }
-
-  // Start + keep alive (rerenders)
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", run);
-  } else {
-    run();
-  }
-  const mo = new MutationObserver(run);
-  mo.observe(document.documentElement, { childList: true, subtree: true });
 })();
