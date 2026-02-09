@@ -86,3 +86,12 @@ body.teacher .teacherOnly{display:block !important}
 /* ID card layout tweaks */
 .idCard{min-height:260px}
 .idCard .idFooter{font-size:12px;line-height:1.15;margin-top:6px}
+
+/* UI scaling tweaks for 100% zoom readability */
+.container{max-width: 1200px}
+.card{padding: 22px}
+h2{font-size: 22px}
+label{font-size: 14px}
+input[type="text"], textarea{font-size:16px; padding:12px 14px}
+#studentInput{min-height:44px}
+#visitorAnswer{min-height:56px;font-size:16px}

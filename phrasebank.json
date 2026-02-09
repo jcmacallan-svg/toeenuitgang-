@@ -89,7 +89,8 @@
       "what is your age",
       "what is your age?",
       "are you 42",
-      "are you 42?"
+      "are you 42?",
+      "your age?"
     ],
     "ask_dob": [
       "what is your date of birth",
@@ -98,7 +99,11 @@
       "dob",
       "date of birth",
       "when is your birthday",
-      "when were you born"
+      "when were you born",
+      "date of birth?",
+      "dob?",
+      "when is your birthday?",
+      "when were you born?"
     ],
     "challenge": [
       "you look tired",
@@ -128,6 +133,34 @@
       "can you tell me your name?",
       "can you tell me your name please",
       "can you tell me your name please?"
+    ],
+    "ask_nervous": [
+      "are you nervous",
+      "are you nervous?",
+      "you look nervous",
+      "why are you nervous",
+      "why are you nervous?",
+      "are you uneasy",
+      "are you uneasy?",
+      "you look uneasy",
+      "why are you uneasy",
+      "why are you uneasy?"
+    ],
+    "ask_illegal_items": [
+      "do you have anything illegal",
+      "do you have anything illegal?",
+      "do you have any illegal items",
+      "do you have any illegal items?",
+      "do you have any illegal items such as weapons drugs or alcohol",
+      "do you have any illegal items such as weapons drugs or alcohol?",
+      "do you have any weapons drugs or alcohol",
+      "do you have any weapons drugs or alcohol?",
+      "do you have any weapons",
+      "do you have any weapons?",
+      "do you have drugs",
+      "do you have drugs?",
+      "do you have alcohol",
+      "do you have alcohol?"
     ]
   }
 }

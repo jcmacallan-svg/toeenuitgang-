@@ -158,25 +158,25 @@ const DATA = {
 
 const VISITORS = [
   { photo:"assets/photos/headshot_01.png", name:"Mark Visser", org:"MedLogistics", role:"courier",
-    purpose:"a delivery", topic:"spare parts delivery", host:"Sgt. De Boer", time:"09:00", nationality:"Dutch" },
+    purpose:"a delivery", topic:"spare parts delivery", host:"Sgt. De Boer", time: computeMeetingTime(), nationality:"Dutch" },
   { photo:"assets/photos/headshot_02.png", name:"Tom Bakker", org:"AeroTech Services", role:"technical inspector",
-    purpose:"an inspection", topic:"fire safety inspection", host:"Captain Smit", time:"10:30", nationality:"Dutch" },
+    purpose:"an inspection", topic:"fire safety inspection", host:"Captain Smit", time: computeMeetingTime(), nationality:"Dutch" },
   { photo:"assets/photos/headshot_03.png", name:"James Khan", org:"BlueShield Contractors", role:"contractor electrician",
-    purpose:"maintenance work", topic:"equipment repair", host:"Lt. Van Dijk", time:"13:00", nationality:"British" },
+    purpose:"maintenance work", topic:"equipment repair", host:"Lt. Van Dijk", time: computeMeetingTime(), nationality:"British" },
   { photo:"assets/photos/headshot_04.png", name:"Lucas Jansen", org:"NetSecure BV", role:"security vendor",
-    purpose:"a meeting", topic:"security briefing", host:"Major Jansen", time:"14:30", nationality:"Dutch" },
+    purpose:"a meeting", topic:"security briefing", host:"Major Jansen", time: computeMeetingTime(), nationality:"Dutch" },
   { photo:"assets/photos/headshot_05.png", name:"Daan Martens", org:"NorthRail", role:"mechanic",
-    purpose:"maintenance work", topic:"vehicle inspection", host:"Sgt. De Boer", time:"15:15", nationality:"Belgian" },
+    purpose:"maintenance work", topic:"vehicle inspection", host:"Sgt. De Boer", time: computeMeetingTime(), nationality:"Belgian" },
   { photo:"assets/photos/headshot_06.png", name:"Pieter Smit", org:"TriCom Systems", role:"it specialist",
-    purpose:"a meeting", topic:"IT audit meeting", host:"Captain De Vries", time:"09:00", nationality:"Dutch" },
+    purpose:"a meeting", topic:"IT audit meeting", host:"Captain De Vries", time: computeMeetingTime(), nationality:"Dutch" },
   { photo:"assets/photos/headshot_07.png", name:"Ahmed Omar", org:"MedLogistics", role:"driver",
-    purpose:"a delivery", topic:"equipment delivery", host:"Lt. Van Dijk", time:"10:30", nationality:"German" },
+    purpose:"a delivery", topic:"equipment delivery", host:"Lt. Van Dijk", time: computeMeetingTime(), nationality:"German" },
   { photo:"assets/photos/headshot_08.png", name:"Robert Brown", org:"AeroTech Services", role:"briefing attendee",
-    purpose:"a briefing", topic:"training coordination", host:"Captain Smit", time:"13:00", nationality:"British" },
+    purpose:"a briefing", topic:"training coordination", host:"Captain Smit", time: computeMeetingTime(), nationality:"British" },
   { photo:"assets/photos/headshot_09.png", name:"Kevin Johnson", org:"BlueShield Contractors", role:"contractor",
-    purpose:"maintenance work", topic:"HVAC maintenance", host:"Major Jansen", time:"14:30", nationality:"French" },
+    purpose:"maintenance work", topic:"HVAC maintenance", host:"Major Jansen", time: computeMeetingTime(), nationality:"French" },
   { photo:"assets/photos/headshot_10.png", name:"Hassan De Vries", org:"NetSecure BV", role:"supplier",
-    purpose:"a delivery", topic:"package delivery", host:"Captain De Vries", time:"15:15", nationality:"Dutch" }
+    purpose:"a delivery", topic:"package delivery", host:"Captain De Vries", time: computeMeetingTime(), nationality:"Dutch" }
 ];
 
 
@@ -237,6 +237,20 @@ const INTENT_PHRASES_BASE = {
   alarm_rally_point: ["if the alarm sounds","assembly area","rally point","muster point","go to the assembly area","go to the rally point"],
   closing_time: ["we close at four","closing time is 16:00","visitors must leave by 4 pm","the base closes for visitors at 4","all visitors must leave by four"],
 };
+
+function computeMeetingTime(){
+  const now = new Date();
+  const addMin = 10 + Math.floor(Math.random()*16); // 10-25
+  const d = new Date(now.getTime() + addMin*60000);
+  // round to nearest 5 minutes
+  const mins = d.getMinutes();
+  const rounded = Math.round(mins/5)*5;
+  d.setMinutes(rounded);
+  d.setSeconds(0); d.setMilliseconds(0);
+  const hh = String(d.getHours()).padStart(2,'0');
+  const mm = String(d.getMinutes()).padStart(2,'0');
+  return `${hh}:${mm}`;
+}
 
 function norm(s){
   return String(s ?? "").toLowerCase().trim().replace(/\s+/g," ");
@@ -1000,6 +1014,19 @@ function processUserLine(state, userText){
     reveal(matched, state);
     const answer = visitorResponseForIntent(state, matched, userText, state.card);
     showVisitor(answer);
+  // Auto-advance from gate to ID-check when all required questions have been asked
+  const step = currentStep(state);
+  if(step && step.key === "threat_rules" && threatComplete(state)){
+    showVisitor("Alright. Due to an increased threat level, everyone is searched. Please follow me to the pat-down.");
+    // allow moving on
+    updateActionButtons && updateActionButtons(state);
+  }
+
+  if(step && step.key === "gate" && gateComplete(state)){
+    showVisitor("Thank you. Please show me your ID.");
+    goToStep(state, "id_check");
+    updateIdVisibility(state);
+  }
     renderIdCard(state);
   } else {
     // Log unknown questions (optional)
@@ -1136,6 +1163,7 @@ function finishRun(state){
     updateIdVisibility(state);
     updateVisitorAvatar(state);
     showVisitor("Good morning.");
+    setTimeout(focusQuestion, 50);
     renderMood(state);
   });
 
@@ -1233,6 +1261,7 @@ $("#btnDoneStep").addEventListener("click", () => {
     updateIdVisibility(state);
     updateVisitorAvatar(state);
     showVisitor("Good morning.");
+    setTimeout(focusQuestion, 50);
   });
 
   // Teacher button (visible for now)
@@ -1636,4 +1665,29 @@ function setAvatarSrc(img, src){
   if(!img) return;
   img.onerror = null;
   img.src = src || "data:image/svg+xml;charset=utf-8,<svg xmlns=%27http://www.w3.org/2000/svg%27 width=%2764%27 height=%2764%27> <rect width=%27100%%27 height=%27100%%27 fill=%27%231b2a44%27/> <circle cx=%2732%27 cy=%2726%27 r=%2714%27 fill=%27%237aa2d6%27/> <rect x=%2714%27 y=%2742%27 width=%2736%27 height=%2718%27 rx=%279%27 fill=%27%237aa2d6%27/> </svg>";
+}
+
+function focusQuestion(){
+  const el = $("#studentInput");
+  if(el){ el.focus(); el.select && el.select(); }
+}
+
+function gateComplete(state){
+  const a = state.asked || {};
+  return a.who && a.purpose && a.appointment && a.host && a.time && a.about;
+}
+
+function threatComplete(state){
+  return state.asked && state.asked["threat_rules"];
+}
+
+function denyEntrance(state){
+  state.finished = true;
+  showVisitor("You are denied entry. Please step aside and wait.");
+  logEvent(state, "deny_entrance", {reason:"manual"});
+  // disable input
+  const inp = $("#studentInput");
+  const btn = $("#btnSend");
+  if(inp) inp.disabled = true;
+  if(btn) btn.disabled = true;
 }
