@@ -1,334 +1,197 @@
-/* ==============================
-   VEVA — Clean Styles (Fullscreen + WhatsApp UI)
-   ============================== */
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>VEVA – Ingang/Uitgang Trainer</title>
+  <meta name="color-scheme" content="light dark">
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="icon" href="data:image/svg+xml;charset=utf-8,<svg xmlns=%27http://www.w3.org/2000/svg%27 width=%2764%27 height=%2764%27><rect width=%27100%%27 height=%27100%%27 fill=%27%231b2a44%27/><circle cx=%2732%27 cy=%2726%27 r=%2714%27 fill=%27%237aa2d6%27/><rect x=%2714%27 y=%2742%27 width=%2736%27 height=%2718%27 rx=%279%27 fill=%27%237aa2d6%27/></svg>">
+</head>
 
-*{box-sizing:border-box}
-html, body, #app { height: 100%; }
-html, body{
-  margin:0;
-  padding:0;
-  font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
-}
+<body>
+<main class="wrap">
+  <header class="topbar">
+    <div class="brand">
+      <div class="logo">VEVA</div>
+      <div>
+        <div class="title">VEVA – Ingang/Uitgang Trainer</div>
+        <div class="subtitle">English checkpoint conversation practice</div>
+      </div>
+    </div>
 
-:root{
-  --bg: #070c16;
-  --panel: rgba(255,255,255,.06);
-  --panelBorder: rgba(255,255,255,.10);
-  --text: rgba(255,255,255,.92);
-  --muted: rgba(255,255,255,.65);
+    <div class="topActions">
+      <div class="meta" id="meta"></div>
+      <button class="btn subtle" id="btnTeacher" title="Teacher mode">Docent</button>
+    </div>
+  </header>
 
-  --visitorBubble: rgba(255,255,255,.08);
-  --visitorText: #d6d9e2;
+  <!-- Screen 1: Login -->
+  <section class="card" id="screen-login">
+    <h1>Start</h1>
+    <p class="muted">Vul je naam en groep in. Daarna start de oefening.</p>
 
-  --studentBubble: rgba(25,118,210,.18);
-  --studentBorder: rgba(25,118,210,.55);
-  --studentText: #4aa3ff;
+    <div class="grid2">
+      <label class="field">
+        <span>Naam leerling</span>
+        <input id="studentName" autocomplete="name" placeholder="Bijv. Jansen" />
+      </label>
 
-  --dangerBg: rgba(255,59,59,.14);
-  --dangerBorder: rgba(255,59,59,.55);
+      <label class="field">
+        <span>Groep</span>
+        <select id="className" required>
+          <option value="">— kies —</option>
+          <option value="Alpha">Alpha</option>
+          <option value="Bravo">Bravo</option>
+          <option value="Charlie">Charlie</option>
+          <option value="Delta">Delta</option>
+        </select>
+      </label>
+    </div>
 
-  --radius: 18px;
-  --avatar: 72px;
-  --gap: 12px;
-}
+    <label class="field">
+      <span>Niveau</span>
+      <select id="difficulty">
+        <option value="Basic">Basic</option>
+        <option value="Standard" selected>Standard</option>
+        <option value="Advanced">Advanced</option>
+      </select>
+      <div class="muted small levelHelp">
+        <div><b>Basic:</b> bij een foute/onbegrepen vraag krijg je meteen een hint.</div>
+        <div><b>Standard:</b> hint pas na 2 missers.</div>
+        <div><b>Advanced:</b> geen hints.</div>
+      </div>
+    </label>
 
-/* Background */
-body{
-  background: radial-gradient(1200px 800px at 30% 10%, rgba(30,80,160,.40), var(--bg));
-  color: var(--text);
-  padding: 12px;
-}
+    <div class="row">
+      <button class="btn primary" id="btnStart">Start oefening</button>
+      <button class="btn" id="btnResetLocal" title="Verwijdert alleen lokaal opgeslagen data">Reset lokaal</button>
+    </div>
+  </section>
 
-/* Containers */
-.wrap, .container{
-  width: min(1400px, 96vw);
-  margin: 0 auto;
-  min-height: calc(100vh - 24px);
-  display: flex;
-  flex-direction: column;
-}
+  <!-- Screen 2: Training -->
+  <section class="card hidden" id="screen-train">
+    <div class="trainHead">
+      <div>
+        <div class="stepTitle" id="stepTitle">Start</div>
+        <div class="muted" id="stepHelp">Say hello to the visitor. Then continue with your questions in English.</div>
+      </div>
+      <div class="trainBtns">
+        <button class="btn" id="btnHint">Hint</button>
+        <button class="btn primary" id="btnDoneStep">I'm done with this step</button>
+      </div>
+    </div>
 
-/* Topbar */
-.topbar{
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-  gap: 12px;
-  margin-bottom: 12px;
-}
-.brand{display:flex;gap:12px;align-items:center}
-.logo{
-  width:44px;height:44px;border-radius:12px;
-  background:rgba(59,130,246,.2);
-  display:flex;align-items:center;justify-content:center;
-  font-weight:800;color:#93c5fd;
-  border:1px solid rgba(59,130,246,.35)
-}
-.title{font-size:18px;font-weight:800}
-.subtitle{font-size:12px;color:var(--muted)}
-.meta{font-size:12px;color:var(--muted)}
+    <div class="gridTrain" id="trainGrid">
+      <!-- LEFT: conversation -->
+      <div class="panel convoPanel">
+        <div class="panelTitle">Conversation</div>
 
-/* Cards */
-.card{
-  background: var(--panel);
-  border: 1px solid var(--panelBorder);
-  border-radius: var(--radius);
-  padding: 18px;
-  box-shadow:0 10px 30px rgba(0,0,0,.25);
-}
+        <div class="visitorRow">
+          <img id="visitorAvatar" class="visitorAvatar" alt="visitor" />
+          <div class="visitorCol">
+            <div class="bubble" id="visitorBubble">Ask your first question…</div>
+            <div id="visitorMood" class="visitorMood muted"></div>
+          </div>
+        </div>
 
-/* Make TRAIN screen fill the remaining space */
-#screen-train.card,
-#screen-train .card{
-  flex: 1 1 auto;
-}
+        <div class="studentRow">
+          <img id="studentAvatar" class="studentAvatar" alt="student" src="assets/photos/soldier.png" />
+          <div class="studentCol">
+            <div class="bubble me" id="studentBubble" style="display:none;"></div>
+          </div>
+        </div>
 
-/* Typography */
-h1{margin:0 0 10px 0;font-size:28px}
-h2{margin:0 0 10px 0;font-size:22px}
-.small{font-size:12px}
-.muted{color:var(--muted)}
+        <div class="panelTitle mt">Your question</div>
 
-/* Form fields */
-.field{display:flex;flex-direction:column;gap:6px;margin:10px 0}
-label{font-size: 14px; color: var(--muted);}
-.field input,.field select,.field textarea{
-  border-radius:12px;
-  border:1px solid rgba(148,163,184,.25);
-  background:#0b1220;
-  color: var(--text);
-  padding:12px 14px;
-  outline:none;
-  font-size: 16px;
-}
-.field input:focus,.field select:focus,.field textarea:focus{border-color:rgba(59,130,246,.7)}
+        <div class="inputBar">
+          <input id="studentInput" placeholder="Type your question in English…" />
+          <button class="btn primary" id="btnSend">Send</button>
+          <button class="btn" id="btnMicHold" type="button" title="Hold to talk">🎙 Hold</button>
+          <span class="micStatus" id="micStatus" aria-live="polite"></span>
+        </div>
 
-/* Dropdown contrast (important) */
-select{ color: var(--text); background:#0b1220; }
-select option{ color: var(--text); background:#0b1220; }
+        <div class="row actionBar">
+          <button class="btn" id="btnReturnVisitor" title="Return to visitor after supervisor response">Return</button>
+          <button class="btn" id="btnGoPersonSearch" title="Proceed to person search / pat-down">Go to person search</button>
+          <button class="btn danger" id="btnDenyEntrance" title="Deny entrance at any time">Deny entrance</button>
+        </div>
 
-/* Buttons */
-.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-.btn{
-  border-radius:12px;
-  border:1px solid rgba(148,163,184,.25);
-  background:#0b1220;
-  color:var(--text);
-  padding:10px 12px;
-  cursor:pointer;
-  font-size: 14px;
-  font-weight: 600; /* not “super bold” */
-}
-.btn:hover{border-color:rgba(148,163,184,.5)}
-.btn.primary{background:rgba(59,130,246,.2);border-color:rgba(59,130,246,.45)}
-.btn.primary:hover{border-color:rgba(59,130,246,.8)}
-.btn.danger{
-  background: var(--dangerBg) !important;
-  border-color: var(--dangerBorder) !important;
-  color:#fff !important;
-}
-.btn.danger:hover{filter:brightness(1.08)}
-.hidden{display:none}
+        <div class="muted small">Tip: schrijf de antwoorden in je eigen boekje.</div>
 
-/* Train layout */
-.trainHead{
-  display:flex;
-  justify-content:space-between;
-  align-items:flex-start;
-  gap:12px;
-  margin-bottom: 10px;
-}
-.stepTitle{font-size:18px;font-weight:800}
-.trainBtns{display:flex;gap:10px;flex-wrap:wrap}
+        <div class="divider"></div>
+        <div class="row">
+          <button class="btn" id="btnNewScenario">New scenario</button>
+          <button class="btn" id="btnFinishRun">Finish run</button>
+        </div>
+      </div>
 
-.gridTrain{
-  display:grid;
-  grid-template-columns: 1.2fr .8fr;
-  gap: 12px;
-  align-content: stretch;
-  flex: 1 1 auto;
-  min-height: 0; /* important for flex+scroll */
-}
-.panel{
-  background:#0b1220;
-  border:1px solid rgba(148,163,184,.2);
-  border-radius:16px;
-  padding:14px;
-  min-height: 0;
-}
-.panelTitle{font-weight:700;color:#cbd5e1}
+      <!-- RIGHT: ID card -->
+      <div class="panel" id="idPanel" aria-live="polite">
+        <div class="row" style="justify-content:space-between; align-items:center;">
+          <div class="panelTitle">ID Card</div>
+          <button class="btn small" id="btnCloseId" type="button">Close ID</button>
+        </div>
+        <canvas id="idCanvas" width="980" height="560" class="idCanvas"></canvas>
+        <div class="muted small" style="margin-top:8px;">
+          Ask control questions about name / nationality / DOB / age.
+        </div>
+      </div>
+    </div>
+  </section>
 
-/* Chat area should grow */
-.chatArea{
-  display:flex;
-  flex-direction:column;
-  gap: 12px;
-  height: 100%;
-  min-height: 0;
-}
-.chatWrap{
-  border: 1px solid rgba(255,255,255,0.08);
-  border-radius: 14px;
-  padding: 14px;
-  background: rgba(0,0,0,0.14);
-  flex: 1 1 auto;
-  min-height: 220px;
-  overflow: auto;
-}
+  <!-- Screen 3: Feedback -->
+  <section class="card hidden" id="screen-feedback">
+    <h1>Feedback</h1>
+    <p class="muted">Hier staan je grootste 3 missers en wat je volgende keer kunt vragen.</p>
 
-/* WhatsApp rows */
-.visitorRow{
-  display:flex;
-  gap: var(--gap);
-  align-items:flex-start; /* align avatar with bubble */
-}
-.studentRow{
-  display:flex;
-  gap: var(--gap);
-  align-items:flex-start;
-  justify-content:flex-end;
-  flex-direction: row-reverse; /* avatar on right */
-  width: 100%;
-}
+    <div class="feedbackBox">
+      <h2>Biggest 3 misses</h2>
+      <ul id="top3"></ul>
+    </div>
 
-/* Avatars same size */
-.visitorAvatar,
-.studentAvatar{
-  width: var(--avatar);
-  height: var(--avatar);
-  border-radius: 50%;
-  object-fit: cover;
-  flex: 0 0 var(--avatar);
-  border: 1px solid rgba(255,255,255,.18);
-  background: rgba(255,255,255,.06);
-}
+    <details class="details" open>
+      <summary>All missed items</summary>
+      <div class="detailsBody" id="allMisses"></div>
+    </details>
 
-.visitorCol,
-.studentCol{
-  flex: 1 1 auto;
-  max-width: calc(100% - (var(--avatar) + 24px));
-}
+    <div class="row">
+      <button class="btn" id="btnBackToStart">Back to start</button>
+      <button class="btn primary" id="btnDownloadCsv">Download CSV</button>
+    </div>
+  </section>
 
-/* Bubbles */
-.bubble{
-  border-radius:14px;
-  padding:12px;
-  min-height:54px;
-  display:flex;
-  align-items:center;
-  border:1px solid rgba(255,255,255,.10);
-  white-space: pre-wrap;
-  line-height: 1.35;
-}
-#visitorBubble.bubble{
-  background: var(--visitorBubble);
-  color: var(--visitorText);
-}
-#studentBubble.bubble.me{
-  background: var(--studentBubble);
-  border-color: var(--studentBorder);
-  color: var(--studentText);
-  margin-left:auto;
-  max-width: 70%;
-}
+  <!-- Supervisor modal (kept, but no button in UI; only text trigger) -->
+  <div class="modal hidden" id="supervisorModal" role="dialog" aria-modal="true">
+    <div class="modalCard">
+      <div class="modalHead">
+        <div class="modalTitle">Supervisor call (5W briefing)</div>
+        <button class="btn" id="btnCloseModal">Close</button>
+      </div>
 
-/* Mood text under visitor bubble */
-#visitorMood{
-  margin-top: 6px;
-  font-size: 13px;
-  color: rgba(255,255,255,.70);
-  font-style: normal;
-}
+      <p class="muted small">Fill in the 5W briefing (can be in Dutch). Then send to supervisor.</p>
 
-/* Input bar pinned to bottom of left panel (if your markup is like that) */
-.inputBar{
-  display:flex;
-  gap: 10px;
-  align-items:center;
-}
-#studentInput{
-  width: 100%;
-  min-height: 44px;
-  font-size: 16px;
-  padding: 10px 12px;
-  border-radius: 12px;
-}
+      <div class="grid2">
+        <label class="field"><span>Who?</span><input id="wWho" placeholder="Naam bezoeker" /></label>
+        <label class="field"><span>What?</span><input id="wWhat" placeholder="Doel (delivery/inspection/etc.)" /></label>
+        <label class="field"><span>With whom?</span><input id="wWithWhom" placeholder="Host / contactpersoon" /></label>
+        <label class="field"><span>What time?</span><input id="wTime" placeholder="Bijv. 10:30" /></label>
+        <label class="field"><span>Why?</span><input id="wWhy" placeholder="Onderwerp / reden" /></label>
+      </div>
 
-/* ID panel (INLINE, not fullscreen) */
-#idPanel{ display:none; }
-#idPanel.show{
-  display:block;
-}
-#idCanvas{
-  width: 100%;
-  height: auto;
-  max-height: 420px; /* prevents “takes over screen” */
-  border-radius:14px;
-  border:1px solid rgba(148,163,184,.18);
-  background:#f5f5f5;
-}
+      <div class="row">
+        <button class="btn primary" id="btnSendSupervisor">Send to supervisor</button>
+        <button class="btn" id="btnBackToVisitor" type="button">Return to visitor</button>
+      </div>
 
-/* Modals */
-.modal{position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:18px;z-index:9999}
-.modal.hidden{display:none !important}
-.modalCard{width:min(900px,100%);background:#0f1a2e;border:1px solid rgba(148,163,184,.25);border-radius:16px;padding:16px;box-shadow:0 20px 60px rgba(0,0,0,.45)}
-.modalHead{display:flex;justify-content:space-between;align-items:center;gap:10px}
-.modalTitle{font-weight:800;font-size:18px}
+      <div class="divider"></div>
+      <div class="muted small" id="supervisorResponse"></div>
+    </div>
+  </div>
 
-/* Mobile: single column, ID goes under chat */
-@media (max-width:900px){
-  .gridTrain{ grid-template-columns: 1fr; }
-  #idCanvas{ max-height: 360px; }
-}
-/* ============================
-   FIX: full-height chat + ID panel visibility
-   Plak ONDERAAN styles.css
-   ============================ */
+</main>
 
-/* 1) Laat de training grid de hele viewport gebruiken */
-.gridTrain{
-  min-height: calc(100vh - 140px) !important; /* header + padding marge */
-  align-items: stretch !important;
-}
-
-/* 2) Maak de LINKER panel (waar chat in zit) een flex-kolom die kan groeien
-   (werkt zonder extra IDs in HTML) */
-.gridTrain > .panel:first-child{
-  display: flex !important;
-  flex-direction: column !important;
-  min-height: 0 !important;
-}
-
-/* 3) Chatbox neemt nu de beschikbare ruimte */
-.chatWrap{
-  flex: 1 1 auto !important;
-  min-height: 0 !important;
-  max-height: none !important;       /* BELANGRIJK: weg met 360px limiet */
-  overflow: auto !important;
-}
-
-/* 4) Zet je input/knoppen onderaan (als ze in dezelfde panel zitten) */
-.actionBar,
-.row.actionBar,
-#actionBar{
-  margin-top: 12px !important;
-}
-
-/* 5) ID panel: standaard verborgen, maar toonbaar via body.show-id */
-#idPanel{ display: none; }
-
-/* Als JS body class zet, MOET het zichtbaar worden (geen !important conflicts) */
-body.show-id #idPanel{
-  display: block !important;
-}
-
-/* ID canvas wat groter/leesbaarder maar niet fullscreen */
-#idCanvas{
-  width: 100% !important;
-  height: auto !important;
-  max-height: 520px !important;
-}
-
-/* Op mobiel: ID panel onder de chat in 1 kolom */
-@media (max-width: 900px){
-  .gridTrain{ grid-template-columns: 1fr !
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
