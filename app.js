@@ -406,6 +406,30 @@ function computeAgeFromDob(dobStr){
   }catch(e){ return null; }
 }
 
+function moodMistakeRate(state){
+  try{
+    const mood = (state && state.card && state.card.mood) ? String(state.card.mood).toLowerCase() : "";
+    if(mood.includes("relaxed") || mood.includes("confident")) return 0.08;
+    if(mood.includes("tired") && mood.includes("cooperative")) return 0.14;
+    if(mood.includes("impatient")) return 0.22;
+    if(mood.includes("uneasy") || mood.includes("nervous") || mood.includes("glancing")) return 0.35;
+  }catch(e){}
+  return 0.18;
+}
+function rememberClaim(state, kind, value, truthy){
+  if(!state) return;
+  state.lastClaim = { kind: kind, value: value, truthy: truthy, ts: Date.now() };
+}
+function excuseLine(){
+  const lines = [
+    "Sorry, I must have misheard you.",
+    "Sorry, I misspoke.",
+    "Apologies, I got that wrong.",
+    "Sorry, I wasn’t listening properly."
+  ];
+  return lines[Math.floor(Math.random()*lines.length)];
+}
+
 function buildAboutDetail(card){
   const topic = (card.about || "").toLowerCase();
   const purpose = (card.purpose || "").toLowerCase();
@@ -601,18 +625,38 @@ function visitorResponseForIntent(state, intent, userText, card){
     case "ask_age":
         {
           const dob = getDobFromCard(state.card);
-          const age = computeAgeFromDob(dob);
-          if(age !== null) return "I'm " + age + " years old.";
+          const realAge = computeAgeFromDob(dob);
+          const rate = moodMistakeRate(state);
+          if(realAge !== null){
+            if(Math.random() < rate){
+              const wrong = (Math.random() < 0.5) ? (realAge + 1) : Math.max(18, realAge - 1);
+              rememberClaim(state, "age", wrong, false);
+              return "I'm " + wrong + " years old.";
+            }
+            rememberClaim(state, "age", realAge, true);
+            return "I'm " + realAge + " years old.";
+          }
+          rememberClaim(state, "age", 37, true);
           return "I'm 37 years old.";
         }
-
       case "ask_dob":
         {
           const dob = getDobFromCard(state.card);
-          if(dob) return "My date of birth is " + formatDob(dob) + ".";
+          const rate = moodMistakeRate(state);
+          if(dob){
+            if(Math.random() < rate){
+              const d = new Date(dob);
+              d.setDate(d.getDate() + (Math.random()<0.5 ? -1 : 1));
+              const wrong = d.toISOString().slice(0,10);
+              rememberClaim(state, "dob", wrong, false);
+              return "My date of birth is " + formatDob(wrong) + ".";
+            }
+            rememberClaim(state, "dob", dob, true);
+            return "My date of birth is " + formatDob(dob) + ".";
+          }
+          rememberClaim(state, "dob", "1987-04-18", true);
           return "My date of birth is 18 Apr 1987.";
         }
-
       case "challenge":
         // Mood can shift when challenged
         if(state.card){
@@ -1057,6 +1101,32 @@ function processUserLine(state, userText){
   // threat rules completion (simple)
   if(state.stepKey === "threat_rules"){
     const t = norm(userText);
+  // LASTCLAIM_CHALLENGE_V37: handle "are you sure" / "but you said" challenges
+  if((t.includes("are you sure") || t.includes("but you said") || t.includes("you said")) && state.lastClaim){
+    const rate = moodMistakeRate(state);
+    if(state.lastClaim.truthy === false){
+      if(Math.random() > rate){
+        if(state.lastClaim.kind === "age"){
+          const realAge = computeAgeFromDob(getDobFromCard(state.card));
+          if(realAge !== null){
+            state.lastClaim = null;
+            return showVisitor("Sorry — I'm " + realAge + ".");
+          }
+        }
+        if(state.lastClaim.kind === "dob"){
+          const dob = getDobFromCard(state.card);
+          if(dob){
+            state.lastClaim = null;
+            return showVisitor("Sorry — my date of birth is " + formatDob(dob) + ".");
+          }
+        }
+      }
+      return showVisitor(excuseLine());
+    } else {
+      return showVisitor("Yes.");
+    }
+  }
+
 
   // AGE_VERIFICATION_V36: handle questions like "are you 35?"
   const ageMatch = t.match(/\bare you\s+(\d{1,3})\b/);
