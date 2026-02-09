@@ -23,37 +23,6 @@
 
       <div class="divider" role="separator" aria-hidden="true"></div>
 
-      <section class="idSlot" aria-label="ID Slot">
-        <div class="idCardWrap" id="idCardWrap" hidden>
-          <div class="idCard" role="group" aria-label="ID Card">
-            <div class="idCard__top">
-              <div class="idCard__title">IDENTITY CARD</div>
-              <button class="btn btn--small" id="btnReturnId" type="button">Return ID</button>
-            </div>
-
-            <div class="idCard__body">
-              <img class="idPhoto" id="idPhoto" alt="ID photo" />
-              <div class="idFields">
-                <div class="idRow"><span class="k">Name</span><span class="v" id="idName"></span></div>
-                <div class="idRow"><span class="k">DOB</span><span class="v" id="idDob"></span></div>
-                <div class="idRow"><span class="k">Nationality</span><span class="v" id="idNat"></span></div>
-                <div class="idRow"><span class="k">ID No.</span><span class="v" id="idNo"></span></div>
-              </div>
-            </div>
-
-            <div class="idCard__note" id="idNote">
-              (The ID is shown here after you ask for it.)
-            </div>
-          </div>
-        </div>
-
-        <div class="idSlotHint" id="idSlotHint">
-          Ask for the visitor’s ID to display it here.
-        </div>
-      </section>
-
-      <div class="divider divider--spacer" role="separator" aria-hidden="true"></div>
-
       <section class="settings" aria-label="Training Settings">
         <label class="label" for="difficulty">Difficulty</label>
         <select class="select" id="difficulty">
@@ -63,6 +32,24 @@
         </select>
 
         <div class="hintBox" id="hintBox" hidden></div>
+      </section>
+
+      <div class="divider" role="separator" aria-hidden="true"></div>
+
+      <!-- Quick add rules (stored in localStorage) -->
+      <section class="quickAdd" aria-label="Quick Add">
+        <h3>Quick add (dev)</h3>
+        <div class="row">
+          <input id="qaPhrases" type="text" placeholder="Match phrases (comma separated) e.g. what is your name, what's your name" />
+        </div>
+        <div class="row">
+          <textarea id="qaReply" placeholder="Visitor reply e.g. My name is Jordan Miller."></textarea>
+        </div>
+        <div class="row">
+          <button class="btn btn--small" id="qaAddBtn" type="button">Add rule</button>
+          <button class="btn btn--small" id="qaClearBtn" type="button">Clear rules</button>
+        </div>
+        <div class="note">Rules are saved in your browser (localStorage). Refresh keeps them.</div>
       </section>
     </aside>
 
@@ -80,7 +67,7 @@
       <section class="screen screen--active" id="screenTraining" aria-label="Training Screen">
         <div class="chat">
           <div class="msg msg--left">
-            <img class="avatar" id="visitorAvatar" src="assets/photos/headshot_01.png" alt="Visitor avatar" />
+            <img class="avatar" id="visitorAvatar" src="assets/photos/headshots_01.png" alt="Visitor avatar" />
             <div class="bubbleCol">
               <div class="bubble bubble--visitor" id="visitorBubble">Hello.</div>
               <div class="mood" id="moodLine">The visitor looks neutral.</div>
@@ -93,6 +80,34 @@
             </div>
             <img class="avatar" id="studentAvatar" src="assets/photos/soldier.png" alt="Student avatar" />
           </div>
+        </div>
+
+        <div class="chatDivider" aria-hidden="true"></div>
+
+        <!-- ID card under the chat bubbles (hidden until you ask for ID) -->
+        <div class="idUnderChat" aria-label="Identity card area">
+          <div class="idUnderChatInner" id="idCardWrap" hidden>
+            <div class="idCard" role="group" aria-label="ID Card">
+              <div class="idCard__top">
+                <div class="idCard__title">IDENTITY CARD</div>
+                <button class="btn btn--small" id="btnReturnId" type="button">Return ID</button>
+              </div>
+
+              <div class="idCard__body">
+                <img class="idPhoto" id="idPhoto" alt="ID photo" />
+                <div class="idFields">
+                  <div class="idRow"><span class="k">Name</span><span class="v" id="idName"></span></div>
+                  <div class="idRow"><span class="k">DOB</span><span class="v" id="idDob"></span></div>
+                  <div class="idRow"><span class="k">Nationality</span><span class="v" id="idNat"></span></div>
+                  <div class="idRow"><span class="k">ID No.</span><span class="v" id="idNo"></span></div>
+                </div>
+              </div>
+
+              <div class="idCard__note">Shown after you ask for ID.</div>
+            </div>
+          </div>
+
+          <div class="idSlotHint" id="idSlotHint">Ask for the visitor’s ID to display it here.</div>
         </div>
 
         <div class="inputBar">
@@ -113,7 +128,7 @@
       <section class="screen" id="screenPersonSearch" aria-label="Person Search Screen">
         <div class="placeholder">
           <h2>Person Search (later)</h2>
-          <p>Hier komt later je search-flow. Voor nu is dit alleen een placeholder zodat de navigatie “bestaat”.</p>
+          <p>Placeholder.</p>
           <button class="btn" id="btnBackToTraining" type="button">Back to Training</button>
         </div>
       </section>
@@ -121,7 +136,7 @@
       <section class="screen" id="screenReturn" aria-label="Return Screen">
         <div class="placeholder">
           <h2>Return</h2>
-          <p>Placeholder-screen voor “Return”.</p>
+          <p>Placeholder.</p>
           <button class="btn" id="btnBackReturn" type="button">Back to Training</button>
         </div>
       </section>

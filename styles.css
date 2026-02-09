@@ -333,3 +333,63 @@ body{
   }
   .bubbleCol{ max-width: 86%; }
 }
+
+
+/* --- v5 patches --- */
+
+/* Avatars align with the TOP of the chat bubble (not the mood line) */
+.msg{ align-items:flex-start; }
+
+/* ID card under chat */
+.idUnderChat{
+  padding: 0 12px 12px 12px;
+}
+.idUnderChatInner{
+  display:flex;
+  justify-content:flex-start;
+}
+.idUnderChat .idCard{
+  width: 340px;
+}
+
+/* Make input + hold-to-talk look aligned */
+.inputBar{ align-items:center; }
+.holdWrap{ flex-direction:column; justify-content:center; }
+.typeWrap{ align-items:center; }
+
+/* Divider between chat and ID */
+.chatDivider{
+  height:1px;
+  background:var(--border);
+  margin: 0 12px 12px 12px;
+}
+
+/* Quick Add panel */
+.quickAdd{
+  border:1px solid var(--border);
+  background:#0b1220;
+  border-radius:12px;
+  padding:10px;
+}
+.quickAdd h3{
+  margin:0 0 8px 0;
+  font-size:13px;
+  color:var(--text);
+}
+.quickAdd .row{
+  display:flex;
+  gap:8px;
+  margin-bottom:8px;
+}
+.quickAdd input, .quickAdd textarea{
+  width:100%;
+  background:#0b1220;
+  border:1px solid var(--border);
+  color:var(--text);
+  border-radius:10px;
+  padding:10px;
+  font-size:13px;
+  outline:none;
+}
+.quickAdd textarea{ min-height:66px; resize:vertical; }
+.quickAdd .note{ color:var(--muted); font-size:12px; margin-top:6px; }
