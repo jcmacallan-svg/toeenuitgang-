@@ -36,6 +36,18 @@ function parseHotkey(str){
     key: parts.find(p => !["ctrl","control","alt","option","shift","meta","cmd","command"].includes(p)) || ""
   };
 }
+
+
+// --- ID panel visibility (declared early) ---
+function updateIdVisibility(state){
+  const panel = $("#idPanel");
+  const step = currentStep(state);
+  const show = (step && step.key !== "gate") || (state.asked && state.asked["request_id"]);
+  if(panel) panel.style.display = show ? "" : "none";
+}
+window.updateIdVisibility = updateIdVisibility;
+
+
 function matchesHotkey(e, hk){
   if(!hk) return false;
   const key = (e.key || "").toLowerCase();
@@ -480,6 +492,7 @@ function visitorResponseForIntent(state, intent, userText, card){
     case "request_id":
         markAsked(state, "request_id");
         updateIdVisibility(state);
+        updateIdVisibility(state);
         updateVisitorAvatar(state);
       return "Sure, here is my ID.";
     case "control_question":
@@ -759,8 +772,8 @@ function renderIdCard(state){
     field("Nationality", nat, 274);
     field("Date of birth", dob, 326);
     field("Age", age, 378);
-    field("ID No.", id.id_no, 510);
-    field("Expiry", id.expiry, 552);
+    field("ID No.", id.id_no, 490);
+    field("Expiry", id.expiry, 520);
   }
 }
 
@@ -848,12 +861,6 @@ function setStepUI(state){
       }
     }
 
-function updateIdVisibility(state){
-  const panel = $("#idCardPanel");
-  const step = currentStep(state);
-  const show = (step && step.key !== "gate") || (state.asked && state.asked["request_id"]);
-  if(panel) panel.style.display = show ? "" : "none";
-}
 
 function updateActionButtons(state){
   const step = currentStep(state);
@@ -1120,6 +1127,8 @@ function finishRun(state){
     // Now begin
     updateIdVisibility(state);
     updateVisitorAvatar(state);
+    updateIdVisibility(state);
+    updateVisitorAvatar(state);
     showVisitor("Good morning.");
     renderMood(state);
   });
@@ -1201,6 +1210,8 @@ $("#btnDoneStep").addEventListener("click", () => {
     const seed = (Math.random()*1e9) >>> 0;
     state.runId = `run_${seed}`;
     state.card = generateVisitorCard(seed);
+    updateVisitorAvatar(state);
+    updateIdVisibility(state);
     state.revealed = { id:false };
     state.stepIndex = 0;
     state.stepKey = STEPS[0].key;
@@ -1211,6 +1222,8 @@ $("#btnDoneStep").addEventListener("click", () => {
     $("#stepHelp").textContent = "";
     updateMeta(state);
     setStepUI(state);
+    updateIdVisibility(state);
+    updateVisitorAvatar(state);
     updateIdVisibility(state);
     updateVisitorAvatar(state);
     showVisitor("Good morning.");
