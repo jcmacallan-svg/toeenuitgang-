@@ -1015,6 +1015,15 @@ function processUserLine(state, userText){
   // threat rules completion (simple)
   if(state.stepKey === "threat_rules"){
     const t = norm(userText);
+
+  // Auto-open supervisor popup when the student says they will contact/call the supervisor
+  // Examples: "I'll contact my supervisor", "I will call my supervisor", "Contact supervisor"
+  if(t.includes("contact my supervisor") || t.includes("call my supervisor") || t.includes("contact supervisor") || t.includes("call supervisor") || t.includes("phone my supervisor")){
+    try {
+      setTimeout(() => { try { openSupervisorModal(state); } catch(e) {} }, 900);
+    } catch(e) {}
+  }
+
     if(t.includes("no weapons") || t.includes("no drugs") || t.includes("no alcohol") || t.includes("prohibited") || t.includes("searched") || t.includes("search") || t.includes("pat-down") || t.includes("due to") ){
       state.threatRulesComplete = true;
     }
