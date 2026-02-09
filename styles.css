@@ -1,574 +1,228 @@
-*{box-sizing:border-box}html,body{margin:0;padding:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:#0b1220;color:#e5e7eb}
+/* =========================================================
+   VEVA — WhatsApp style (clean, single source of truth)
+   ========================================================= */
+
+*{box-sizing:border-box}
+html,body{
+  margin:0;
+  padding:0;
+  font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+  color:rgba(255,255,255,.92);
+  background: radial-gradient(1200px 800px at 30% 10%, rgba(30,80,160,.40), #070c16);
+}
+
+:root{
+  --panel: rgba(255,255,255,.06);
+  --panelBorder: rgba(255,255,255,.10);
+  --muted: rgba(255,255,255,.65);
+
+  --visitorBubble: rgba(255,255,255,.08);
+  --visitorText: #d6d9e2;
+
+  --studentBubble: rgba(25,118,210,.18);
+  --studentBorder: rgba(25,118,210,.55);
+  --studentText: #4aa3ff;
+
+  --dangerBg: rgba(255,59,59,.14);
+  --dangerBorder: rgba(255,59,59,.55);
+
+  --avatar: 72px;
+  --radius: 16px;
+}
+
+/* Layout shell */
 .wrap{max-width:1100px;margin:0 auto;padding:18px}
-.topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+.topbar{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:12px;
+  margin-bottom:16px;
+}
 .brand{display:flex;gap:12px;align-items:center}
-.logo{width:44px;height:44px;border-radius:12px;background:rgba(59,130,246,.2);display:flex;align-items:center;justify-content:center;font-weight:800;color:#93c5fd;border:1px solid rgba(59,130,246,.35)}
+.logo{
+  width:44px;height:44px;border-radius:12px;
+  background:rgba(59,130,246,.2);
+  display:flex;align-items:center;justify-content:center;
+  font-weight:800;color:#93c5fd;border:1px solid rgba(59,130,246,.35)
+}
 .title{font-size:18px;font-weight:800}
-.subtitle{font-size:12px;color:#94a3b8}
-.meta{font-size:12px;color:#94a3b8}
-.card{background:#0f1a2e;border:1px solid rgba(148,163,184,.2);border-radius:16px;padding:18px;box-shadow:0 10px 30px rgba(0,0,0,.25);margin-bottom:16px}
-h1{margin:0 0 10px 0;font-size:22px}
-h2{margin:0 0 10px 0;font-size:18px}
-.muted{color:#94a3b8}
-.small{font-size:12px}
-.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-.field{display:flex;flex-direction:column;gap:6px;margin:10px 0}
-.field input,.field select{border-radius:12px;border:1px solid rgba(148,163,184,.25);background:#0b1220;color:#e5e7eb;padding:10px 12px;outline:none}
-.field input:focus,.field select:focus{border-color:rgba(59,130,246,.7)}
-.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-.btn{border-radius:12px;border:1px solid rgba(148,163,184,.25);background:#0b1220;color:#e5e7eb;padding:10px 12px;cursor:pointer}
-.btn:hover{border-color:rgba(148,163,184,.5)}
-.btn.primary{background:rgba(59,130,246,.2);border-color:rgba(59,130,246,.45)}
-.btn.primary:hover{border-color:rgba(59,130,246,.8)}
-.hidden{display:none}
-.details{margin-top:12px}
-.details summary{cursor:pointer;color:#cbd5e1}
-.detailsBody{margin-top:10px;color:#cbd5e1}
-.trainHead{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
-.stepTitle{font-size:18px;font-weight:800}
-.trainBtns{display:flex;gap:10px}
-.gridTrain{display:grid;grid-template-columns:1.2fr .8fr;gap:12px;margin-top:12px}
-.panel{background:#0b1220;border:1px solid rgba(148,163,184,.2);border-radius:16px;padding:14px}
-.panelTitle{font-weight:700;color:#cbd5e1}
-.mt{margin-top:12px}
-.bubble{margin-top:8px;border:2px solid rgba(59,130,246,.6);border-radius:14px;padding:12px;background:rgba(59,130,246,.08);min-height:54px;display:flex;align-items:center}
-.divider{height:1px;background:rgba(148,163,184,.18);margin:14px 0}
-.idCanvas{width:100%;height:auto;border-radius:14px;border:1px solid rgba(148,163,184,.18);background:#f5f5f5}
-.feedbackBox{background:#0b1220;border:1px solid rgba(148,163,184,.2);border-radius:16px;padding:14px;margin:12px 0}
-.footer{display:flex;justify-content:center;padding:10px 0}
-@media(max-width:900px){.grid2{grid-template-columns:1fr}.gridTrain{grid-template-columns:1fr}}
-
-.modal{position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:18px;z-index:9999}
-.modalCard{width:min(900px,100%);background:#0f1a2e;border:1px solid rgba(148,163,184,.25);border-radius:16px;padding:16px;box-shadow:0 20px 60px rgba(0,0,0,.45)}
-.modalHead{display:flex;justify-content:space-between;align-items:center;gap:10px}
-.modalTitle{font-weight:800;font-size:18px}
-.actionBar{margin-top:10px}
-
-.tabs{display:flex;gap:8px;margin:12px 0;flex-wrap:wrap}
-.tab{border-radius:999px;border:1px solid rgba(148,163,184,.25);background:#0b1220;color:#e5e7eb;padding:8px 12px;cursor:pointer}
-.tab.active{background:rgba(59,130,246,.2);border-color:rgba(59,130,246,.55)}
-.tabPanel{margin-top:6px}
-
-/* Ensure modals can be hidden even though .modal sets display:flex */
-.modal.hidden{display:none !important}
-
-.teacherOnly{display:none !important}
-body.teacher .teacherOnly{display:block !important}
-
-.btn.danger{border-color:rgba(239,68,68,.6);background:rgba(239,68,68,.12)}
-.btn.danger:hover{background:rgba(239,68,68,.18)}
-
-.visitorMood{margin:8px 0 14px 0; font-style:italic; opacity:.85}
-
-.runId{color:rgba(20,45,90,.35)!important}
-
-.topbar{display:flex;align-items:center;justify-content:space-between}
-.topActions{display:flex;gap:8px;align-items:center}
+.meta{font-size:12px;color:rgba(255,255,255,.65)}
+.btn{
+  border-radius:12px;
+  border:1px solid rgba(255,255,255,.14);
+  background:rgba(0,0,0,.18);
+  color:rgba(255,255,255,.92);
+  padding:10px 12px;
+  cursor:pointer;
+}
+.btn:hover{border-color:rgba(255,255,255,.22)}
+.btn.primary{
+  background:rgba(59,130,246,.20);
+  border-color:rgba(59,130,246,.45)
+}
+.btn.primary:hover{border-color:rgba(59,130,246,.70)}
+.btn.danger{
+  background:var(--dangerBg);
+  border-color:var(--dangerBorder);
+  color:#fff;
+}
+.btn.danger:hover{filter:brightness(1.08)}
 .btn.small{padding:6px 10px;font-size:12px}
-
 .btn.subtle{opacity:.85}
 .btn.subtle:hover{opacity:1}
 
-#idCardPanel{display:none;}
-
-.visitorRow{display:flex;gap:12px;align-items:flex-start}
-.visitorAvatar{width:44px;height:44px;border-radius:999px;object-fit:cover;border:1px solid rgba(255,255,255,.18)}
-.visitorCol{flex:1}
-
-.idCard{min-height:240px}
-.idCard .idFooter{font-size:12px;line-height:1.15}
-
-/* When ID panel is hidden, expand the conversation pane */
-#trainGrid.trainGridOneCol{grid-template-columns: 1fr !important;}
-#trainGrid.trainGridOneCol #idPanel{display:none !important;}
-#trainGrid.trainGridOneCol{display:block !important;}
-
-/* ID card layout tweaks */
-.idCard{min-height:260px}
-.idCard .idFooter{font-size:12px;line-height:1.15;margin-top:6px}
-
-/* UI scaling tweaks for 100% zoom readability */
-.container{max-width: 1200px}
-.card{padding: 22px}
-h2{font-size: 22px}
-label{font-size: 14px}
-input[type="text"], textarea{font-size:16px; padding:12px 14px}
-#studentInput{min-height:44px}
-#visitorAnswer{min-height:56px;font-size:16px}
-
-/* --- Fullscreen readability mode (default) --- */
-:root{
-  --base-font: 18px;
-  --card-pad: 26px;
-  --radius: 18px;
-}
-html, body { font-size: var(--base-font); }
-body { padding: 12px !important; }
-
-.container{
-  width: 96vw !important;
-  max-width: 1400px !important;
-  margin: 0 auto !important;
-}
-
-header{
-  padding: 14px 16px !important;
-}
-
 .card{
-  padding: var(--card-pad) !important;
-  border-radius: var(--radius) !important;
+  background:var(--panel);
+  border:1px solid var(--panelBorder);
+  border-radius:var(--radius);
+  padding:18px;
+  box-shadow:0 10px 30px rgba(0,0,0,.25);
+  margin-bottom:16px;
+  backdrop-filter: blur(6px);
 }
 
-h1{ font-size: 28px !important; }
-h2{ font-size: 24px !important; }
-h3{ font-size: 18px !important; }
+h1{margin:0 0 10px 0;font-size:22px}
+h2{margin:0 0 10px 0;font-size:18px}
+.muted{color:var(--muted)}
+.small{font-size:12px}
+.hidden{display:none}
 
-small, .muted{ font-size: 0.92em !important; }
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.field{display:flex;flex-direction:column;gap:6px;margin:10px 0}
+.field input,.field select{
+  border-radius:12px;border:1px solid rgba(255,255,255,.14);
+  background:rgba(0,0,0,.18);
+  color:rgba(255,255,255,.92);
+  padding:10px 12px;outline:none
+}
+.field input:focus,.field select:focus{border-color:rgba(59,130,246,.7)}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 
-input[type="text"], select, textarea{
-  font-size: 18px !important;
-  padding: 14px 16px !important;
-  border-radius: 12px !important;
+.details{margin-top:12px}
+.details summary{cursor:pointer;color:rgba(255,255,255,.78)}
+.detailsBody{margin-top:10px;color:rgba(255,255,255,.78)}
+
+.trainHead{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.stepTitle{font-size:18px;font-weight:800}
+.trainBtns{display:flex;gap:10px;flex-wrap:wrap}
+
+/* Training grid: chat + ID panel */
+.gridTrain{
+  display:grid;
+  grid-template-columns: 1.25fr .75fr;
+  gap:12px;
+  margin-top:12px;
+}
+.panel{
+  background:rgba(0,0,0,.18);
+  border:1px solid rgba(255,255,255,.10);
+  border-radius:var(--radius);
+  padding:14px;
+}
+.panelTitle{font-weight:700;color:rgba(255,255,255,.85)}
+.mt{margin-top:12px}
+.divider{height:1px;background:rgba(255,255,255,.10);margin:14px 0}
+.actionBar{margin-top:10px;gap:10px}
+
+/* WhatsApp rows: visitor left, student right */
+.visitorRow{
+  display:flex;
+  gap:12px;
+  align-items:flex-start; /* align avatar with bubble top */
+}
+.studentRow{
+  display:flex;
+  gap:12px;
+  align-items:flex-end;
+  justify-content:flex-end;
+  flex-direction: row-reverse; /* avatar right */
+  width:100%;
 }
 
-button, .btn{
-  font-size: 16px !important;
-  padding: 10px 14px !important;
-  border-radius: 12px !important;
+.visitorAvatar, .studentAvatar{
+  width:var(--avatar);
+  height:var(--avatar);
+  border-radius:50%;
+  object-fit:cover;
+  flex:0 0 var(--avatar);
+  border:1px solid rgba(255,255,255,.18);
+  background:rgba(255,255,255,.06);
 }
 
-#visitorAnswer{ min-height: 72px !important; font-size: 18px !important; }
-#studentInput{ min-height: 52px !important; }
-
-@media (min-width: 1200px){
-  /* give the training panel more breathing room */
-  .panel { padding: 22px !important; }
+.visitorCol, .studentCol{
+  flex:1 1 auto;
+  max-width: calc(100% - (var(--avatar) + 24px));
 }
 
-/* Make the training area feel more 'screen-filling' */
-main { min-height: calc(100vh - 120px); }
+/* Bubbles (single bubble, overwritten each time) */
+.bubble{
+  margin-top:2px;
+  border-radius:14px;
+  padding:12px;
+  min-height:54px;
+  display:flex;
+  align-items:center;
+  line-height:1.35;
+  white-space:pre-wrap;
+  border:1px solid rgba(255,255,255,.10);
+}
 
+#visitorBubble{
+  background:var(--visitorBubble);
+  color:var(--visitorText);
+}
+#studentBubble{
+  background:var(--studentBubble);
+  border-color:var(--studentBorder);
+  color:var(--studentText);
+  margin-left:auto;
+  max-width:70%;
+}
+
+#visitorMood{
+  margin-top:6px;
+  font-size:13px;
+  color:rgba(255,255,255,.70);
+}
+
+/* Input row */
+#studentInput{
+  width:100%;
+  min-height:44px;
+  font-size:16px;
+  padding:10px 12px;
+}
+
+/* Mic */
 .micStatus{margin-left:10px; opacity:.9; font-size:0.95em}
 #btnMicHold{user-select:none; -webkit-user-select:none; touch-action:none}
 #btnMicHold.listening{outline:2px solid rgba(120,180,255,.55)}
 
-/* Bigger visitor avatar */
-.visitorAvatar{width:88px !important;height:88px !important;}
-.visitorRow{align-items:center !important;}
-
-/* Chat log */
-.chatWrap{
-  border: 1px solid rgba(255,255,255,0.08);
-  border-radius: 14px;
-  padding: 14px;
-  background: rgba(0,0,0,0.14);
-  min-height: 220px;
-  max-height: 360px;
-  overflow: auto;
-}
-.chatLog{display:flex; flex-direction:column; gap:10px;}
-.msgRow{display:flex; gap:10px; align-items:flex-start;}
-.msgRow.me{flex-direction:row-reverse;}
-.msgAvatar{
-  width:54px; height:54px; border-radius:50%;
-  object-fit:cover; flex: 0 0 auto;
-  border: 1px solid rgba(255,255,255,0.16);
-  background: rgba(255,255,255,0.06);
-}
-.msgBubble{
-  max-width: 76%;
-  padding: 10px 12px;
-  border-radius: 14px;
-  line-height: 1.35;
-  white-space: pre-wrap;
-  border: 1px solid rgba(255,255,255,0.10);
-  background: rgba(255,255,255,0.06);
-}
-.msgRow.me .msgBubble{
-  background: rgba(120,180,255,0.12);
-  border-color: rgba(120,180,255,0.25);
-}
-
-/* Question input: slightly smaller but full width */
-#studentInput{
-  width: 100% !important;
-  min-height: 44px !important;
-  font-size: 16px !important;
-  padding: 10px 12px !important;
-}
-
-/* Student bubble row (right side) */
-.studentRow{display:flex; gap:10px; align-items:flex-start; justify-content:flex-end; margin-top:10px; flex-direction:row-reverse}
-.studentAvatar{width:64px; height:64px; border-radius:50%; object-fit:cover; border:1px solid rgba(255,255,255,0.16); background:rgba(255,255,255,0.06)}
-.studentCol{max-width: calc(100% - 90px)}
-.bubble.me{background: rgba(120,180,255,0.12); border:1px solid rgba(120,180,255,0.25)}
-/* Visitor avatar bigger */
-.visitorAvatar{width:72px; height:72px}
-.visitorCol{max-width: calc(100% - 90px)}
-
-.studentCol{display:flex; justify-content:flex-end;}
-
-/* v36: hard right-align student message row */
-.studentRow{
-  width:100% !important;
-  justify-content:flex-end !important;
-  align-items:flex-start !important;
-}
-.studentCol{
-  flex: 1 1 auto !important;
-  width:100% !important;
-  display:flex !important;
-  justify-content:flex-end !important;
-}
-#studentBubble.bubble.me{
-  margin-left:auto !important;
-  text-align:left; /* keep bubble text readable */
-  max-width: 70%;
-}
-/* ==============================
-   VEVA WhatsApp-style UI patch
-   ============================== */
-
-:root{
-  --bg: #070c16;
-  --panel: rgba(255,255,255,.06);
-  --panelBorder: rgba(255,255,255,.10);
-  --text: rgba(255,255,255,.92);
-  --muted: rgba(255,255,255,.65);
-
-  --visitorBubble: rgba(255,255,255,.08);
-  --visitorText: #d6d9e2;           /* light grey text */
-
-  --studentBubble: rgba(25,118,210,.18);
-  --studentBorder: rgba(25,118,210,.55);
-  --studentText: #4aa3ff;           /* blue text */
-  --danger: #ff3b3b;
-  --dangerBg: rgba(255,59,59,.14);
-}
-
-html, body{
-  background: radial-gradient(1200px 800px at 30% 10%, rgba(30,80,160,.40), var(--bg));
-  color: var(--text);
-}
-
-.card{
-  background: var(--panel);
-  border: 1px solid var(--panelBorder);
-  backdrop-filter: blur(6px);
-}
-
-.muted{ color: var(--muted); }
-
-/* Make action bar look cleaner */
-.actionBar{
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-/* Hide the supervisor button (you wanted TEXT trigger only) */
-#btnContactSupervisor{
-  display: none !important;
-}
-
-/* Deny entrance pops */
-#btnDenyEntrance, .btn.danger{
-  background: var(--dangerBg) !important;
-  border-color: rgba(255,59,59,.55) !important;
-  color: #fff !important;
-}
-#btnDenyEntrance:hover, .btn.danger:hover{
-  filter: brightness(1.08);
-}
-
-/* WhatsApp rows: visitor left, student right */
-.visitorRow,
-.studentRow{
-  display: flex;
-  align-items: flex-end;
-  gap: 12px;
-}
-
-.studentRow{
-  justify-content: flex-end;
-}
-
-/* Avatar sizing + same size */
-.visitorAvatar,
-.studentAvatar{
-  width: 56px !important;
-  height: 56px !important;
-  border-radius: 50% !important;
-  object-fit: cover !important;
-  flex: 0 0 56px;
-  border: 1px solid rgba(255,255,255,.18);
-  background: rgba(255,255,255,.06);
-}
-
-/* Bubble colors */
-#visitorBubble.bubble{
-  background: var(--visitorBubble) !important;
-  color: var(--visitorText) !important;
-  border: 1px solid rgba(255,255,255,.10);
-}
-#studentBubble.bubble.me{
-  background: var(--studentBubble) !important;
-  color: var(--studentText) !important;        /* blue text */
-  border: 1px solid var(--studentBorder) !important;
-}
-
-/* Mood text under visitor bubble */
-#visitorMood{
-  margin-top: 6px;
-  font-size: 12px;
-  color: rgba(255,255,255,.65);
-}
-
-/* =========================================================
-   VEVA FINAL OVERRIDE — WhatsApp style (single source of truth)
-   Plak dit HELEMAAL ONDERAAN je styles.css
-   ========================================================= */
-
-:root{
-  --veva-bg: #070c16;
-  --veva-panel: rgba(255,255,255,.06);
-  --veva-panelBorder: rgba(255,255,255,.10);
-  --veva-text: rgba(255,255,255,.92);
-  --veva-muted: rgba(255,255,255,.65);
-
-  --veva-visitorBubble: rgba(255,255,255,.08);
-  --veva-visitorText: #d6d9e2;
-
-  --veva-studentBubble: rgba(25,118,210,.18);
-  --veva-studentBorder: rgba(25,118,210,.55);
-  --veva-studentText: #4aa3ff;
-
-  --veva-dangerBg: rgba(255,59,59,.14);
-  --veva-dangerBorder: rgba(255,59,59,.55);
-
-  --veva-avatar: 72px; /* groter + gelijk */
-}
-
-html, body{
-  background: radial-gradient(1200px 800px at 30% 10%, rgba(30,80,160,.40), var(--veva-bg)) !important;
-  color: var(--veva-text) !important;
-}
-
-.card{
-  background: var(--veva-panel) !important;
-  border: 1px solid var(--veva-panelBorder) !important;
-  backdrop-filter: blur(6px);
-}
-
-.muted{ color: var(--veva-muted) !important; }
-
-/* Supervisor knop weg (alleen via teksttrigger) */
-#btnContactSupervisor{ display:none !important; }
-
-/* Deny entrance pops */
-#btnDenyEntrance, .btn.danger{
-  background: var(--veva-dangerBg) !important;
-  border-color: var(--veva-dangerBorder) !important;
-  color: #fff !important;
-}
-#btnDenyEntrance:hover, .btn.danger:hover{ filter: brightness(1.08); }
-
-/* Layout: visitor links, student rechts */
-.visitorRow{
-  display:flex !important;
-  gap:12px !important;
-  align-items:flex-end !important;
-}
-
-.studentRow{
-  display:flex !important;
-  gap:12px !important;
-  align-items:flex-end !important;
-  justify-content:flex-end !important;
-  flex-direction: row-reverse !important; /* avatar rechts */
-  width: 100% !important;
-}
-
-/* Avatars: exact gelijk + groter */
-.visitorAvatar,
-.studentAvatar{
-  width: var(--veva-avatar) !important;
-  height: var(--veva-avatar) !important;
-  border-radius: 50% !important;
-  object-fit: cover !important;
-  flex: 0 0 var(--veva-avatar) !important;
-  border: 1px solid rgba(255,255,255,.18) !important;
-  background: rgba(255,255,255,.06) !important;
-}
-
-/* Col widths (zodat bubble netjes uitlijnt) */
-.visitorCol,
-.studentCol{
-  max-width: calc(100% - (var(--veva-avatar) + 24px)) !important;
-  flex: 1 1 auto !important;
-}
-
-/* Bubbles */
-#visitorBubble.bubble{
-  background: var(--veva-visitorBubble) !important;
-  border: 1px solid rgba(255,255,255,.10) !important;
-  color: var(--veva-visitorText) !important;
-  min-height: 54px !important;
-}
-
-#studentBubble.bubble.me{
-  background: var(--veva-studentBubble) !important;
-  border: 1px solid var(--veva-studentBorder) !important;
-  color: var(--veva-studentText) !important;
-  min-height: 54px !important;
-  margin-left: auto !important; /* bubble rechts */
-  max-width: 70% !important;
-}
-
-/* Mood onder visitor bubble */
-#visitorMood{
-  margin-top: 8px !important;
-  font-style: normal !important;
-  font-size: 13px !important;
-  color: rgba(255,255,255,.70) !important;
-  opacity: 1 !important;
-}
-
-/* ID panel op mobiel weg */
-@media (max-width: 900px){
-  #idPanel{ display:none !important; }
-  .gridTrain{ grid-template-columns: 1fr !important; }
-}
-/* =========================
- 
-/* =========================================================
-   VEVA CSS PATCH — fixes conflicts + makes ID overlay work on mobile
-   Plak dit helemaal ONDERAAN styles.css
-   ========================================================= */
-
-/* 1) Eén bron van waarheid voor avatar size */
-:root{
-  --veva-avatar: 72px;
-}
-
-/* 2) WhatsApp rows (force) */
-.visitorRow{
-  display:flex !important;
-  gap:12px !important;
-  align-items:flex-end !important;
-}
-
-.studentRow{
-  display:flex !important;
-  gap:12px !important;
-  align-items:flex-end !important;
-  justify-content:flex-end !important;
-  flex-direction: row-reverse !important; /* avatar rechts */
-  width:100% !important;
-}
-
-/* 3) Avatars gelijk en groter */
-.visitorAvatar,
-.studentAvatar{
-  width: var(--veva-avatar) !important;
-  height: var(--veva-avatar) !important;
-  border-radius: 50% !important;
-  object-fit: cover !important;
-  flex: 0 0 var(--veva-avatar) !important;
-  border: 1px solid rgba(255,255,255,.18) !important;
-  background: rgba(255,255,255,.06) !important;
-}
-
-/* 4) Bubbles */
-#visitorBubble.bubble{
-  background: rgba(255,255,255,.08) !important;
-  border: 1px solid rgba(255,255,255,.10) !important;
-  color: #d6d9e2 !important; /* visitor text lichtgrijs */
-  min-height: 54px !important;
-}
-
-#studentBubble.bubble.me{
-  background: rgba(25,118,210,.18) !important;
-  border: 1px solid rgba(25,118,210,.55) !important;
-  color: #4aa3ff !important; /* student text blauw */
-  min-height: 54px !important;
-  margin-left: auto !important;
-  max-width: 70% !important;
-}
-
-/* 5) Mood onder visitor bubble */
-#visitorMood{
-  margin-top: 8px !important;
-  font-style: normal !important;
-  font-size: 13px !important;
-  color: rgba(255,255,255,.70) !important;
-  opacity: 1 !important;
-}
-
-/* 6) ID panel: standaard uit (app.js zet 'm aan) */
+/* ID panel: inline, hidden until asked */
 #idPanel{ display:none; }
-
-/* 7)Y — werkt ook op mobiel */
-body.id-open #idPanel{
-  display:block !important;
-  position:fixed !important;
-  inset: 14px !important;
-  z-index: 9998 !important;
-  background: rgba(10,14,22,.92) !important;
-  border: 1px solid rgba(255,255,255,.14) !important;
-  border-radius: 18px !important;
-  padding: 14px !important;
-  box-shadow: 0 30px 90px rgba(0,0,0,.55) !important;
-}
-
-body.id-open #idCanvas{
-  width: 100% !important;
-  height: auto !important;
-  border-radius: 14px !important;
-  max-height: calc(100vh - 120px);
-}
-
-/* 8) IMPORTANT: verwijder het 'idPanel hidden on mobile' conflict.
-   Als je deze regel elders hebt: @media(max-width:900px){ #idPanel{ display:none !important; } }
-   dan overschrijven we het hier zodat overlay kan werken.
-*/
-@media (max-width: 900px){
-  /* Alleen verbergen als overlay NIET open is */
-  body:not(.id-open) #idPanel{ display:none !important; }
-  body.id-open #idPanel{ inset: 10px !important; }
-}
-/* Align visitor avatar with the bubble (not with mood text) */
-.visitorRow{
-  align-items: flex-start !important;
-}
-#visitorBubble{
-  margin-top: 2px !important;
-}
-#visitorMood{
-  margin-top: 6px !important;
-}
-/* =========================
-   INLINE ID PANEL (no fullscreen)
-   ========================= */
-
-/* Start hidden until asked */
-#idPanel{ display:none; }
-
-/* When shown: normal panel size, scroll if needed */
-#idPanel{
-  max-height: 520px;
-  overflow: auto;
-}
-
-/* Make canvas responsive and not gigantic */
 #idCanvas{
-  width: 100% !important;
-  height: auto !important;
-  max-height: 420px; /* prevents huge take-over */
+  width:100%;
+  height:auto;
+  border-radius:14px;
+  border:1px solid rgba(255,255,255,.12);
+  background:#f5f5f5;
+  max-height: 420px;
 }
 
-/* On mobile: show under chat (single column) */
-@media (max-width: 900px){
-  #idPanel{ display:none; } /* default hidden */
-  .gridTrain{ grid-template-columns: 1fr !important; }
+/* Footer */
+.footer{display:flex;justify-content:center;padding:10px 0}
+
+/* Modal */
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:18px;z-index:9999}
+.modalCard{width:min(900px,100%);background:rgba(0,0,0,.30);border:1px solid rgba(255,255,255,.14);border-radius:16px;padding:16px;box-shadow:0 20px 60px rgba(0,0,0,.45)}
+.modalHead{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.modalTitle{font-weight:800;font-size:18px}
+.modal.hidden{display:none !important}
+
+/* Mobile: single column; ID goes under chat when shown */
+@media(max-width:900px){
+  .grid2{grid-template-columns:1fr}
+  .gridTrain{grid-template-columns:1fr}
+  #idCanvas{max-height:300px}
 }
