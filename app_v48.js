@@ -1231,3 +1231,164 @@
 
   document.addEventListener("DOMContentLoaded", init);
 })();
+/* ============================
+   VEVA PATCH: supervisor v1.0
+   - Hide "Contact supervisor" button everywhere
+   - Text trigger "I will contact my supervisor" opens the SAME popup by clicking the (hidden) button
+   - Survives rerenders
+   ============================ */
+
+(() => {
+  const PATCH_VERSION = "supfix-2026-02-09a";
+  window.__VEVA_SUP_PATCH_VERSION = PATCH_VERSION;
+  console.log("[VEVA] Supervisor patch loaded:", PATCH_VERSION);
+
+  // Matches the UI button label(s)
+  const RX_SUP_BTN = /(contact\s+supervisor|contact\s+leidinggevende)/i;
+
+  // Matches typed intents (very forgiving)
+  const RX_SUP_TEXT =
+    /\b(contact|call|ring|phone)\b.*\b(supervisor|boss|team\s*leader|manager)\b/i;
+
+  const RX_SUP_TEXT_EXACT =
+    /\bi\s+(will|’ll|'ll)\s+contact\s+(my\s+)?supervisor\b/i;
+
+  function allClickable() {
+    return Array.from(document.querySelectorAll("button, a, [role='button'], input[type='button'], input[type='submit']"));
+  }
+
+  function findSupervisorButtons() {
+    return allClickable().filter(el => RX_SUP_BTN.test((el.textContent || el.value || "").trim()));
+  }
+
+  function hideSupervisorButtons() {
+    const btns = findSupervisorButtons();
+    btns.forEach(btn => {
+      if (btn.dataset.vevaSupHidden === "1") return;
+      btn.dataset.vevaSupHidden = "1";
+      btn.style.display = "none";     // removes it from layout
+      btn.style.visibility = "hidden";
+      btn.style.pointerEvents = "none";
+    });
+    return btns;
+  }
+
+  function clickSupervisorButton() {
+    const btns = findSupervisorButtons();
+    if (!btns.length) return false;
+
+    // click the first (hidden) button – this should open your existing popup
+    try {
+      btns[0].click();
+      return true;
+    } catch (e) {
+      console.warn("[VEVA] Could not click supervisor button:", e);
+      return false;
+    }
+  }
+
+  function findQuestionInput() {
+    const candidates = Array.from(document.querySelectorAll("input[type='text'], textarea"));
+    // Your screenshot shows placeholder "Type your question in English..."
+    return (
+      candidates.find(el => /type your question/i.test(el.placeholder || "")) ||
+      candidates[0] ||
+      null
+    );
+  }
+
+  function findSendButton() {
+    const btns = allClickable();
+    return btns.find(el => /^send$/i.test((el.textContent || el.value || "").trim())) || null;
+  }
+
+  function maybeTriggerFromInput(text) {
+    const t = (text || "").trim();
+    if (!t) return false;
+
+    if (RX_SUP_TEXT_EXACT.test(t) || RX_SUP_TEXT.test(t)) {
+      const ok = clickSupervisorButton();
+      if (ok) {
+        console.log("[VEVA] Supervisor triggered by text:", t);
+      } else {
+        console.warn("[VEVA] Text looked like supervisor intent, but no supervisor button found.");
+      }
+      return ok;
+    }
+    return false;
+  }
+
+  function wireInterceptors() {
+    // 1) Always hide button(s)
+    hideSupervisorButtons();
+
+    // 2) Intercept Send click
+    const sendBtn = findSendButton();
+    if (sendBtn && sendBtn.dataset.vevaSupHooked !== "1") {
+      sendBtn.dataset.vevaSupHooked = "1";
+      sendBtn.addEventListener(
+        "click",
+        (e) => {
+          const input = findQuestionInput();
+          const t = (input?.value || "").trim();
+          if (maybeTriggerFromInput(t)) {
+            // prevent the old handler from consuming it as a normal question
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            if (input) input.value = "";
+          }
+        },
+        true // capture to run before existing listeners
+      );
+    }
+
+    // 3) Intercept Enter key
+    const input = findQuestionInput();
+    if (input && input.dataset.vevaSupKeyHooked !== "1") {
+      input.dataset.vevaSupKeyHooked = "1";
+      input.addEventListener(
+        "keydown",
+        (e) => {
+          if (e.key !== "Enter") return;
+          const t = (input.value || "").trim();
+          if (maybeTriggerFromInput(t)) {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            input.value = "";
+          }
+        },
+        true
+      );
+    }
+
+    // 4) If there is a suggestion chip like "I will contact my supervisor" (your screenshot),
+    // hook it too (but do NOT remove it; only trigger the popup on click)
+    const chips = allClickable().filter(el =>
+      /\bi\s+(will|’ll|'ll)\s+contact\s+(my\s+)?supervisor\b/i.test((el.textContent || el.value || "").trim())
+    );
+    chips.forEach(chip => {
+      if (chip.dataset.vevaSupChipHooked === "1") return;
+      chip.dataset.vevaSupChipHooked = "1";
+      chip.addEventListener("click", () => {
+        clickSupervisorButton();
+      }, true);
+    });
+  }
+
+  function start() {
+    wireInterceptors();
+
+    // Survive rerenders
+    const mo = new MutationObserver(() => wireInterceptors());
+    mo.observe(document.body, { childList: true, subtree: true });
+
+    // Extra safety: periodic re-hide (cheap)
+    setInterval(() => wireInterceptors(), 1500);
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", start);
+  } else {
+    start();
+  }
+})();
