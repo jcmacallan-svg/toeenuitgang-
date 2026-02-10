@@ -149,14 +149,18 @@
 
     syncVisitorAvatars();
     idCardWrap.hidden = false;
-    idSlotHint.hidden = true;
+    
+    idCardWrap.style.display = "flex";
+idSlotHint.hidden = true;
     state.idVisible = true;
   }
 
   function hideId(){
     if (!idCardWrap) return;
     idCardWrap.hidden = true;
-    idSlotHint.hidden = false;
+    
+    idCardWrap.style.display = "none";
+idSlotHint.hidden = false;
     if (state) state.idVisible = false;
   }
 
