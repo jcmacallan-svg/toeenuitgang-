@@ -105,16 +105,14 @@ body{
 }
 
 /* Chat ladder (4 slots) */
-.chatArea{
-  flex:1;
-  min-height:0;
+.chatArea{flex:1;
   display:flex;
   flex-direction:column;
+  align-items:stretch;
   justify-content:flex-start;
-  gap:10px;
-  padding-top:6px;
-  overflow:hidden; /* pushes old bubbles out of frame */
-}
+  gap:12px;
+  padding:16px 18px 10px 18px;
+  overflow:hidden;}
 
 .msg{
   display:flex;
@@ -180,12 +178,15 @@ body{
 .faded{ opacity:.18; filter:blur(.2px); }
 
 /* Input bar */
-.inputBar{
+.inputBar{position:sticky;
+  bottom:0;
   display:flex;
   align-items:center;
   gap:10px;
-  padding:12px 0 2px;
-}
+  padding:12px 14px;
+  border-top:1px solid rgba(255,255,255,.08);
+  background: linear-gradient(180deg, rgba(22,27,34,.88), rgba(22,27,34,.98));
+  backdrop-filter: blur(6px);}
 
 .holdBtn{
   width:160px;
@@ -229,14 +230,7 @@ body{
 }
 
 /* ID slot under chat */
-.idSlot{
-  margin-top:4px;
-  border-top:1px solid var(--border);
-  padding-top:10px;
-  display:flex;
-  flex-direction:column;
-  gap:8px;
-}
+.idSlot{padding: 6px 18px 0 18px;}
 .idHint{ color:var(--muted); font-size:12px; }
 
 .idCard{
@@ -371,3 +365,21 @@ body{
   font-size:16px;
   line-height:1.35;
 }
+
+
+.msgRow{display:flex;
+  align-items:flex-start;
+  gap:10px;
+  max-width: 980px;}
+.msgRow.visitor{ justify-content:flex-start; }
+.msgRow.student{ justify-content:flex-end; margin-left:auto; flex-direction:row-reverse; }
+.avatar{ width:44px; height:44px; border-radius:999px; object-fit:cover; flex:0 0 auto; box-shadow:0 6px 18px rgba(0,0,0,.25); border:1px solid rgba(255,255,255,.08); }
+.bubbleWrap{ display:flex; flex-direction:column; gap:6px; min-width:0; }
+.bubble{ padding:12px 14px; border-radius:18px; font-size:18px; line-height:1.35; max-width: 560px; }
+.msgRow.visitor .bubble{ background: rgba(230,235,242,.96); color:#0f172a; border:1px solid rgba(15,23,42,.10); }
+.msgRow.student .bubble{ background: rgba(155,216,255,.92); color:#0b1220; border:1px solid rgba(11,18,32,.16); }
+.meta{ font-size:13px; color: var(--muted); padding-left:4px; }
+.hintBand{ display:flex; flex-direction:column; gap:10px; align-items:center; width:100%; padding:10px 0 8px 0; }
+.dividerLine{ width:100%; height:1px; background: rgba(255,255,255,.10); }
+.hintText{ font-size:24px; font-weight:700; color:#e6edf3; text-align:center; letter-spacing:.2px; }
+

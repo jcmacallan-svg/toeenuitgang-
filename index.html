@@ -77,80 +77,76 @@
         </div>
 
         <!-- Chat ladder: 4 slots -->
-        <div class="chatArea" id="chatArea" aria-label="Chat">
-          <div class="msg left faded" id="slot0">
-            <img class="avatar" id="slot0Avatar" alt="Visitor avatar" />
-            <div class="bubbleCol">
-              <div class="bubble" id="slot0Text"></div>
-              <div class="meta" id="slot0Meta"></div>
-            </div>
-          </div>
-
-          <div class="msg right faded" id="slot1">
-            <div class="bubbleCol">
-              <div class="bubble" id="slot1Text"></div>
-            </div>
-            <img class="avatar" id="slot1Avatar" alt="Student avatar" src="assets/photos/soldier.png" />
-          </div>
-
-          <div class="msg left" id="slot2">
-            <img class="avatar" id="slot2Avatar" alt="Visitor avatar" />
-            <div class="bubbleCol">
-              <div class="bubble" id="slot2Text"></div>
-              <div class="meta" id="slot2Meta"></div>
-            </div>
-          </div>
-
-          <div class="msg right" id="slot3">
-            <div class="bubbleCol">
-              <div class="bubble" id="slot3Text"></div>
-            </div>
-<div class="msg right" id="slot4">
-            <div class="bubbleCol">
-              <div class="bubble" id="slot4Text"></div>
-            </div>
-<div class="msg right" id="slot5">
-            <div class="bubbleCol">
-              <div class="bubble" id="slot5Text"></div>
-            </div>
-            <img class="avatar" id="slot3Avatar" alt="Student avatar" src="assets/photos/soldier.png" />
+              <div class="chatArea" id="chatArea" aria-label="Conversation">
+        <!-- Newest message is shown at the TOP (slot0). Up to 6 bubbles are kept. -->
+        <div class="msgRow visitor" id="slot0">
+          <img class="avatar" id="slot0Avatar" alt="Visitor"/>
+          <div class="bubbleWrap">
+            <div class="bubble" id="slot0Text"></div>
+            <div class="meta" id="slot0Meta"></div>
           </div>
         </div>
 
-        <!-- ID slot (under chat bubbles) -->
-        <div class="idSlot" aria-label="ID slot">
-          <div class="idHint" id="idSlotHint">Ask for the visitor's ID to display it here.</div>
-
-          <div class="idCard" id="idCardWrap" hidden>
-            <img class="idPhoto" id="idPhoto" alt="ID photo" />
-            <div style="min-width:0;flex:1;">
-              <div class="idFields">
-                <div>
-                  <div class="idLabel">NAME</div>
-                  <div class="idValue" id="idName">—</div>
-                </div>
-                <div>
-                  <div class="idLabel">NATIONALITY</div>
-                  <div class="idValue" id="idNat">—</div>
-                </div>
-                <div>
-                  <div class="idLabel">DATE OF BIRTH</div>
-                  <div class="idValue" id="idDob">—</div>
-                </div>
-                <div>
-                  <div class="idLabel">ID NO.</div>
-                  <div class="idValue" id="idNo">—</div>
-                </div>
-              </div>
-              <div class="idActions">
-                <button class="btn idReturnBtn" id="btnReturnId" type="button">Return ID</button>
-              </div>
-            </div>
+        <div class="msgRow student" id="slot1">
+          <img class="avatar" id="slot1Avatar" alt="Soldier"/>
+          <div class="bubbleWrap">
+            <div class="bubble" id="slot1Text"></div>
+            <div class="meta" id="slot1Meta"></div>
           </div>
         </div>
 
-        <!-- Input -->
-        <div class="inputBar" aria-label="Input">
+        <div class="msgRow visitor" id="slot2">
+          <img class="avatar" id="slot2Avatar" alt="Visitor"/>
+          <div class="bubbleWrap">
+            <div class="bubble" id="slot2Text"></div>
+            <div class="meta" id="slot2Meta"></div>
+          </div>
+        </div>
+
+        <div class="msgRow student" id="slot3">
+          <img class="avatar" id="slot3Avatar" alt="Soldier"/>
+          <div class="bubbleWrap">
+            <div class="bubble" id="slot3Text"></div>
+            <div class="meta" id="slot3Meta"></div>
+          </div>
+        </div>
+
+        <div class="msgRow visitor" id="slot4">
+          <img class="avatar" id="slot4Avatar" alt="Visitor"/>
+          <div class="bubbleWrap">
+            <div class="bubble" id="slot4Text"></div>
+            <div class="meta" id="slot4Meta"></div>
+          </div>
+        </div>
+
+        <div class="msgRow student" id="slot5">
+          <img class="avatar" id="slot5Avatar" alt="Soldier"/>
+          <div class="bubbleWrap">
+            <div class="bubble" id="slot5Text"></div>
+            <div class="meta" id="slot5Meta"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="idSlot" id="idSlot" aria-label="Hint and ID area">
+        <div class="hintBand" id="hintBand">
+          <div class="dividerLine"></div>
+          <div class="hintText" id="hintBandText">Ask: “Who are you?”</div>
+          <div class="dividerLine"></div>
+        </div>
+
+        <div class="idCardWrap" id="idCardWrap" hidden>
+          <img id="idPhoto" alt="ID photo" />
+          <div class="idFields">
+            <div class="idRow"><span class="k">Name</span><span id="idName"></span></div>
+            <div class="idRow"><span class="k">DOB</span><span id="idDob"></span></div>
+            <div class="idRow"><span class="k">Nationality</span><span id="idNat"></span></div>
+            <div class="idRow"><span class="k">ID No.</span><span id="idNo"></span></div>
+          </div>
+        </div>
+      </div>
+
+<div class="inputBar" aria-label="Input">
           <div>
             <button class="holdBtn" id="holdToTalk" type="button">Hold to talk</button>
             <div class="holdSub">Release to send (autosend)</div>
@@ -215,7 +211,7 @@
     </div>
 <script>
       // Build stamp for cache sanity
-      window.BUILD = { version: "7.3.6", name: "VEVA Ingang/Uitgang Trainer", date: "2026-02-10" };
+      window.BUILD = { version: "7.4.1", name: "VEVA Ingang/Uitgang Trainer", date: "2026-02-10" };
     </script>
 </div>
 

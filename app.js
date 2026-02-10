@@ -45,6 +45,8 @@
   const idDob = $("#idDob");
   const idNat = $("#idNat");
   const idNo = $("#idNo");
+const hintBand = $("#hintBand");
+  const hintBandText = $("#hintBandText");
 
   // Supervisor modal
   const supervisorModal = $("#supervisorModal");
@@ -66,9 +68,11 @@
   // Chat slots (4)
   const slotEls = [
     { row: $("#slot0"), av: $("#slot0Avatar"), txt: $("#slot0Text"), meta: $("#slot0Meta") },
-    { row: $("#slot1"), av: $("#slot1Avatar"), txt: $("#slot1Text"), meta: null },
+    { row: $("#slot1"), av: $("#slot1Avatar"), txt: $("#slot1Text"), meta: $("#slot1Meta") },
     { row: $("#slot2"), av: $("#slot2Avatar"), txt: $("#slot2Text"), meta: $("#slot2Meta") },
-    { row: $("#slot3"), av: $("#slot3Avatar"), txt: $("#slot3Text"), meta: null },
+    { row: $("#slot3"), av: $("#slot3Avatar"), txt: $("#slot3Text"), meta: $("#slot3Meta") },
+    { row: $("#slot4"), av: $("#slot4Avatar"), txt: $("#slot4Text"), meta: $("#slot4Meta") },
+    { row: $("#slot5"), av: $("#slot5Avatar"), txt: $("#slot5Text"), meta: $("#slot5Meta") },
   ];
 
   // Version banner
@@ -144,26 +148,21 @@
 
   function showId(){
     if (!idCardWrap) return;
-    idName.textContent = ID_DATA.name;
-    idDob.textContent  = ID_DATA.dob;
-    idNat.textContent  = ID_DATA.nat;
-    idNo.textContent   = ID_DATA.idNo;
+    idName.textContent = state.visitor.name;
+    idDob.textContent  = state.visitor.dob;
+    idNat.textContent  = state.visitor.nat;
+    idNo.textContent   = state.visitor.idNo;
+    idPhoto.src = state.visitor.photoSrc;
 
-    syncVisitorAvatars();
     idCardWrap.hidden = false;
-    
-    idCardWrap.style.display = "flex";
-idSlotHint.hidden = true;
     state.idVisible = true;
+    if (hintBand) hintBand.hidden = true;
   }
 
   function hideId(){
-    if (!idCardWrap) return;
-    idCardWrap.hidden = true;
-    
-    idCardWrap.style.display = "none";
-idSlotHint.hidden = false;
-    if (state) state.idVisible = false;
+    if (idCardWrap) idCardWrap.hidden = true;
+    state.idVisible = false;
+    updateHintBand(true);
   }
 
   // ---------- Mood ----------
@@ -179,7 +178,70 @@ idSlotHint.hidden = false;
   // ---------- Chat ladder ----------
   // Keep last 4 messages (V,S,V,S). Oldest 2 are faded via CSS.
   
-  const history = []; // { side:'visitor'|'student', text:'', meta:'' }
+  let history = []; // { side:'visitor'|'student', text:'', meta:'' }
+  // ---------- Hint band ----------
+  function shouldShowHints(){
+    return (session?.difficulty || "standard") !== "advanced";
+  }
+
+  function setHintText(t){
+    if (!hintBandText) return;
+    hintBandText.textContent = t || "";
+  }
+
+  function nudge(t){
+    state.misses = (state.misses || 0) + 1;
+    const diff = (session?.difficulty || "standard");
+    const canShow = diff === "basic" || (diff === "standard" && state.misses >= 2);
+    if (!shouldShowHints() || state?.idVisible || !canShow) return;
+    if (hintBand) hintBand.hidden = false;
+    setHintText(t || getNextHint());
+  }
+
+  function updateHintBand(force=false){
+    if (!hintBand) return;
+    if (!shouldShowHints()){
+      hintBand.hidden = true;
+      return;
+    }
+    // In "standard" difficulty, show hints after a couple misses. In "basic", always show.
+    const diff = (session?.difficulty || "standard");
+    const canShow = force || diff === "basic" || (diff === "standard" && (state?.misses || 0) >= 2);
+
+    if (state?.idVisible){
+      hintBand.hidden = true;
+      return;
+    }
+
+    if (!canShow){
+      hintBand.hidden = true;
+      return;
+    }
+
+    hintBand.hidden = false;
+    setHintText(getNextHint());
+  }
+
+  function getNextHint(){
+    // Fixed intake order requested by you:
+    // 1) name, 2) purpose, 3) appointment, 4) who, 5) time, 6) about, then ID.
+    const f = state?.facts || {};
+    if (state?.stage === "greet") return 'Say: “Good morning. How can I help you?”';
+    if (state?.stage === "help")  return 'Ask: “What do you need?”';
+
+    if (!f.name) return 'Ask: “Who are you?”';
+    if (!f.purpose) return 'Ask: “What are you doing here?”';
+    if (!f.appt) return 'Ask: “Do you have an appointment?”';
+
+    if (f.appt === "yes"){
+      if (!f.who) return 'Ask: “With whom do you have an appointment?”';
+      if (!f.time) return 'Ask: “What time is your appointment?”';
+      if (!f.about) return 'Ask: “What is the appointment about?”';
+    }
+
+    if (!state?.idChecked) return 'Ask: “Can I see your ID, please?”';
+    return "Continue the procedure.";
+  }
 
   function applySlotSide(rowEl, side){
     if (!rowEl) return;
@@ -189,62 +251,54 @@ idSlotHint.hidden = false;
   }
 
   function renderHistory(){
-    // Newest message should appear at the TOP and push older messages DOWN.
-    // We keep at most 4 visible slots.
-    const tail = history.slice(-MAX_CHAT_BUBBLES).reverse(); // newest first
-    for (let i=0;i<MAX_CHAT_BUBBLES;i++){
-      const s = slotEls[i];
-      if (!s) continue;
-      if (s.txt) s.txt.textContent = "";
-      if (s.meta) s.meta.textContent = "";
-      // reset classes; will set below if message exists
-      s.row.classList.add("faded");
-      applySlotSide(s.row, "visitor"); // default (will be overwritten)
-    }
+    // Newest message is stored first and shown at the TOP (slot0).
+    const slice = history.slice(0, slotEls.length);
 
-    for (let i=0;i<tail.length;i++){
-      const msg = tail[i];
-      const s = slotEls[i];
-      if (!s) continue;
+    slotEls.forEach((s, i) => {
+      const msg = slice[i];
+      if (!s?.row) return;
 
-      // side mapping:
-      // - student bubble = LEFT with soldier avatar
-      // - visitor bubble = RIGHT with visitor headshot avatar
-      applySlotSide(s.row, msg.side);
-
-      if (s.txt) s.txt.textContent = msg.text;
-
-      // meta: only show mood under VISITOR messages
-      if (s.meta) s.meta.textContent = (msg.side === "visitor") ? (msg.meta || "") : "";
-
-      // avatar per message side
-      if (s.av){
-        if (msg.side === "visitor"){
-          s.av.src = ID_DATA.photoSrc;
-          s.av.alt = "Visitor avatar";
-        } else {
-          s.av.src = "assets/photos/soldier.png";
-          s.av.alt = "Student avatar";
-        }
+      if (!msg){
+        s.row.hidden = true;
+        if (s.txt) s.txt.textContent = "";
+        if (s.meta) s.meta.textContent = "";
+        return;
       }
-    }
 
-    // Fade older messages (below the top 2) so the active speaker is clearly on top.
-    for (let i=0;i<slotEls.length;i++){
-      if (!slotEls[i]) continue;
-      const shouldFade = (i >= 2) && (tail.length >= (i+1));
-      slotEls[i].row.classList.toggle("faded", shouldFade);
-    }
-}
+      s.row.hidden = false;
+      s.row.classList.toggle("visitor", msg.side === "visitor");
+      s.row.classList.toggle("student", msg.side === "student");
 
-  function pushVisitor(text){
-    history.push({ side:"visitor", text:String(text||"").trim(), meta: currentMood.line });
+      if (s.av){
+        s.av.src = (msg.side === "visitor") ? (state?.visitor?.photoSrc || "") : "assets/photos/soldier.png";
+      }
+      if (s.txt) s.txt.textContent = msg.text || "";
+
+      // Only show the mood line once (under the newest visitor bubble), otherwise keep it blank.
+      if (s.meta){
+        if (i === 0 && msg.side === "visitor" && state?.moodLine) s.meta.textContent = state.moodLine;
+        else s.meta.textContent = "";
+      }
+
+      // Fade older messages a bit for readability (keep newest crisp).
+      s.row.classList.toggle("fade", i >= 4);
+    });
+  }
+
+function pushVisitor(text){
+    history.unshift({ side:"visitor", text:String(text||"").trim() });
+    history = history.slice(0, 6);
+    state.misses = 0;
     renderHistory();
+    updateHintBand();
   }
 
   function pushStudent(text){
-    history.push({ side:"student", text:String(text||"").trim(), meta:"" });
+    history.unshift({ side:"student", text:String(text||"").trim() });
+    history = history.slice(0, 6);
+    state.misses = 0;
     renderHistory();
+    updateHintBand();
   }
 
   // ---------- Meeting time (system clock + 17..23 min) ----------
@@ -411,18 +465,19 @@ idSlotHint.hidden = false;
       stage: "start",
       misses: 0,
       idVisible: false,
-      facts: { why:"", appt:"yes", who:"", about:"", nat:"", meetingTime:"" },
-      contraband: { weapons:false, drugs:false, alcohol:false }
+      idChecked: false,
+      moodLine: currentMood.line,
+      visitor: { ...ID_DATA },
+      facts: { name:"", purpose:"", appt:"", who:"", time:"", about:"" }
     };
 
-    hideId();                // enforce hidden on boot
-    syncVisitorAvatars();
-    pushVisitor(visitorLineResolved("greeting"));
-    pushStudent("Hold-to-talk or type below.");
-    // next visitor line should come after correct greeting/help from student
+    // Initial visitor line
+    pushVisitor("Hello.");
+    hideId();
+    updateHintBand(true);
   }
 
-  function spellLastName(){
+function spellLastName(){
     const full = (ID_DATA && ID_DATA.name) ? String(ID_DATA.name) : "Miller";
     const parts = full.trim().split(/\s+/).filter(Boolean);
     const ln = parts.length ? parts[parts.length-1] : full;
@@ -516,6 +571,14 @@ idSlotHint.hidden = false;
 
     pushStudent(clean);
     const intent = detectIntent(clean);
+    // Track progress for hinting (intake order)
+    if (intent === "ask_name") state.facts.name = state.visitor.name;
+    if (intent === "purpose") state.facts.purpose = "known";
+    if (intent === "has_appointment") state.facts.appt = "yes";
+    if (intent === "who_meeting") state.facts.who = "known";
+    if (intent === "time_meeting") state.facts.time = "known";
+    if (intent === "about_meeting") state.facts.about = "known";
+    if (intent === "ask_id") state.idChecked = true;
 
     // Deny flow
     if (state.stage === "deny_reason"){
@@ -556,7 +619,7 @@ idSlotHint.hidden = false;
           pushVisitor(visitorLineResolved("need_base"));
           return;
         }
-        pushVisitor("Try greeting first.");
+        nudge("Try greeting first.");
         return;
 
       case "help":
@@ -570,7 +633,7 @@ idSlotHint.hidden = false;
           pushVisitor(visitorLineResolved("greeting"));
           return;
         }
-        pushVisitor("Try: “How can I help you?”");
+        nudge("Try: “How can I help you?”");
         return;
 
       case "purpose":
@@ -606,7 +669,7 @@ idSlotHint.hidden = false;
           pushVisitor("Sure. Here you go.");
           return;
         }
-        pushVisitor("Try 5W questions, or ask for ID.");
+        nudge("Try 5W questions, or ask for ID.");
         return;
 
       case "control_q":
@@ -630,7 +693,7 @@ idSlotHint.hidden = false;
           return;
         }
         // Move on when supervisor was called
-        pushVisitor("Try a control question, or contact your supervisor.");
+        nudge("Try a control question, or contact your supervisor.");
         return;
 
       case "search_announce":
@@ -639,7 +702,7 @@ idSlotHint.hidden = false;
           pushVisitor(visitorLineResolved("search_why"));
           return;
         }
-        pushVisitor("Try: “You will be searched.”");
+        nudge("Try: “You will be searched.”");
         return;
 
       case "why_searched":
@@ -648,7 +711,7 @@ idSlotHint.hidden = false;
           pushVisitor("Okay.");
           return;
         }
-        pushVisitor("Try: “Everyone is searched due to an increased threat.”");
+        nudge("Try: “Everyone is searched due to an increased threat.”");
         return;
 
       case "illegal_items":
@@ -657,7 +720,7 @@ idSlotHint.hidden = false;
           pushVisitor(visitorLineResolved("illegal_what"));
           return;
         }
-        pushVisitor("Try: “Do you have any illegal items?”");
+        nudge("Try: “Do you have any illegal items?”");
         return;
 
       case "clarify_illegal": {
@@ -690,7 +753,7 @@ idSlotHint.hidden = false;
           // placeholder screen switch later
           return;
         }
-        pushVisitor("Try: “Let’s go to the person search.”");
+        nudge("Try: “Let’s go to the person search.”");
         return;
 
       default:
