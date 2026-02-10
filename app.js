@@ -183,8 +183,9 @@ idSlotHint.hidden = false;
 
   function applySlotSide(rowEl, side){
     if (!rowEl) return;
-    rowEl.classList.toggle("left", side === "student");
-    rowEl.classList.toggle("right", side === "visitor");
+    // Visitor should be LEFT, Student (soldier) should be RIGHT
+    rowEl.classList.toggle("left", side === "visitor");
+    rowEl.classList.toggle("right", side === "student");
   }
 
   function renderHistory(){
@@ -198,7 +199,7 @@ idSlotHint.hidden = false;
       if (s.meta) s.meta.textContent = "";
       // reset classes; will set below if message exists
       s.row.classList.add("faded");
-      applySlotSide(s.row, "student"); // default (will be overwritten)
+      applySlotSide(s.row, "visitor"); // default (will be overwritten)
     }
 
     for (let i=0;i<tail.length;i++){

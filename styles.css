@@ -331,11 +331,19 @@ body{
 
 .msgRow.visitor .msgAvatar{ order:2; }
 
+.msg.right .avatar{ order:2; }
+
 .msgMeta{
-  font-size:13px;
+  font-size:14px;
   color:var(--muted);
-  margin-right:54px;
-  margin-left:auto;
+  margin-left:54px;
+  margin-right:auto;
   margin-top:-6px;
-  text-align:right;
+  text-align:left;
 }
+
+.msgBubble{ font-size:18px; }
+
+/* Role colors based on side in this build: visitor=left, student=right */
+.msg.left .bubble{ background:#e5e7eb; color:#0b1220; }
+.msg.right .bubble{ background:#93c5fd; color:#0b1220; }
