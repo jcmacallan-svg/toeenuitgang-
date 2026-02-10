@@ -72,8 +72,10 @@
   ];
 
   // Version banner
-  if (versionPill) versionPill.textContent = `v${BUILD.version}`;
-  document.title = `${BUILD.name} v${BUILD.version}`;
+  const __assetVer = String(window.__ASSET_VER__ || "");
+  const __assetShort = __assetVer ? __assetVer.slice(-6) : "";
+  if (versionPill) versionPill.textContent = `v${BUILD.version}${__assetShort ? " · " + __assetShort : ""}`;
+  document.title = `${BUILD.name} v${BUILD.version}${__assetShort ? " ("+__assetShort+")" : ""}`;
   console.info(
     `%c${BUILD.name} v${BUILD.version}`,
     "background:#161b22;color:#e6edf3;padding:6px 10px;border-radius:8px;font-weight:800;"
@@ -176,36 +178,62 @@ idSlotHint.hidden = false;
 
   // ---------- Chat ladder ----------
   // Keep last 4 messages (V,S,V,S). Oldest 2 are faded via CSS.
+  
   const history = []; // { side:'visitor'|'student', text:'', meta:'' }
 
+  function applySlotSide(rowEl, side){
+    if (!rowEl) return;
+    rowEl.classList.toggle("left", side === "student");
+    rowEl.classList.toggle("right", side === "visitor");
+  }
+
   function renderHistory(){
-    const tail = history.slice(-4);
-    // Clear all
+    // Newest message should appear at the TOP and push older messages DOWN.
+    // We keep at most 4 visible slots.
+    const tail = history.slice(-4).reverse(); // newest first
     for (let i=0;i<4;i++){
       const s = slotEls[i];
       if (!s) continue;
       if (s.txt) s.txt.textContent = "";
       if (s.meta) s.meta.textContent = "";
-      // keep avatars; visitor avatars sync separately
+      // reset classes; will set below if message exists
+      s.row.classList.add("faded");
+      applySlotSide(s.row, "student"); // default (will be overwritten)
     }
-    // Fill from start of tail
+
     for (let i=0;i<tail.length;i++){
       const msg = tail[i];
-      const slotIndex = i; // 0..3
-      const s = slotEls[slotIndex];
+      const s = slotEls[i];
       if (!s) continue;
+
+      // side mapping:
+      // - student bubble = LEFT with soldier avatar
+      // - visitor bubble = RIGHT with visitor headshot avatar
+      applySlotSide(s.row, msg.side);
+
       if (s.txt) s.txt.textContent = msg.text;
-      if (s.meta) s.meta.textContent = msg.meta || "";
+
+      // meta: only show mood under VISITOR messages
+      if (s.meta) s.meta.textContent = (msg.side === "visitor") ? (msg.meta || "") : "";
+
+      // avatar per message side
+      if (s.av){
+        if (msg.side === "visitor"){
+          s.av.src = ID_DATA.photoSrc;
+          s.av.alt = "Visitor avatar";
+        } else {
+          s.av.src = "assets/photos/soldier.png";
+          s.av.alt = "Student avatar";
+        }
+      }
     }
 
-    // Fade only the first two slots (as long as they exist)
-    slotEls[0].row.classList.toggle("faded", tail.length >= 1);
-    slotEls[1].row.classList.toggle("faded", tail.length >= 2);
-    slotEls[2].row.classList.toggle("faded", false);
-    slotEls[3].row.classList.toggle("faded", false);
-
-    // Visitor avatars always same
-    syncVisitorAvatars();
+    // Fade only the bottom two visible messages (older ones).
+    // Since newest are at top (0,1), fade indices 2,3 when present.
+    slotEls[0].row.classList.toggle("faded", false);
+    slotEls[1].row.classList.toggle("faded", false);
+    slotEls[2].row.classList.toggle("faded", tail.length >= 3);
+    slotEls[3].row.classList.toggle("faded", tail.length >= 4);
   }
 
   function pushVisitor(text){
