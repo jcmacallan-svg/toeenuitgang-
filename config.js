@@ -1,7 +1,7 @@
 // config.js
 // build info (baseline tracking)
 window.BUILD = {
-  version: "7.0.1",
+  version: "7.3.4",
   name: "VEVA Ingang/Uitgang Trainer",
   date: "2026-02-09"
 };

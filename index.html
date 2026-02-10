@@ -4,6 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>VEVA Ingang/Uitgang Trainer</title>
+  <link rel="icon" href="favicon.ico" />
   <link rel="stylesheet" href="styles.css" />
 </head>
 
@@ -18,12 +19,117 @@
       <div class="controls">
         <button class="btn" id="btnReturn" type="button">Return</button>
         <button class="btn" id="btnPersonSearch" type="button">Go to Person Search</button>
+          <button class="sideBtn" id="btnSignIn" type="button">Go to sign-in office</button>
         <button class="btn btn--danger" id="btnDeny" type="button">Deny entrance</button>
+          <button class="sideBtn" id="btnNewScenario" type="button">Start new scenario</button>
       </div>
 
       <div class="divider" role="separator" aria-hidden="true"></div>
 
       <div class="hintBox" id="hintBox" hidden></div>
+    
+      <div class="divider" role="separator" aria-hidden="true"></div>
+
+      <section class="questionBank" aria-label="Question Bank">
+        <div class="qbTitle">Question bank</div>
+        <div class="qbRow">
+          <label class="qbLabel" for="qbIntent">Category</label>
+          <select id="qbIntent" class="qbSelect">
+            <option value="">Choose…</option>
+            <option value="help_open">Opening / help</option>
+            <option value="ask_name">Name</option>
+            <option value="ask_mood">Mood</option>
+            <option value="purpose">Purpose</option>
+            <option value="has_appointment">Appointment: yes/no</option>
+            <option value="who_meeting">Appointment: who</option>
+            <option value="time_meeting">Appointment: time</option>
+            <option value="about_meeting">Appointment: about</option>
+            <option value="ask_id">Ask for ID</option>
+            <option value="dob_q">Control: DOB</option>
+            <option value="nat_q">Control: nationality</option>
+          </select>
+        </div>
+
+        <div class="qbRow">
+          <label class="qbLabel" for="qbPhrase">Add phrase to recognition</label>
+          <input id="qbPhrase" class="qbInput" type="text" placeholder="Type a new variant, then Add" />
+        </div>
+
+        
+        <div class="qbRow">
+          <label class="qbLabel" for="qbRespKey">Response key</label>
+          <select id="qbRespKey" class="qbSelect">
+            <option value="">Choose…</option>
+            <option value="visitor.greeting.hello">Visitor: Hello</option>
+            <option value="visitor.open.need_help">Visitor: Can you help me?</option>
+            <option value="visitor.open.need_base">Visitor: I need to get onto the base.</option>
+
+            <option value="visitor.id.requested">Visitor: Here is my ID.</option>
+
+            <option value="visitor.supervisor.wait">Visitor: Okay. I can wait.</option>
+
+            <option value="visitor.appointment.yes">Visitor: Yes, I have an appointment.</option>
+            <option value="visitor.appointment.no">Visitor: No, I do not.</option>
+
+            <option value="visitor.search.why">Visitor: Why am I searched?</option>
+            <option value="visitor.search.ok_where">Visitor: Okay. Tell me where to go.</option>
+
+            <option value="visitor.illegal.what_is">Visitor: What are illegal items?</option>
+            <option value="visitor.illegal.followup_missing">Visitor: Anything about …?</option>
+            <option value="visitor.illegal.no_where">Visitor: No. I do not. Tell me where to go.</option>
+
+            <option value="visitor.generic.ok">Visitor: Okay.</option>
+            <option value="visitor.generic.thanks">Visitor: Thank you.</option>
+          </select>
+        </div>
+
+        <div class="qbRow">
+          <label class="qbLabel" for="qbResponse">Add visitor response (for this category)</label>
+          <input id="qbResponse" class="qbInput" type="text" placeholder="Type a new visitor reply, then Add" />
+        </div>
+
+        <div class="qbActions">
+          <button class="btn btn--small" id="qbInsertBtn" type="button">Insert example</button>
+          <button class="btn btn--small btn--primary" id="qbAddBtn" type="button">Add phrase</button>
+          <button class="btn btn--small btn--primary" id="qbAddRespBtn" type="button">Add response</button>
+        </div>
+
+        <div class="qbActions qbActions--secondary">
+</div>
+
+        <div class="qbNote">Saved locally in your browser (localStorage). </div>
+      </section>
+
+    
+        <div class="divider" role="separator" aria-hidden="true"></div>
+
+        <section class="categoryMgr" aria-label="Category Manager">
+          <div class="qbTitle">Add category</div>
+          <div class="qbRow">
+            <label class="qbLabel" for="qbCatLabel">Label</label>
+            <input id="qbCatLabel" class="qbInput" type="text" placeholder="e.g. Appointment: security questions" />
+          </div>
+          <div class="qbRow">
+            <label class="qbLabel" for="qbCatKey">Key (lowercase, no spaces)</label>
+            <input id="qbCatKey" class="qbInput" type="text" placeholder="e.g. appt_security" />
+          </div>
+          <div class="qbActions">
+            <button class="btn btn--small btn--primary" id="qbAddCatBtn" type="button">Add category</button>
+            <button class="btn btn--small" id="qbDelCatBtn" type="button">Delete selected</button>
+          </div>
+
+          <div class="catList" id="qbCatList" aria-label="Custom categories list"></div>
+
+          <div class="qbTitle" style="margin-top:10px;">Live seed JSON</div>
+          <div class="qbRow">
+            <label class="qbLabel" for="qbJsonOut"></label>
+</div>
+          <div class="qbActions qbActions--secondary">
+</div>
+
+          <div class="qbNote">Categories are saved locally. Static pages cannot write files automatically, so useto update your repo file.</div>
+        </section>
+
     </aside>
 
     <main class="main">
@@ -157,11 +263,65 @@
           <button class="btn" id="btnBackReturn" type="button">Back to Training</button>
         </div>
       </section>
+    
+      <!-- Supervisor modal -->
+      <div class="modalOverlay" id="supervisorModal" hidden>
+        <div class="modalCard" role="dialog" aria-modal="true" aria-label="Supervisor checklist">
+          <div class="modalTop">
+            <div class="modalTitle">Supervisor checklist</div>
+            <button class="btn btn--small" id="btnCloseSupervisor" type="button">Close</button>
+          </div>
+
+          <div class="modalGrid">
+<div class="mRow">
+              <div class="mQ">1) Why are you here?</div>
+              <input class="mInput" id="svWhy" type="text" placeholder="Student note / visitor answer" />
+              <div class="mStatus" id="svWhyStatus">—</div>
+            </div>
+
+            <div class="mRow">
+              <div class="mQ">2) Do you have an appointment?</div>
+              <select class="mInput" id="svAppt">
+                <option value="">Choose…</option>
+                <option value="yes">Yes</option>
+                <option value="no">No</option>
+              </select>
+              <div class="mStatus" id="svApptStatus">—</div>
+            </div>
+
+            <div class="mRow">
+              <div class="mQ">3) With whom do you have the appointment?</div>
+              <input class="mInput" id="svWho" type="text" placeholder="e.g. Sergeant de Vries" />
+              <div class="mStatus" id="svWhoStatus">—</div>
+            </div>
+
+            <div class="mRow">
+              <div class="mQ">4) What is the appointment about?</div>
+              <input class="mInput" id="svAbout" type="text" placeholder="e.g. delivery for the workshop" />
+              <div class="mStatus" id="svAboutStatus">—</div>
+            </div>
+
+            <div class="mRow">
+              <div class="mQ">5) What time is the appointment?</div>
+              <input class="mInput" id="svTime" type="text" placeholder="e.g. 14:00" />
+              <div class="mStatus" id="svTimeStatus">—</div>
+            </div>
+          </div>
+
+          <div class="modalActions">
+            <button class="btn" id="btnSupervisorCheck" type="button">Run checks</button>
+            <button class="btn btn--primary" id="btnReturnToVisitor" type="button">Return to Visitor</button>
+          </div>
+
+          <div class="modalNote" id="svNote">Fill in the answers, run checks, then return to the visitor.</div>
+        </div>
+      </div>
+
     </main>
   </div>
 
   <!-- Cache busting via version query param -->
-  <script src="config.js?v=7.0.1"></script>
-  <script src="app.js?v=7.0.1"></script>
+  <script src="config.js?v=7.3.4"></script>
+  <script src="app.js?v=7.3.4"></script>
 </body>
 </html>
