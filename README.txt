@@ -1,6 +1,7 @@
-VEVA Trainer baseline v7.3.9
+VEVA Trainer baseline v7.4.0
 
-Changes from v7.3.8:
-- Visitor is LEFT, Student (soldier) is RIGHT.
-- Avatars sit on the OUTSIDE edge of their bubbles (visitor far left, student far right).
-- Bubble font-size increased to 18px; bubbles slightly larger.
+Updates:
+- Chat ladder shows up to 6 bubbles (newest at TOP).
+- Visitor LEFT, Student RIGHT, with active speaker always on TOP.
+- Hints moved OUT of chat into a dedicated Hint panel above the ID section.
+- Hint text is larger and separated by dividers.

@@ -347,3 +347,27 @@ body{
 /* Role colors based on side in this build: visitor=left, student=right */
 .msg.left .bubble{ background:#e5e7eb; color:#0b1220; }
 .msg.right .bubble{ background:#93c5fd; color:#0b1220; }
+
+/* Hint area (separate from chat) */
+.dividerLine{
+  height:1px;
+  background:rgba(255,255,255,0.10);
+  margin:10px 0;
+}
+.hintPanel{
+  padding:10px 12px;
+  border-top:1px solid rgba(255,255,255,0.10);
+  border-bottom:1px solid rgba(255,255,255,0.10);
+  background:rgba(255,255,255,0.04);
+  border-radius:12px;
+}
+.hintTitle{
+  font-weight:800;
+  margin-bottom:6px;
+  font-size:14px;
+  letter-spacing:0.2px;
+}
+.hintText{
+  font-size:16px;
+  line-height:1.35;
+}

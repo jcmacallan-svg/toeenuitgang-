@@ -191,8 +191,8 @@ idSlotHint.hidden = false;
   function renderHistory(){
     // Newest message should appear at the TOP and push older messages DOWN.
     // We keep at most 4 visible slots.
-    const tail = history.slice(-4).reverse(); // newest first
-    for (let i=0;i<4;i++){
+    const tail = history.slice(-MAX_CHAT_BUBBLES).reverse(); // newest first
+    for (let i=0;i<MAX_CHAT_BUBBLES;i++){
       const s = slotEls[i];
       if (!s) continue;
       if (s.txt) s.txt.textContent = "";
@@ -229,13 +229,13 @@ idSlotHint.hidden = false;
       }
     }
 
-    // Fade only the bottom two visible messages (older ones).
-    // Since newest are at top (0,1), fade indices 2,3 when present.
-    slotEls[0].row.classList.toggle("faded", false);
-    slotEls[1].row.classList.toggle("faded", false);
-    slotEls[2].row.classList.toggle("faded", tail.length >= 3);
-    slotEls[3].row.classList.toggle("faded", tail.length >= 4);
-  }
+    // Fade older messages (below the top 2) so the active speaker is clearly on top.
+    for (let i=0;i<slotEls.length;i++){
+      if (!slotEls[i]) continue;
+      const shouldFade = (i >= 2) && (tail.length >= (i+1));
+      slotEls[i].row.classList.toggle("faded", shouldFade);
+    }
+}
 
   function pushVisitor(text){
     history.push({ side:"visitor", text:String(text||"").trim(), meta: currentMood.line });
