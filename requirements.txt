@@ -1,5 +1,0 @@
-streamlit>=1.33
-pandas>=2.0
-streamlit-mic-recorder>=0.0.8
-faster-whisper>=1.0.0
-Pillow>=10.0
