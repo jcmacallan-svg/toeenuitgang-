@@ -7,167 +7,57 @@
   <link rel="icon" href="favicon.ico" />
   <link rel="stylesheet" href="styles.css" />
 </head>
-
 <body>
   <div class="app" id="app">
+
     <aside class="sidebar" aria-label="Controls">
       <div class="brand">
         <div class="brand__title">VEVA Checkpoint</div>
-        <div class="brand__sub">Ingang/Uitgang Trainer</div>
+        <div class="brand__subtitle">Ingang/Uitgang Trainer</div>
       </div>
 
       <div class="controls">
         <button class="btn" id="btnReturn" type="button">Return</button>
         <button class="btn" id="btnPersonSearch" type="button">Go to Person Search</button>
-          <button class="sideBtn" id="btnSignIn" type="button">Go to sign-in office</button>
-        <button class="btn btn--danger" id="btnDeny" type="button">Deny entrance</button>
-          <button class="sideBtn" id="btnNewScenario" type="button">Start new scenario</button>
+        <button class="btn" id="btnSignIn" type="button">Go to sign-in office</button>
+        <button class="btn btn--danger btn--dangerStrong" id="btnDeny" type="button">Deny entrance</button>
+        <button class="btn" id="btnNewScenario" type="button">Start new scenario</button>
       </div>
-
-      <div class="divider" role="separator" aria-hidden="true"></div>
-
-      <div class="hintBox" id="hintBox" hidden></div>
-    
-      <div class="divider" role="separator" aria-hidden="true"></div>
-
-      <section class="questionBank" aria-label="Question Bank">
-        <div class="qbTitle">Question bank</div>
-        <div class="qbRow">
-          <label class="qbLabel" for="qbIntent">Category</label>
-          <select id="qbIntent" class="qbSelect">
-            <option value="">Choose…</option>
-            <option value="help_open">Opening / help</option>
-            <option value="ask_name">Name</option>
-            <option value="ask_mood">Mood</option>
-            <option value="purpose">Purpose</option>
-            <option value="has_appointment">Appointment: yes/no</option>
-            <option value="who_meeting">Appointment: who</option>
-            <option value="time_meeting">Appointment: time</option>
-            <option value="about_meeting">Appointment: about</option>
-            <option value="ask_id">Ask for ID</option>
-            <option value="dob_q">Control: DOB</option>
-            <option value="nat_q">Control: nationality</option>
-          </select>
-        </div>
-
-        <div class="qbRow">
-          <label class="qbLabel" for="qbPhrase">Add phrase to recognition</label>
-          <input id="qbPhrase" class="qbInput" type="text" placeholder="Type a new variant, then Add" />
-        </div>
-
-        
-        <div class="qbRow">
-          <label class="qbLabel" for="qbRespKey">Response key</label>
-          <select id="qbRespKey" class="qbSelect">
-            <option value="">Choose…</option>
-            <option value="visitor.greeting.hello">Visitor: Hello</option>
-            <option value="visitor.open.need_help">Visitor: Can you help me?</option>
-            <option value="visitor.open.need_base">Visitor: I need to get onto the base.</option>
-
-            <option value="visitor.id.requested">Visitor: Here is my ID.</option>
-
-            <option value="visitor.supervisor.wait">Visitor: Okay. I can wait.</option>
-
-            <option value="visitor.appointment.yes">Visitor: Yes, I have an appointment.</option>
-            <option value="visitor.appointment.no">Visitor: No, I do not.</option>
-
-            <option value="visitor.search.why">Visitor: Why am I searched?</option>
-            <option value="visitor.search.ok_where">Visitor: Okay. Tell me where to go.</option>
-
-            <option value="visitor.illegal.what_is">Visitor: What are illegal items?</option>
-            <option value="visitor.illegal.followup_missing">Visitor: Anything about …?</option>
-            <option value="visitor.illegal.no_where">Visitor: No. I do not. Tell me where to go.</option>
-
-            <option value="visitor.generic.ok">Visitor: Okay.</option>
-            <option value="visitor.generic.thanks">Visitor: Thank you.</option>
-          </select>
-        </div>
-
-        <div class="qbRow">
-          <label class="qbLabel" for="qbResponse">Add visitor response (for this category)</label>
-          <input id="qbResponse" class="qbInput" type="text" placeholder="Type a new visitor reply, then Add" />
-        </div>
-
-        <div class="qbActions">
-          <button class="btn btn--small" id="qbInsertBtn" type="button">Insert example</button>
-          <button class="btn btn--small btn--primary" id="qbAddBtn" type="button">Add phrase</button>
-          <button class="btn btn--small btn--primary" id="qbAddRespBtn" type="button">Add response</button>
-        </div>
-
-        <div class="qbActions qbActions--secondary">
-</div>
-
-        <div class="qbNote">Saved locally in your browser (localStorage). </div>
-      </section>
-
-    
-        <div class="divider" role="separator" aria-hidden="true"></div>
-
-        <section class="categoryMgr" aria-label="Category Manager">
-          <div class="qbTitle">Add category</div>
-          <div class="qbRow">
-            <label class="qbLabel" for="qbCatLabel">Label</label>
-            <input id="qbCatLabel" class="qbInput" type="text" placeholder="e.g. Appointment: security questions" />
-          </div>
-          <div class="qbRow">
-            <label class="qbLabel" for="qbCatKey">Key (lowercase, no spaces)</label>
-            <input id="qbCatKey" class="qbInput" type="text" placeholder="e.g. appt_security" />
-          </div>
-          <div class="qbActions">
-            <button class="btn btn--small btn--primary" id="qbAddCatBtn" type="button">Add category</button>
-            <button class="btn btn--small" id="qbDelCatBtn" type="button">Delete selected</button>
-          </div>
-
-          <div class="catList" id="qbCatList" aria-label="Custom categories list"></div>
-
-          <div class="qbTitle" style="margin-top:10px;">Live seed JSON</div>
-          <div class="qbRow">
-            <label class="qbLabel" for="qbJsonOut"></label>
-</div>
-          <div class="qbActions qbActions--secondary">
-</div>
-
-          <div class="qbNote">Categories are saved locally. Static pages cannot write files automatically, so useto update your repo file.</div>
-        </section>
-
     </aside>
 
     <main class="main">
-      <header class="topbar">
-        <div class="topbar__left">
-          <div class="pill">Last-bubble-only</div>
+      <div class="topbar">
+        <div class="pills">
+          <div class="pill pill--muted">Last-bubble-only</div>
           <div class="pill" id="studentPill">Student: —</div>
-          <div class="pill" id="versionPill">v—</div>
+          <div class="pill" id="versionPill">vdev</div>
           <div class="pill" id="voiceStatus">Voice: ready</div>
         </div>
-        <div class="topbar__right">
-          <button class="btn btn--small" id="btnReset" type="button">Reset</button>
-        </div>
-      </header>
+        <button class="btn" id="btnReset" type="button" style="width:auto;">Reset</button>
+      </div>
 
-      <!-- Mandatory login screen -->
-      <section class="screen screen--active" id="screenLogin" aria-label="Login Screen">
-        <div class="loginWrap">
-          <div class="loginCard">
-            <h2>Start training</h2>
-            <div class="loginGrid">
-              <div class="loginRow">
+      <div class="content">
+
+        <!-- Login overlay -->
+        <div class="modal" id="loginModal">
+          <div class="modalCard">
+            <div class="modalTitle">Start training</div>
+            <div class="svGrid">
+              <div class="svRow">
                 <label for="studentSurname">Student surname (required)</label>
-                <input id="studentSurname" type="text" placeholder="e.g. Jansen" autocomplete="off" />
+                <input id="studentSurname" autocomplete="off" />
               </div>
-
-              <div class="loginRow">
+              <div class="svRow">
                 <label for="studentGroup">Group (required)</label>
                 <select id="studentGroup">
                   <option value="">Choose…</option>
-                  <option value="Alpha">Alpha</option>
-                  <option value="Bravo">Bravo</option>
-                  <option value="Charlie">Charlie</option>
-                  <option value="Delta">Delta</option>
+                  <option>Alpha</option>
+                  <option>Bravo</option>
+                  <option>Charlie</option>
+                  <option>Delta</option>
                 </select>
               </div>
-
-              <div class="loginRow">
+              <div class="svRow">
                 <label for="studentDifficulty">Difficulty</label>
                 <select id="studentDifficulty">
                   <option value="basic">Basic</option>
@@ -175,153 +65,153 @@
                   <option value="advanced">Advanced</option>
                 </select>
               </div>
-            </div>
-
-            <div class="loginActions">
-              <button class="btn btn--primary" id="btnStartTraining" type="button">Start</button>
-            </div>
-
-            <div class="loginError" id="loginError">Please enter your surname and select a group.</div>
-          </div>
-        </div>
-      </section>
-
-      <section class="screen" id="screenTraining" aria-label="Training Screen">
-        <div class="chat">
-          <div class="msg msg--left">
-            <img class="avatar" id="visitorAvatar" src="assets/photos/headshot_01.png" alt="Visitor avatar" />
-            <div class="bubbleCol">
-              <div class="bubble bubble--visitor" id="visitorBubble">Hello.</div>
-              <div class="mood" id="moodLine">The visitor looks neutral.</div>
-            </div>
-          </div>
-
-          <div class="msg msg--right">
-            <div class="bubbleCol bubbleCol--right">
-              <div class="bubble bubble--student" id="studentBubble">Hold-to-talk or type below.</div>
-            </div>
-            <img class="avatar" id="studentAvatar" src="assets/photos/soldier.png" alt="Student avatar" />
-          </div>
-        </div>
-
-        <div class="chatDivider" aria-hidden="true"></div>
-
-        <!-- ID card under the chat bubbles -->
-        <div class="idUnderChat" aria-label="Identity card area">
-          <!-- Force hidden at start (hidden attr + inline display none) -->
-          <div class="idUnderChatInner" id="idCardWrap" hidden style="display:none;">
-            <div class="idCard" role="group" aria-label="ID Card">
-              <div class="idCard__top">
-                <div class="idCard__title">IDENTITY CARD</div>
-                <button class="btn btn--small" id="btnReturnId" type="button">Return ID</button>
-              </div>
-
-              <div class="idCard__body">
-                <img class="idPhoto" id="idPhoto" alt="ID photo" />
-                <div class="idFields">
-                  <div class="idRow"><span class="k">Name</span><span class="v" id="idName"></span></div>
-                  <div class="idRow"><span class="k">DOB</span><span class="v" id="idDob"></span></div>
-                  <div class="idRow"><span class="k">Nationality</span><span class="v" id="idNat"></span></div>
-                  <div class="idRow"><span class="k">ID No.</span><span class="v" id="idNo"></span></div>
+              <div class="svRow">
+                <label>&nbsp;</label>
+                <button class="btn" id="btnStartTraining" type="button">Start</button>
+                <div class="note" id="loginError" style="display:none;color:var(--danger);font-weight:800;margin-top:8px;">
+                  Please enter your surname and select a group.
                 </div>
               </div>
-
-              <div class="idCard__note">Shown after you ask for ID.</div>
             </div>
           </div>
-
-          <div class="idSlotHint" id="idSlotHint">Ask for the visitor’s ID to display it here.</div>
         </div>
 
-        <div class="inputBar">
-          <div class="holdWrap">
-            <button class="btn btn--mic" id="holdToTalk" type="button" aria-label="Hold to talk">
-              Hold to talk
-            </button>
-            <div class="micHint">Release to send (autosend)</div>
+        <!-- Chat ladder: 4 slots -->
+        <div class="chatArea" id="chatArea" aria-label="Chat">
+          <div class="msg left faded" id="slot0">
+            <img class="avatar" id="slot0Avatar" alt="Visitor avatar" />
+            <div class="bubbleCol">
+              <div class="bubble" id="slot0Text"></div>
+              <div class="meta" id="slot0Meta"></div>
+            </div>
           </div>
 
-          <div class="typeWrap">
-            <input class="input" id="textInput" type="text" placeholder="Type your English sentence…" autocomplete="off" />
-            <button class="btn btn--primary" id="btnSend" type="button">Send</button>
+          <div class="msg right faded" id="slot1">
+            <div class="bubbleCol">
+              <div class="bubble" id="slot1Text"></div>
+            </div>
+            <img class="avatar" id="slot1Avatar" alt="Student avatar" src="assets/photos/soldier.png" />
+          </div>
+
+          <div class="msg left" id="slot2">
+            <img class="avatar" id="slot2Avatar" alt="Visitor avatar" />
+            <div class="bubbleCol">
+              <div class="bubble" id="slot2Text"></div>
+              <div class="meta" id="slot2Meta"></div>
+            </div>
+          </div>
+
+          <div class="msg right" id="slot3">
+            <div class="bubbleCol">
+              <div class="bubble" id="slot3Text"></div>
+            </div>
+            <img class="avatar" id="slot3Avatar" alt="Student avatar" src="assets/photos/soldier.png" />
           </div>
         </div>
-      </section>
 
-      <section class="screen" id="screenPersonSearch" aria-label="Person Search Screen">
-        <div class="placeholder">
-          <h2>Person Search (later)</h2>
-          <p>Placeholder.</p>
-          <button class="btn" id="btnBackToTraining" type="button">Back to Training</button>
-        </div>
-      </section>
+        <!-- ID slot (under chat bubbles) -->
+        <div class="idSlot" aria-label="ID slot">
+          <div class="idHint" id="idSlotHint">Ask for the visitor's ID to display it here.</div>
 
-      <section class="screen" id="screenReturn" aria-label="Return Screen">
-        <div class="placeholder">
-          <h2>Return</h2>
-          <p>Placeholder.</p>
-          <button class="btn" id="btnBackReturn" type="button">Back to Training</button>
-        </div>
-      </section>
-    
-      <!-- Supervisor modal -->
-      <div class="modalOverlay" id="supervisorModal" hidden>
-        <div class="modalCard" role="dialog" aria-modal="true" aria-label="Supervisor checklist">
-          <div class="modalTop">
-            <div class="modalTitle">Supervisor checklist</div>
-            <button class="btn btn--small" id="btnCloseSupervisor" type="button">Close</button>
-          </div>
-
-          <div class="modalGrid">
-<div class="mRow">
-              <div class="mQ">1) Why are you here?</div>
-              <input class="mInput" id="svWhy" type="text" placeholder="Student note / visitor answer" />
-              <div class="mStatus" id="svWhyStatus">—</div>
-            </div>
-
-            <div class="mRow">
-              <div class="mQ">2) Do you have an appointment?</div>
-              <select class="mInput" id="svAppt">
-                <option value="">Choose…</option>
-                <option value="yes">Yes</option>
-                <option value="no">No</option>
-              </select>
-              <div class="mStatus" id="svApptStatus">—</div>
-            </div>
-
-            <div class="mRow">
-              <div class="mQ">3) With whom do you have the appointment?</div>
-              <input class="mInput" id="svWho" type="text" placeholder="e.g. Sergeant de Vries" />
-              <div class="mStatus" id="svWhoStatus">—</div>
-            </div>
-
-            <div class="mRow">
-              <div class="mQ">4) What is the appointment about?</div>
-              <input class="mInput" id="svAbout" type="text" placeholder="e.g. delivery for the workshop" />
-              <div class="mStatus" id="svAboutStatus">—</div>
-            </div>
-
-            <div class="mRow">
-              <div class="mQ">5) What time is the appointment?</div>
-              <input class="mInput" id="svTime" type="text" placeholder="e.g. 14:00" />
-              <div class="mStatus" id="svTimeStatus">—</div>
+          <div class="idCard" id="idCardWrap" hidden>
+            <img class="idPhoto" id="idPhoto" alt="ID photo" />
+            <div style="min-width:0;flex:1;">
+              <div class="idFields">
+                <div>
+                  <div class="idLabel">NAME</div>
+                  <div class="idValue" id="idName">—</div>
+                </div>
+                <div>
+                  <div class="idLabel">NATIONALITY</div>
+                  <div class="idValue" id="idNat">—</div>
+                </div>
+                <div>
+                  <div class="idLabel">DATE OF BIRTH</div>
+                  <div class="idValue" id="idDob">—</div>
+                </div>
+                <div>
+                  <div class="idLabel">ID NO.</div>
+                  <div class="idValue" id="idNo">—</div>
+                </div>
+              </div>
+              <div class="idActions">
+                <button class="btn idReturnBtn" id="btnReturnId" type="button">Return ID</button>
+              </div>
             </div>
           </div>
+        </div>
 
-          <div class="modalActions">
+        <!-- Input -->
+        <div class="inputBar" aria-label="Input">
+          <div>
+            <button class="holdBtn" id="holdToTalk" type="button">Hold to talk</button>
+            <div class="holdSub">Release to send (autosend)</div>
+          </div>
+          <div class="inputWrap">
+            <input class="textInput" id="textInput" placeholder="Type your English sentence…" autocomplete="off" />
+            <button class="sendBtn" id="btnSend" type="button">Send</button>
+          </div>
+        </div>
+
+      </div>
+    </main>
+
+    <!-- Supervisor modal -->
+    <div class="modal" id="supervisorModal" hidden>
+      <div class="modalCard">
+        <div class="modalTitle">Supervisor check (5W/H)</div>
+
+        <div class="svGrid">
+          <div class="svRow">
+            <label for="svWhy">Why are you here?</label>
+            <input id="svWhy" autocomplete="off" />
+            <div class="svStatus" id="svWhyStatus">—</div>
+          </div>
+
+          <div class="svRow">
+            <label for="svAppt">Do you have an appointment?</label>
+            <select id="svAppt">
+              <option value="yes">Yes</option>
+              <option value="no">No</option>
+            </select>
+            <div class="svStatus" id="svApptStatus">—</div>
+          </div>
+
+          <div class="svRow">
+            <label for="svWho">With whom?</label>
+            <input id="svWho" autocomplete="off" />
+            <div class="svStatus" id="svWhoStatus">—</div>
+          </div>
+
+          <div class="svRow">
+            <label for="svAbout">What is it about?</label>
+            <input id="svAbout" autocomplete="off" />
+            <div class="svStatus" id="svAboutStatus">—</div>
+          </div>
+
+          <div class="svRow">
+            <label for="svTime">What time is the appointment?</label>
+            <input id="svTime" autocomplete="off" />
+            <div class="svStatus" id="svTimeStatus">—</div>
+          </div>
+
+          <div class="svRow">
+            <label>Actions</label>
             <button class="btn" id="btnSupervisorCheck" type="button">Run checks</button>
-            <button class="btn btn--primary" id="btnReturnToVisitor" type="button">Return to Visitor</button>
+            <button class="btn" id="btnReturnToVisitor" type="button" style="margin-top:10px;">Return to Visitor</button>
+            <button class="btn" id="btnCloseSupervisor" type="button" style="margin-top:10px;">Close</button>
+            <div class="note" id="svNote">Fill in the answers, run checks, then return to the visitor.</div>
           </div>
-
-          <div class="modalNote" id="svNote">Fill in the answers, run checks, then return to the visitor.</div>
         </div>
       </div>
+    </div>
 
-    </main>
+    <script src="config.js"></script>
+    <script>
+      // Build stamp for cache sanity
+      window.BUILD = { version: "7.3.5", name: "VEVA Ingang/Uitgang Trainer", date: "2026-02-10" };
+    </script>
+    <script src="app.js"></script>
   </div>
-
-  <!-- Cache busting via version query param -->
-  <script src="config.js?v=7.3.4"></script>
-  <script src="app.js?v=7.3.4"></script>
 </body>
 </html>

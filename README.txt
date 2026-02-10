@@ -1,5 +1,11 @@
-VEVA Trainer baseline v7.3.4
+VEVA Ingang/Uitgang Trainer — Baseline v7.3.5
 
-Includes:
-- Chat ladder (#chatThread) with 4 bubbles, oldest 2 fade.
-- Sidebar adds: Go to sign-in office (placeholder) + Start new scenario (works).
+Run locally (recommended):
+- VS Code: install "Live Server" extension -> right click index.html -> "Open with Live Server"
+- Or in Terminal (in this folder):
+    python3 -m http.server 5500
+  Then open: http://localhost:5500
+
+NOTE: Voice (SpeechRecognition) usually requires a secure context:
+- https:// OR http://localhost
+- It will NOT work reliably when opening index.html via file://
