@@ -386,7 +386,7 @@ idSlotHint.hidden = false;
       contraband: { weapons:false, drugs:false, alcohol:false }
     };
 
-    hideId();
+    hideId();                // enforce hidden on boot
     syncVisitorAvatars();
     pushVisitor(visitorLineResolved("greeting"));
     pushStudent("Hold-to-talk or type below.");

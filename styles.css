@@ -328,3 +328,14 @@ body{
   .main{ height:auto; }
   .chatArea{ min-height:340px; }
 }
+
+.msgRow.visitor .msgAvatar{ order:2; }
+
+.msgMeta{
+  font-size:13px;
+  color:var(--muted);
+  margin-right:54px;
+  margin-left:auto;
+  margin-top:-6px;
+  text-align:right;
+}
