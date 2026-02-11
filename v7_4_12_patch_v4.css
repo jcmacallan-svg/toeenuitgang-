@@ -1,0 +1,13 @@
+/* v7.4.12 patch v4
+   Goal: do NOT show empty chat slots at start.
+   Root cause: earlier patch CSS forced msg rows to display even when the DOM sets [hidden].
+   Fix: ensure the HTML hidden attribute always wins.
+*/
+
+/* Always honor the hidden attribute */
+.msgRow[hidden],
+.msgRow.hidden,
+[hidden] { display: none !important; }
+
+/* Safety: if a bubble is truly empty, hide the whole row (best-effort). */
+.msgRow .bubble:empty { display:none !important; }
