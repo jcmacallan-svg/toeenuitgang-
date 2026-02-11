@@ -1,5 +1,5 @@
 :root{
-  --bg:#131b26;
+  --bg:#182233;
   --panel:#1b2532;
   --panel2:#233042;
   --text:#e6edf3;
@@ -9,7 +9,7 @@
   --danger:#ff4d4d;
 
   --sidebarW: 320px;
-  --avatar: 44px;
+  --avatar: 56px;
   --gap: 12px;
   --bubbleMax: 620px;
 }
@@ -140,6 +140,8 @@ body{
 
 .bubbleCol{ max-width:var(--bubbleMax); min-width:0; }
 .bubble{
+  font-size:18px;
+  line-height:1.35;
   padding:10px 12px;
   border-radius:16px;
   border:1px solid var(--border);
@@ -217,6 +219,7 @@ body{
   border-radius:14px;
   padding:12px 12px;
   outline:none;
+  font-size:18px;
 }
 .sendBtn{
   width:92px;
@@ -415,3 +418,41 @@ body{
 .hintText{ font-size:24px; line-height:1.25; font-weight:800; color:rgba(255,255,255,0.92); text-align:left; }
 .portraitMood{ margin-left:12px; font-size:16px; color:rgba(255,255,255,0.78); line-height:1.25; max-width:240px; }
 .typingDots{ letter-spacing:2px; font-weight:900; }
+
+
+/* Inline hold-to-talk button inside input bar */
+.holdBtn--inline{
+  width:auto;
+  min-width:72px;
+  padding:12px 12px;
+  border-radius:14px;
+  white-space:nowrap;
+}
+.holdBtn--inline.listening{
+  outline:2px solid rgba(74,163,255,.55);
+  box-shadow:0 0 0 6px rgba(74,163,255,.12);
+}
+
+/* Typing dots bubble */
+.typingDots{
+  display:inline-flex;
+  gap:6px;
+  align-items:center;
+  padding:2px 0;
+}
+.typingDots span{
+  width:7px;
+  height:7px;
+  border-radius:50%;
+  background: rgba(255,255,255,.7);
+  display:inline-block;
+  animation: dotPulse 1.1s infinite ease-in-out;
+}
+.typingDots span:nth-child(2){ animation-delay: .15s; }
+.typingDots span:nth-child(3){ animation-delay: .30s; }
+
+@keyframes dotPulse{
+  0%, 80%, 100%{ transform: translateY(0); opacity:.35; }
+  40%{ transform: translateY(-4px); opacity:1; }
+}
+.bubble.typing{ min-height:44px; display:flex; align-items:center; }

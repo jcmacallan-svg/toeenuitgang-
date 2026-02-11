@@ -136,7 +136,7 @@
 <div id="portraitMood" class="portraitMood">The visitor looks neutral.</div>
 
           <div class="idCardWrap" id="idCardWrap" hidden>
-          <img id="idPhoto" alt="ID photo" />
+          <img id="idPhoto" class="idPhoto" alt="ID photo" />
           <div class="idFields">
             <div class="idRow"><span class="k">Name</span><span id="idName"></span></div>
             <div class="idRow"><span class="k">DOB</span><span id="idDob"></span></div>
@@ -154,13 +154,15 @@
       </div>
 
 <div class="inputBar" aria-label="Input">
-          <div>
-            <button class="holdBtn" id="holdToTalk" type="button">Hold to talk</button>
-            <div class="holdSub">Release to send (autosend)</div>
+  <div class="inputWrap">
+    <input class="textInput" id="textInput" placeholder="Type your English sentence…" autocomplete="off" />
+    <button class="holdBtn holdBtn--inline" id="holdToTalk" type="button" aria-label="Hold to talk">Hold</button>
+    <button class="sendBtn" id="btnSend" type="button" aria-label="Send">Send</button>
+  </div>
+</div>
           </div>
           <div class="inputWrap">
             <input class="textInput" id="textInput" placeholder="Type your English sentence…" autocomplete="off" />
-            <button id="btnMic" class="iconBtn" type="button" aria-label="Microphone">🎙</button>
 <button class="sendBtn" id="btnSend" type="button">Send</button>
           </div>
         </div>
@@ -219,7 +221,7 @@
     </div>
 <script>
       // Build stamp for cache sanity
-  window.BUILD = { version: "7.4.5", name: "VEVA Ingang/Uitgang Trainer", date: "2026-02-11" };
+  window.BUILD = { version: "7.4.7", name: "VEVA Ingang/Uitgang Trainer", date: "2026-02-11" };
     </script>
 </div>
 

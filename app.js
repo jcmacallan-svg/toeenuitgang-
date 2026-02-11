@@ -35,7 +35,6 @@
   const holdToTalk = $("#holdToTalk");
   const textInput = $("#textInput");
   const btnSend = $("#btnSend");
-  const btnMic = $("#btnMic");
 
   // ID UI
   const idCardWrap = $("#idCardWrap");
@@ -258,39 +257,53 @@ const hintBand = $("#hintBand");
   }
 
   function renderHistory(){
-    // Newest message is stored first and shown at the TOP (slot0).
-    const slice = history.slice(0, slotEls.length);
+  const rows = slotEls;
 
-    slotEls.forEach((s, i) => {
-      const msg = slice[i];
-      if (!s?.row) return;
+  // Build display list: newest at top. Optionally prepend a typing indicator.
+  let view = (state.history || []).slice(0, MAX_SLOTS);
 
-      if (!msg){
-        s.row.hidden = true;
-        if (s.txt) s.txt.textContent = "";
-        if (s.meta) s.meta.textContent = "";
-        return;
-      }
+  const typingMsg = (state.typing && state.typing.visitor) ? { side:"visitor", typing:true }
+                  : (state.typing && state.typing.student) ? { side:"student", typing:true }
+                  : null;
 
-      s.row.hidden = false;
-      s.row.classList.toggle("visitor", msg.side === "visitor");
-      s.row.classList.toggle("student", msg.side === "student");
-
-      if (s.av){
-        s.av.src = (msg.side === "visitor") ? (state?.visitor?.photoSrc || "") : "assets/photos/soldier.png";
-      }
-      if (s.txt) s.txt.textContent = msg.text || "";
-
-      // Only show the mood line once (under the newest visitor bubble), otherwise keep it blank.
-      if (s.meta){
-        if (i === 0 && msg.side === "visitor" && state?.moodLine) s.meta.textContent = state.moodLine;
-        else s.meta.textContent = "";
-      }
-
-      // Fade older messages a bit for readability (keep newest crisp).
-      s.row.classList.toggle("fade", i >= 4);
-    });
+  if (typingMsg){
+    view = [typingMsg, ...view].slice(0, MAX_SLOTS);
   }
+
+  for (let i = 0; i < MAX_SLOTS; i++){
+    const msg = view[i];
+    const row = rows[i];
+    if (!row) continue;
+
+    if (!msg){
+      row.hidden = true;
+      continue;
+    }
+
+    row.hidden = false;
+    row.classList.toggle("isVisitor", msg.side === "visitor");
+    row.classList.toggle("isStudent", msg.side === "student");
+
+    const avatarImg = row.querySelector("img");
+    if (avatarImg){
+      avatarImg.src = (msg.side === "visitor") ? visitorAvatar.src : soldierAvatar.src;
+      avatarImg.alt = (msg.side === "visitor") ? "Visitor" : "Student";
+    }
+
+    const bubble = row.querySelector(".bubble");
+    const meta = row.querySelector(".bubbleMeta");
+    if (meta) meta.textContent = "";
+
+    if (bubble){
+      bubble.classList.toggle("typing", !!msg.typing);
+      if (msg.typing){
+        bubble.innerHTML = '<span class="typingDots" aria-label="Typing"><span></span><span></span><span></span></span>';
+      } else {
+        bubble.textContent = msg.text;
+      }
+    }
+  }
+}
 
 function pushVisitor(text){
     history.unshift({ side:"visitor", text:String(text||"").trim() });
@@ -313,19 +326,35 @@ function pushVisitor(text){
   }
 
   function drainVisitorQueue(){
-    if (!_visitorQueue.length){
-      _visitorQueueBusy = false;
-      return;
-    }
-    _visitorQueueBusy = true;
-    const t = _visitorQueue.shift();
-    setTimeout(() => {
-      pushVisitor(t);
-      drainVisitorQueue();
-    }, VISITOR_REPLY_DELAY_MS);
+  if (visitorTimer) return;
+  if (!visitorQueue.length) return;
+
+  if (state && state.typing){
+    state.typing.visitor = true;
+    state.typing.student = false;
   }
+  renderHistory();
+
+  visitorTimer = setTimeout(() => {
+    visitorTimer = null;
+
+    // Stop typing indicator just before the message appears.
+    if (state && state.typing) state.typing.visitor = false;
+
+    const next = visitorQueue.shift();
+    if (next) pushVisitor(next);
+
+    if (visitorQueue.length){
+      drainVisitorQueue();
+    } else {
+      renderHistory();
+    }
+  }, VISITOR_REPLY_DELAY_MS);
+}
+
 
   function pushStudent(text){
+    if (state && state.typing) state.typing.student = false;
     history.unshift({ side:"student", text:String(text||"").trim() });
     history = history.slice(0, 6);
     state.misses = 0;
@@ -855,19 +884,28 @@ function spellLastName(){
   btnPersonSearch.addEventListener("click", () => pushVisitor("Person search (placeholder)."));
   btnSignIn.addEventListener("click", () => pushVisitor("Sign-in office (placeholder)."));
 
-  // ---------- Input ----------
-  btnMic?.addEventListener("click", () => {
-    if (!recognition) return;
-    if (!isRecognizing){ try{ recognition.start(); }catch(e){} }
-    else { try{ recognition.stop(); }catch(e){} }
-  });
+// ---------- Input ----------
+btnSend.addEventListener("click", () => {
+  if (!state || state.stage === "ended") return;
+  const t = (textInput.value || "").trim();
+  textInput.value = "";
+  if (state && state.typing) state.typing.student = false;
+  renderHistory();
+  handleStudent(t);
+});
 
-  btnSend.addEventListener("click", () => {
-    const t = textInput.value;
-    textInput.value = "";
-    handleStudent(t);
-    textInput.focus();
-  });
+// Send on Enter
+// Push-to-talk (hold)
+holdToTalk.addEventListener("pointerdown", (e) => { e.preventDefault(); startListen(); });
+holdToTalk.addEventListener("pointerup", (e) => { e.preventDefault(); stopListen(); });
+holdToTalk.addEventListener("pointercancel", stopListen);
+holdToTalk.addEventListener("pointerleave", () => stopListen());
+// Show student typing dots while typing (or while speech is active)
+textInput.addEventListener("input", () => {
+  if (!state || !state.typing) return;
+  state.typing.student = !!(textInput.value || "").trim();
+  renderHistory();
+});
   textInput.addEventListener("keydown", (e) => {
     if (e.key === "Enter") btnSend.click();
   });
@@ -896,6 +934,31 @@ function spellLastName(){
   // ---------- Voice ----------
   let recognition = null;
   let isRecognizing = false;
+  let interim = "";
+
+  function setVoiceStatusSafe(text){
+    if (voiceStatus) voiceStatus.textContent = text;
+  }
+
+  function voiceErrorHint(text){
+    try{
+      showHint(text);
+      setTimeout(() => hideHint(), 2500);
+    }catch{}
+  }
+
+  async function ensureMicPermission(){
+    try{
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return true;
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      // Immediately stop; we only wanted to trigger the permission prompt.
+      stream.getTracks().forEach(t => t.stop());
+      return true;
+    }catch(e){
+      console.warn("Mic permission denied or unavailable", e);
+      return false;
+    }
+  }
 
   function voiceSupported(){
     return !!(window.SpeechRecognition || window.webkitSpeechRecognition);
@@ -903,9 +966,15 @@ function spellLastName(){
 
   function setupSpeech(){
     if (!voiceSupported()){
-      voiceStatus.textContent = "Voice: not supported";
-      holdToTalk.disabled = true;
-      holdToTalk.title = "SpeechRecognition not supported in this browser.";
+      setVoiceStatusSafe("Voice: not supported");
+      if (holdToTalk){
+        holdToTalk.disabled = true;
+        holdToTalk.title = "SpeechRecognition not supported in this browser.";
+      }
+      if (holdToTalk){
+        holdToTalk.disabled = true;
+        holdToTalk.title = "SpeechRecognition not supported in this browser.";
+      }
       return;
     }
 
@@ -914,9 +983,15 @@ function spellLastName(){
     const okContext = window.isSecureContext || location.protocol === "https:" || isLocalhost;
 
     if (!okContext){
-      voiceStatus.textContent = "Voice: use https/localhost";
-      holdToTalk.disabled = true;
-      holdToTalk.title = "Voice requires https:// or http://localhost (not file://).";
+      setVoiceStatusSafe("Voice: use https/localhost");
+      if (holdToTalk){
+        holdToTalk.disabled = true;
+        holdToTalk.title = "Voice requires https:// or http://localhost (not file://).";
+      }
+      if (holdToTalk){
+        holdToTalk.disabled = true;
+        holdToTalk.title = "Voice requires https:// or http://localhost (not file://).";
+      }
       return;
     }
 
@@ -929,8 +1004,8 @@ function spellLastName(){
     recognition.onstart = () => {
       isRecognizing = true;
       interim = "";
-      voiceStatus.textContent = "Voice: listening…";
-      btnMic?.classList.add("listening");
+      setVoiceStatusSafe("Voice: listening…");
+      holdToTalk?.classList.add("listening");
     };
 
     recognition.onresult = (event) => {
@@ -945,28 +1020,47 @@ function spellLastName(){
     };
 
     recognition.onerror = (e) => {
-      console.warn("Speech error", e);
-      voiceStatus.textContent = "Voice: error";
+      // Typical errors: 'not-allowed', 'service-not-allowed', 'network', 'no-speech'
+      const code = (e && (e.error || e.name)) ? String(e.error || e.name) : "error";
+      console.warn("SpeechRecognition error:", code, e);
       isRecognizing = false;
+      holdToTalk?.classList.remove("listening");
+
+      if (code.includes("not-allowed") || code.includes("service-not-allowed")){
+        setVoiceStatusSafe("Voice: blocked");
+        voiceErrorHint("Microphone blocked. Allow mic access for this site (padlock icon) and refresh.");
+      } else if (code.includes("network")){
+        setVoiceStatusSafe("Voice: network");
+        voiceErrorHint("Speech service not reachable (network blocked/offline). You can still type.");
+      } else if (code.includes("no-speech")){
+        setVoiceStatusSafe("Voice: no speech");
+      } else {
+        setVoiceStatusSafe("Voice: error");
+      }
     };
 
     recognition.onend = () => {
-      voiceStatus.textContent = "Voice: ready";
+      setVoiceStatusSafe("Voice: ready");
       isRecognizing = false;
-      btnMic?.classList.remove("listening");
+      holdToTalk?.classList.remove("listening");
     };
   }
 
-  function startListen(){
+  async function startListen(){
     if (!recognition || isRecognizing) return;
     try {
+      const ok = await ensureMicPermission();
+      if (!ok){
+        setVoiceStatusSafe("Voice: blocked");
+        voiceErrorHint("Microphone permission denied. Enable it for this site and refresh.");
+        return;
+      }
       recognition.start();
     } catch (err){
       // Most common: NotAllowedError / NotSupportedError.
-      voiceStatus.textContent = "Voice: blocked";
-      // Keep hints helpful without interrupting the flow.
-      state.hint = "Microphone blocked. Allow mic permission or type your sentence.";
-      updateHintBand();
+      console.warn("recognition.start() failed", err);
+      setVoiceStatusSafe("Voice: blocked");
+      voiceErrorHint("Voice start failed. Check mic permissions and that you're on https:// (or localhost)." );
     }
   }
 
