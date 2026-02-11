@@ -11,7 +11,11 @@
   const ASSET_BASE = CFG.assetBase || "assets/photos";
   const HEADSHOT_PREFIX = CFG.headshotPrefix || "headshot_";
   const HEADSHOT_COUNT = Number(CFG.headshotCount || 10);
-  const VOICE_AUTOSEND = false; // v7.4.4: voice fills input only
+  // Support both legacy keys (voiceAutoSend) and new keys (voiceAutosend)
+  const _voiceCfg = (CFG.voiceAutosend !== undefined) ? CFG.voiceAutosend
+                   : (CFG.voiceAutoSend !== undefined) ? CFG.voiceAutoSend
+                   : undefined;
+  const VOICE_AUTOSEND = (_voiceCfg === undefined) ? true : !!_voiceCfg;
 
   // UI
   const versionPill = $("#versionPill");
@@ -42,13 +46,15 @@
   const btnReturnId = $("#btnReturnId");
   const idPhoto = $("#idPhoto");
   const portraitPhoto = $("#portraitPhoto");
+  const portraitMood = $("#portraitMood");
 
   // Avatar sources used by the chat renderer.
   // Keep these independent of UI nodes so missing elements never break the app.
   const visitorAvatar = portraitPhoto || { src: "" };
   const soldierAvatar = new Image();
-  soldierAvatar.src = "assets/photos/soldier.png";
+  soldierAvatar.src = `${ASSET_BASE}/soldier.png`;
   const idName = $("#idName");
+  const idSurname = $("#idSurname");
   const idDob = $("#idDob");
   const idNat = $("#idNat");
   const idNo = $("#idNo");
@@ -135,11 +141,32 @@ const hintBand = $("#hintBand");
 
   function makeRandomId(){
     const idx = randInt(1, HEADSHOT_COUNT);
+    // Simple gender heuristic based on the headshot index (lets us keep names consistent
+    // without needing separate metadata).
+    const gender = (idx % 2 === 0) ? "female" : "male";
+    const FIRST = {
+      male:   ["Liam","Noah","James","Oliver","Lucas","Milan","Daan","Sem","Jayden","Finn"],
+      female: ["Emma","Sofia","Mila","Lotte","Eva","Nora","Zoë","Anna","Sara","Julia"]
+    };
+    const LAST = ["Miller","Bakker","de Vries","Jansen","Visser","Smit","Bos","van Dijk","de Jong","Meijer"];
+    const NATS = ["Dutch","German","Belgian","French","British"];
+    const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
+    const first = pick(FIRST[gender]);
+    const last  = pick(LAST);
+    const year = randInt(1976, 2002);
+    const month = MONTHS[randInt(0, MONTHS.length - 1)];
+    const day = pad2(randInt(1, 28));
+    const nat = pick(NATS);
+    const idNo = (nat === "Dutch" ? "NL-" : nat === "German" ? "DE-" : nat === "Belgian" ? "BE-" : nat === "French" ? "FR-" : "UK-") + randInt(100000, 999999);
+
     return {
-      name: "Jordan Miller",
-      dob: "21 Mar 1982",
-      nat: "Dutch",
-      idNo: "NL-" + randInt(100000, 999999),
+      first,
+      last,
+      name: `${first} ${last}`,
+      dob: `${day} ${month} ${year}`,
+      nat,
+      idNo,
       headshotIndex: idx,
       photoSrc: headshotPath(idx)
     };
@@ -162,6 +189,7 @@ const hintBand = $("#hintBand");
     // `state` only exists after Start; keep this safe during boot/login.
     if (!state || !state.visitor) return;
     idName.textContent = state.visitor.name;
+    if (idSurname) idSurname.textContent = state.visitor.last || "";
     idDob.textContent  = state.visitor.dob;
     idNat.textContent  = state.visitor.nat;
     idNo.textContent   = state.visitor.idNo;
@@ -189,6 +217,10 @@ const hintBand = $("#hintBand");
     { key:"irritated",line:"The visitor looks irritated.",liarBias:0.28 }
   ];
   let currentMood = MOODS[1];
+
+  function syncMoodUI(){
+    if (portraitMood) portraitMood.textContent = currentMood?.line || "";
+  }
 
   // ---------- Chat ladder ----------
   // Keep last 4 messages (V,S,V,S). Oldest 2 are faded via CSS.
@@ -266,53 +298,59 @@ const hintBand = $("#hintBand");
   }
 
   function renderHistory(){
-    const rows = slotEls;
+    const slots = slotEls;
 
-    // Build display list: newest at top. Optionally prepend a typing indicator.
+    // Newest at top. Optionally prepend a typing indicator.
     let view = history.slice(0, MAX_SLOTS);
 
-  const typingMsg = (state.typing && state.typing.visitor) ? { side:"visitor", typing:true }
-                  : (state.typing && state.typing.student) ? { side:"student", typing:true }
-                  : null;
+    const typingMsg = (state && state.typing && state.typing.visitor) ? { side: "visitor", typing: true }
+                    : (state && state.typing && state.typing.student) ? { side: "student", typing: true }
+                    : null;
 
-  if (typingMsg){
-    view = [typingMsg, ...view].slice(0, MAX_SLOTS);
-  }
+    if (typingMsg){
+      view = [typingMsg, ...view].slice(0, MAX_SLOTS);
+    }
 
     for (let i = 0; i < MAX_SLOTS; i++){
       const msg = view[i];
-      const row = rows[i];
-      if (!row) continue;
+      const slot = slots[i];
+      if (!slot || !slot.row) continue;
 
+      const rowEl = slot.row;
       if (!msg){
-        row.hidden = true;
+        rowEl.hidden = true;
         continue;
       }
 
-      row.hidden = false;
-      row.classList.toggle("isVisitor", msg.side === "visitor");
-      row.classList.toggle("isStudent", msg.side === "student");
+      rowEl.hidden = false;
+      rowEl.classList.toggle("isVisitor", msg.side === "visitor");
+      rowEl.classList.toggle("isStudent", msg.side === "student");
 
-      const avatarImg = row.querySelector("img");
-      if (avatarImg){
-        avatarImg.src = (msg.side === "visitor") ? visitorAvatar.src : soldierAvatar.src;
-        avatarImg.alt = (msg.side === "visitor") ? "Visitor" : "Student";
+      // Side alignment (visitor LEFT, student RIGHT)
+      rowEl.classList.toggle("left", msg.side === "visitor");
+      rowEl.classList.toggle("right", msg.side === "student");
+
+      // Avatar
+      if (slot.av){
+        slot.av.src = (msg.side === "visitor") ? (visitorAvatar.src || "") : (soldierAvatar.src || "");
+        slot.av.alt = (msg.side === "visitor") ? "Visitor" : "Soldier";
       }
 
-      const bubble = row.querySelector(".bubble");
-      const meta = row.querySelector(".bubbleMeta");
-      if (meta) meta.textContent = "";
+      // Meta
+      if (slot.meta) slot.meta.textContent = "";
 
-      if (bubble){
-        bubble.classList.toggle("typing", !!msg.typing);
+      // Bubble text / typing dots
+      if (slot.txt){
+        slot.txt.classList.toggle("typing", !!msg.typing);
         if (msg.typing){
-          bubble.innerHTML = '<span class="typingDots" aria-label="Typing"><span></span><span></span><span></span></span>';
+          slot.txt.innerHTML = '<span class="typingDots" aria-label="Typing"><span></span><span></span><span></span></span>';
         } else {
-          bubble.textContent = msg.text;
+          slot.txt.textContent = msg.text || "";
         }
       }
     }
   }
+
 
   function pushVisitor(text){
     history.unshift({ side:"visitor", text:String(text||"").trim() });
@@ -493,7 +531,9 @@ const hintBand = $("#hintBand");
     { key:"help_open", rx:/\b(how\s+can\s+i\s+help(\s+you(\s+today)?)?|what\s+do\s+you\s+need|how\s+may\s+i\s+help)\b/i },
     { key:"purpose", rx:/\b(why\s+are\s+you\s+here|what\s+is\s+the\s+purpose\s+of\s+your\s+visit|what\s+is\s+the\s+reason\s+for\s+your\s+visit|what\'?s\s+the\s+reason\s+for\s+your\s+visit|whats\s+the\s+reason\s+for\s+your\s+visit)\b/i },
     { key:"has_appointment", rx:/\b(do\s+you\s+have\s+an\s+appointment|do\s+you\s+have\s+a\s+meeting|have\s+you\s+got\s+an\s+appointment|have\s+you\s+got\s+a\s+meeting|is\s+your\s+visit\s+scheduled)\b/i },
-    { key:"who_meeting", rx:/\b(who\s+are\s+you\s+(meeting|seeing|talking\s+to)(\s+with)?|who\s+do\s+you\s+have\s+an?\s+(appointment|meeting)\s+with|with\s+whom\s+do\s+you\s+have\s+an\s+appointment)\b/i },
+
+    { key:"ask_name", rx:/\b(who\s+are\s+you|what\s+is\s+your\s+name|may\s+i\s+have\s+your\s+name|your\s+name\s*,?\s+please)\b/i },
+        { key:"who_meeting", rx:/\b(who\s+are\s+you\s+(meeting|seeing|talking\s+to)(\s+with)?|who\s+do\s+you\s+have\s+an?\s+(appointment|meeting)\s+with|with\s+whom\s+do\s+you\s+have\s+an\s+appointment)\b/i },
     { key:"time_meeting", rx:/\b(what\s+time\s+is\s+(the\s+)?(appointment|meeting)|when\s+is\s+(the\s+)?(appointment|meeting)|when\s+are\s+you\s+expected|what\s+time\s+are\s+you\s+expected)\b/i },
     { key:"about_meeting", rx:/\b(what\s+is\s+(the\s+)?(appointment|meeting)\s+about|can\s+you\s+tell\s+me\s+(a\s+little\s+bit\s+more|more)\s+about\s+the\s+(appointment|meeting)|tell\s+me\s+more\s+about\s+the\s+(appointment|meeting)|what\s+are\s+you\s+delivering)\b/i },
     { key:"ask_id", rx:/\b(do\s+you\s+have\s+(an\s+)?id|have\s+you\s+got\s+id|can\s+i\s+see\s+your\s+id|may\s+i\s+see\s+your\s+id|show\s+me\s+your\s+id|id\s+please|identity\s+card|passport)\b/i },
@@ -524,12 +564,15 @@ const hintBand = $("#hintBand");
 
   function resetScenario(){
     currentMood = MOODS[randInt(0, MOODS.length - 1)];
+    syncMoodUI();
     ID_DATA = makeRandomId();
     history.length = 0;
 
     state = {
       stage: "start",
       misses: 0,
+      typing: { visitor:false, student:false },
+      contraband: { weapons:false, drugs:false, alcohol:false },
       idVisible: false,
       idChecked: false,
       moodLine: currentMood.line,
@@ -633,24 +676,7 @@ function spellLastName(){
     console.info("Supervisor check", { expected, entered, mismatches: mism });
   }
 
-  
-  // ---------- Delayed visitor replies with typing indicator ----------
-  function immediateVisitor(text){
-    pushMessage({side:"visitor", text:String(text||""), typing:false, ts:Date.now()});
-    renderHistory();
-  }
-  function scheduleVisitorReply(getTextFn){
-    const typingMsg = { side:"visitor", text:"...", typing:true, ts:Date.now() };
-    pushMessage(typingMsg);
-    renderHistory();
-    setTimeout(() => {
-      const text = (typeof getTextFn === "function") ? String(getTextFn() || "") : String(getTextFn || "");
-      typingMsg.typing = false;
-      typingMsg.text = text || "…";
-      renderHistory();
-    }, VISITOR_REPLY_DELAY_MS);
-  }
-// ---------- Dialogue ----------
+  // ---------- Dialogue ----------
   function handleStudent(raw){
     const clean = String(raw || "").trim();
     if (!clean) return;
@@ -1009,23 +1035,30 @@ textInput.addEventListener("input", () => {
     recognition.onstart = () => {
       isRecognizing = true;
       interim = "";
+      if (state && state.typing){ state.typing.student = true; state.typing.visitor = false; }
+      renderHistory();
       state._voiceSessionActive = true;
       state._voiceHadResult = false;
       setVoiceStatusSafe("Voice: listening…");
       holdToTalk?.classList.add("listening");
+      if (state && state.typing){ state.typing.student = true; state.typing.visitor = false; }
+      renderHistory();
     };
 
     recognition.onresult = (event) => {
-      // Only final text into input (no stutter)
+      // Put best-available transcript into the input (final preferred, interim as fallback).
       let finalText = "";
+      let interimText = "";
       for (let i = event.resultIndex; i < event.results.length; i++){
         const res = event.results[i];
-        if (res.isFinal) finalText += res[0].transcript;
+        const chunk = (res && res[0] && res[0].transcript) ? res[0].transcript : "";
+        if (res.isFinal) finalText += chunk;
+        else interimText += chunk;
       }
-      const clean = (finalText || "").trim();
-      if (clean){
+      const combined = String(finalText || interimText || "").trim();
+      if (combined){
         state._voiceHadResult = true;
-        textInput.value = clean;
+        textInput.value = combined;
       }
     };
 
@@ -1053,10 +1086,10 @@ textInput.addEventListener("input", () => {
       setVoiceStatusSafe("Voice: ready");
       isRecognizing = false;
       holdToTalk?.classList.remove("listening");
+      if (state && state.typing){ state.typing.student = false; }
+      renderHistory();
 
-      // Auto-send on voice end (push-to-talk) if enabled.
-      // This matches the desired flow: hold → speak → release → message sends.
-      if (CFG.voiceAutosend && state._voiceSessionActive && state._voiceHadResult){
+      if (VOICE_AUTOSEND && state._voiceSessionActive){
         const toSend = (textInput.value || "").trim();
         if (toSend){
           handleStudent(toSend);

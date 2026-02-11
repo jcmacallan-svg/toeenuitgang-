@@ -267,26 +267,51 @@ body{
   border:1px solid var(--border);
   border-radius:14px;
   padding:12px;
-  max-width:720px;
+  max-width:520px;
 }
+.idPhotoWrap{ position:relative; flex:0 0 auto; }
 .idPhoto{
-  width:86px;
-  height:86px;
+  width:76px;
+  height:96px;
   border-radius:10px;
   object-fit:cover;
   border:1px solid var(--border);
-  flex:0 0 auto;
+  background:rgba(255,255,255,0.03);
+  display:block;
 }
+
+/* Passport-like stamps */
+.idStamps{
+  position:absolute;
+  right:-6px;
+  bottom:-6px;
+  display:flex;
+  gap:6px;
+  opacity:0.95;
+}
+.idStamp{
+  font-weight:900;
+  font-size:10px;
+  padding:4px 6px;
+  border-radius:999px;
+  border:1px solid rgba(255,255,255,0.18);
+  background:rgba(0,0,0,0.25);
+  letter-spacing:0.06em;
+}
+.idStamp--nl{ color:#cfe2ff; }
+.idStamp--valid{ color:#c9ffd6; }
+
+/* Fields as rows (more like a passport info page) */
 .idFields{
-  display:grid;
-  grid-template-columns: 1fr 1fr;
-  gap:6px 12px;
-  align-content:start;
+  display:flex;
+  flex-direction:column;
+  gap:6px;
   width:100%;
   min-width:0;
 }
-.idLabel{ color:var(--muted); font-size:11px; }
-.idValue{ font-weight:800; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.idRow{ display:flex; justify-content:space-between; gap:10px; }
+.idRow .k{ color:var(--muted); font-size:11px; flex:0 0 88px; }
+.idRow span:not(.k){ font-weight:900; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 
 .idActions{ display:flex; gap:10px; align-items:center; margin-top:6px; }
 .idReturnBtn{ width:auto; padding:8px 10px; border-radius:12px; }
@@ -400,9 +425,9 @@ body{
   max-width: 980px;}
 .msgRow.visitor{ justify-content:flex-start; }
 .msgRow.student{ justify-content:flex-end; margin-left:auto; flex-direction:row-reverse; }
-.avatar{ width:44px; height:44px; border-radius:999px; object-fit:cover; flex:0 0 auto; box-shadow:0 6px 18px rgba(0,0,0,.25); border:1px solid rgba(255,255,255,.08); }
+.avatar{ width:var(--avatar); height:var(--avatar); border-radius:999px; object-fit:cover; flex:0 0 auto; box-shadow:0 6px 18px rgba(0,0,0,.25); border:1px solid rgba(255,255,255,.08); }
 .bubbleWrap{ display:flex; flex-direction:column; gap:6px; min-width:0; }
-.bubble{ padding:12px 14px; border-radius:18px; font-size:18px; line-height:1.35; max-width: 560px; }
+.bubble{ padding:16px 16px; border-radius:18px; font-size:18px; line-height:1.25; max-width:560px; min-height:var(--avatar); }
 .msgRow.visitor .bubble{ background: rgba(230,235,242,.96); color:#0f172a; border:1px solid rgba(15,23,42,.10); }
 .msgRow.student .bubble{ background: rgba(155,216,255,.92); color:#0b1220; border:1px solid rgba(11,18,32,.16); }
 .meta{ font-size:13px; color: var(--muted); padding-left:4px; }
@@ -455,4 +480,4 @@ body{
   0%, 80%, 100%{ transform: translateY(0); opacity:.35; }
   40%{ transform: translateY(-4px); opacity:1; }
 }
-.bubble.typing{ min-height:44px; display:flex; align-items:center; }
+.bubble.typing{ min-height:56px; display:flex; align-items:center; }

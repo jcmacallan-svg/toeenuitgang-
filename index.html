@@ -136,13 +136,22 @@
 <div id="portraitMood" class="portraitMood">The visitor looks neutral.</div>
 
           <div class="idCardWrap" id="idCardWrap" hidden>
-          <img id="idPhoto" class="idPhoto" alt="ID photo" />
-          <div class="idFields">
-            <div class="idRow"><span class="k">Name</span><span id="idName"></span></div>
-            <div class="idRow"><span class="k">DOB</span><span id="idDob"></span></div>
-            <div class="idRow"><span class="k">Nationality</span><span id="idNat"></span></div>
-            <div class="idRow"><span class="k">ID No.</span><span id="idNo"></span></div>
-          </div>
+            <div class="idCard passport">
+              <div class="idPhotoWrap">
+                <img id="idPhoto" class="idPhoto" alt="ID photo" />
+                <div class="idStamps" aria-hidden="true">
+                  <span class="stamp">NL</span>
+                  <span class="stamp">VALID</span>
+                </div>
+              </div>
+              <div class="idFields">
+                <div class="idRow"><span class="k">Name</span><span id="idName"></span></div>
+                <div class="idRow"><span class="k">Surname</span><span id="idSurname"></span></div>
+                <div class="idRow"><span class="k">DOB</span><span id="idDob"></span></div>
+                <div class="idRow"><span class="k">Nationality</span><span id="idNat"></span></div>
+                <div class="idRow"><span class="k">ID No.</span><span id="idNo"></span></div>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -216,7 +225,7 @@
     </div>
 <script>
       // Build stamp for cache sanity
-  window.BUILD = { version: "7.4.9", name: "VEVA Ingang/Uitgang Trainer", date: "2026-02-11" };
+  window.BUILD = { version: "7.4.11", name: "VEVA Ingang/Uitgang Trainer", date: "2026-02-11" };
     </script>
 </div>
 
