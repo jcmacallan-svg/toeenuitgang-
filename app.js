@@ -42,6 +42,12 @@
   const btnReturnId = $("#btnReturnId");
   const idPhoto = $("#idPhoto");
   const portraitPhoto = $("#portraitPhoto");
+
+  // Avatar sources used by the chat renderer.
+  // Keep these independent of UI nodes so missing elements never break the app.
+  const visitorAvatar = portraitPhoto || { src: "" };
+  const soldierAvatar = new Image();
+  soldierAvatar.src = "assets/photos/soldier.png";
   const idName = $("#idName");
   const idDob = $("#idDob");
   const idNat = $("#idNat");
@@ -1003,6 +1009,8 @@ textInput.addEventListener("input", () => {
     recognition.onstart = () => {
       isRecognizing = true;
       interim = "";
+      state._voiceSessionActive = true;
+      state._voiceHadResult = false;
       setVoiceStatusSafe("Voice: listening…");
       holdToTalk?.classList.add("listening");
     };
@@ -1015,7 +1023,10 @@ textInput.addEventListener("input", () => {
         if (res.isFinal) finalText += res[0].transcript;
       }
       const clean = (finalText || "").trim();
-      if (clean) textInput.value = clean;
+      if (clean){
+        state._voiceHadResult = true;
+        textInput.value = clean;
+      }
     };
 
     recognition.onerror = (e) => {
@@ -1042,6 +1053,18 @@ textInput.addEventListener("input", () => {
       setVoiceStatusSafe("Voice: ready");
       isRecognizing = false;
       holdToTalk?.classList.remove("listening");
+
+      // Auto-send on voice end (push-to-talk) if enabled.
+      // This matches the desired flow: hold → speak → release → message sends.
+      if (CFG.voiceAutosend && state._voiceSessionActive && state._voiceHadResult){
+        const toSend = (textInput.value || "").trim();
+        if (toSend){
+          handleStudent(toSend);
+          textInput.value = "";
+        }
+      }
+      state._voiceSessionActive = false;
+      state._voiceHadResult = false;
     };
   }
 
