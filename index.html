@@ -238,13 +238,13 @@
       document.head.appendChild(s);
     }
 
-    // Ensure config loads before app
-    
-    load('config.js', function(){ load('app.js'); });
-  })();
-</script>
-<script src="app.js"></script>
-<script src="v7_4_12_patch.js"></script>
+    // Ensure config loads before app, then load patch AFTER app
+load('config.js', function(){
+  load('app.js', function(){
+    load('v7_4_12_patch.js');
+  });
+});
+
 
 </body>
 </html>
