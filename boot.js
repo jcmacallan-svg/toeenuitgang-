@@ -17,7 +17,7 @@ window.BUILD = { version: "7.4.11", name: "VEVA Ingang/Uitgang Trainer", date: "
 
   load("config.js", function () {
     load("app.js", function () {
-      load("v7_4_12_patch.js");
+      load("v7_4_12_patch_v2.js");
     });
   });
 })();
