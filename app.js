@@ -76,6 +76,9 @@ const hintBand = $("#hintBand");
     { row: $("#slot5"), av: $("#slot5Avatar"), txt: $("#slot5Text"), meta: $("#slot5Meta") },
   ];
 
+  // Max visible bubbles in the chat ladder
+  const MAX_SLOTS = slotEls.length;
+
   // Version banner
   const __assetVer = String(window.__ASSET_VER__ || "");
   const __assetShort = __assetVer ? __assetVer.slice(-6) : "";
@@ -257,10 +260,10 @@ const hintBand = $("#hintBand");
   }
 
   function renderHistory(){
-  const rows = slotEls;
+    const rows = slotEls;
 
-  // Build display list: newest at top. Optionally prepend a typing indicator.
-  let view = (state.history || []).slice(0, MAX_SLOTS);
+    // Build display list: newest at top. Optionally prepend a typing indicator.
+    let view = history.slice(0, MAX_SLOTS);
 
   const typingMsg = (state.typing && state.typing.visitor) ? { side:"visitor", typing:true }
                   : (state.typing && state.typing.student) ? { side:"student", typing:true }
@@ -270,44 +273,44 @@ const hintBand = $("#hintBand");
     view = [typingMsg, ...view].slice(0, MAX_SLOTS);
   }
 
-  for (let i = 0; i < MAX_SLOTS; i++){
-    const msg = view[i];
-    const row = rows[i];
-    if (!row) continue;
+    for (let i = 0; i < MAX_SLOTS; i++){
+      const msg = view[i];
+      const row = rows[i];
+      if (!row) continue;
 
-    if (!msg){
-      row.hidden = true;
-      continue;
-    }
+      if (!msg){
+        row.hidden = true;
+        continue;
+      }
 
-    row.hidden = false;
-    row.classList.toggle("isVisitor", msg.side === "visitor");
-    row.classList.toggle("isStudent", msg.side === "student");
+      row.hidden = false;
+      row.classList.toggle("isVisitor", msg.side === "visitor");
+      row.classList.toggle("isStudent", msg.side === "student");
 
-    const avatarImg = row.querySelector("img");
-    if (avatarImg){
-      avatarImg.src = (msg.side === "visitor") ? visitorAvatar.src : soldierAvatar.src;
-      avatarImg.alt = (msg.side === "visitor") ? "Visitor" : "Student";
-    }
+      const avatarImg = row.querySelector("img");
+      if (avatarImg){
+        avatarImg.src = (msg.side === "visitor") ? visitorAvatar.src : soldierAvatar.src;
+        avatarImg.alt = (msg.side === "visitor") ? "Visitor" : "Student";
+      }
 
-    const bubble = row.querySelector(".bubble");
-    const meta = row.querySelector(".bubbleMeta");
-    if (meta) meta.textContent = "";
+      const bubble = row.querySelector(".bubble");
+      const meta = row.querySelector(".bubbleMeta");
+      if (meta) meta.textContent = "";
 
-    if (bubble){
-      bubble.classList.toggle("typing", !!msg.typing);
-      if (msg.typing){
-        bubble.innerHTML = '<span class="typingDots" aria-label="Typing"><span></span><span></span><span></span></span>';
-      } else {
-        bubble.textContent = msg.text;
+      if (bubble){
+        bubble.classList.toggle("typing", !!msg.typing);
+        if (msg.typing){
+          bubble.innerHTML = '<span class="typingDots" aria-label="Typing"><span></span><span></span><span></span></span>';
+        } else {
+          bubble.textContent = msg.text;
+        }
       }
     }
   }
-}
 
-function pushVisitor(text){
+  function pushVisitor(text){
     history.unshift({ side:"visitor", text:String(text||"").trim() });
-    history = history.slice(0, 6);
+    history = history.slice(0, MAX_SLOTS);
     state.misses = 0;
     renderHistory();
     updateHintBand();
@@ -325,38 +328,34 @@ function pushVisitor(text){
     if (!_visitorQueueBusy) drainVisitorQueue();
   }
 
+  let _visitorTimer = null;
   function drainVisitorQueue(){
-  if (visitorTimer) return;
-  if (!visitorQueue.length) return;
+    if (_visitorTimer) return;
+    if (!_visitorQueue.length) return;
 
-  if (state && state.typing){
-    state.typing.visitor = true;
-    state.typing.student = false;
-  }
-  renderHistory();
-
-  visitorTimer = setTimeout(() => {
-    visitorTimer = null;
-
-    // Stop typing indicator just before the message appears.
-    if (state && state.typing) state.typing.visitor = false;
-
-    const next = visitorQueue.shift();
-    if (next) pushVisitor(next);
-
-    if (visitorQueue.length){
-      drainVisitorQueue();
-    } else {
-      renderHistory();
+    // Show typing dots for the visitor while we wait.
+    if (state && state.typing){
+      state.typing.visitor = true;
+      state.typing.student = false;
     }
-  }, VISITOR_REPLY_DELAY_MS);
-}
+    renderHistory();
+
+    _visitorTimer = setTimeout(() => {
+      _visitorTimer = null;
+
+      if (state && state.typing) state.typing.visitor = false;
+      const next = _visitorQueue.shift();
+      if (next) pushVisitor(next);
+
+      if (_visitorQueue.length) drainVisitorQueue();
+    }, VISITOR_REPLY_DELAY_MS);
+  }
 
 
   function pushStudent(text){
     if (state && state.typing) state.typing.student = false;
     history.unshift({ side:"student", text:String(text||"").trim() });
-    history = history.slice(0, 6);
+    history = history.slice(0, MAX_SLOTS);
     state.misses = 0;
     renderHistory();
     updateHintBand();
