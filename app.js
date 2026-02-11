@@ -11,7 +11,7 @@
   const ASSET_BASE = CFG.assetBase || "assets/photos";
   const HEADSHOT_PREFIX = CFG.headshotPrefix || "headshot_";
   const HEADSHOT_COUNT = Number(CFG.headshotCount || 10);
-  const VOICE_AUTOSEND = CFG.voiceAutoSend !== false;
+  const VOICE_AUTOSEND = false; // v7.4.4: voice fills input only
 
   // UI
   const versionPill = $("#versionPill");
@@ -35,6 +35,7 @@
   const holdToTalk = $("#holdToTalk");
   const textInput = $("#textInput");
   const btnSend = $("#btnSend");
+  const btnMic = $("#btnMic");
 
   // ID UI
   const idCardWrap = $("#idCardWrap");
@@ -594,7 +595,24 @@ function spellLastName(){
     console.info("Supervisor check", { expected, entered, mismatches: mism });
   }
 
-  // ---------- Dialogue ----------
+  
+  // ---------- Delayed visitor replies with typing indicator ----------
+  function immediateVisitor(text){
+    pushMessage({side:"visitor", text:String(text||""), typing:false, ts:Date.now()});
+    renderHistory();
+  }
+  function scheduleVisitorReply(getTextFn){
+    const typingMsg = { side:"visitor", text:"...", typing:true, ts:Date.now() };
+    pushMessage(typingMsg);
+    renderHistory();
+    setTimeout(() => {
+      const text = (typeof getTextFn === "function") ? String(getTextFn() || "") : String(getTextFn || "");
+      typingMsg.typing = false;
+      typingMsg.text = text || "…";
+      renderHistory();
+    }, VISITOR_REPLY_DELAY_MS);
+  }
+// ---------- Dialogue ----------
   function handleStudent(raw){
     const clean = String(raw || "").trim();
     if (!clean) return;
@@ -672,7 +690,7 @@ function spellLastName(){
           enqueueVisitor("I have an appointment on base.");
           return;
         }
-        if (intent === "has_appointment"){
+        if (intent === "has_appointment"){ if (state && state.facts) state.facts.apptAsked = true;
           state.facts.appt = "yes";
           enqueueVisitor(visitorLineResolved("appointment_yes"));
           return;
@@ -834,6 +852,12 @@ function spellLastName(){
   btnSignIn.addEventListener("click", () => pushVisitor("Sign-in office (placeholder)."));
 
   // ---------- Input ----------
+  btnMic?.addEventListener("click", () => {
+    if (!recognition) return;
+    if (!isRecognizing){ try{ recognition.start(); }catch(e){} }
+    else { try{ recognition.stop(); }catch(e){} }
+  });
+
   btnSend.addEventListener("click", () => {
     const t = textInput.value;
     textInput.value = "";
@@ -900,7 +924,9 @@ function spellLastName(){
 
     recognition.onstart = () => {
       isRecognizing = true;
+      interim = "";
       voiceStatus.textContent = "Voice: listening…";
+      btnMic?.classList.add("listening");
     };
 
     recognition.onresult = (event) => {
@@ -923,11 +949,7 @@ function spellLastName(){
     recognition.onend = () => {
       voiceStatus.textContent = "Voice: ready";
       isRecognizing = false;
-      const spoken = (textInput.value || "").trim();
-      if (VOICE_AUTOSEND && spoken){
-        handleStudent(spoken);
-        textInput.value = "";
-      }
+      btnMic?.classList.remove("listening");
     };
   }
 
@@ -965,11 +987,6 @@ function spellLastName(){
   }
 
   if (holdToTalk){
-    holdToTalk.addEventListener("pointerdown", _holdStart);
-    holdToTalk.addEventListener("pointerup", _holdEnd);
-    holdToTalk.addEventListener("pointercancel", _holdEnd);
-    holdToTalk.addEventListener("pointerleave", _holdEnd);
-
     // Fallbacks
     holdToTalk.addEventListener("mousedown", _holdStart);
     holdToTalk.addEventListener("mouseup", _holdEnd);

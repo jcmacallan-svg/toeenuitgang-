@@ -407,3 +407,11 @@ body{
 .dividerLine{ width:100%; height:1px; background: rgba(255,255,255,.10); }
 .hintText{ font-size:24px; font-weight:700; color:#e6edf3; text-align:center; letter-spacing:.2px; }
 
+
+.iconBtn.listening{ box-shadow:0 0 0 3px rgba(59,130,246,0.35); outline:none; }
+
+.hintBand{ margin-top:10px; }
+.hintDivider{ height:1px; background:rgba(255,255,255,0.12); margin:8px 0; }
+.hintText{ font-size:24px; line-height:1.25; font-weight:800; color:rgba(255,255,255,0.92); text-align:left; }
+.portraitMood{ margin-left:12px; font-size:16px; color:rgba(255,255,255,0.78); line-height:1.25; max-width:240px; }
+.typingDots{ letter-spacing:2px; font-weight:900; }
