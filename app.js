@@ -814,7 +814,8 @@ function spellLastName(){
     if (e.key === "Enter") btnSend.click();
   });
 
-  btnReturnId.addEventListener("click", () => {
+  // ID return button can be omitted in some layouts; guard to prevent boot failure.
+  btnReturnId?.addEventListener("click", () => {
     hideId();
     pushVisitor(visitorLineResolved("thanks"));
   });
