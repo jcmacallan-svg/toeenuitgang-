@@ -1,0 +1,163 @@
+/* v7.4.12 patch v5
+   Fixes:
+   - Student bubbles always BLUE (even when student speaks twice)
+   - Visitor bubbles always LIGHT GREY
+   - Student stays RIGHT-aligned, Visitor stays LEFT-aligned
+   - ID card: remove full-width white backdrop; make card fully white, larger, with dark text
+
+   Load this AFTER styles.css and any earlier patch CSS.
+*/
+
+/* =========================
+   CHAT (alignment + colors)
+   ========================= */
+
+/* Prefer the dynamic classes set by JS. Fall back to the static ones if needed. */
+.msgRow.isVisitor,
+.msgRow.visitor { 
+  justify-content: flex-start !important;
+}
+
+.msgRow.isStudent,
+.msgRow.student {
+  justify-content: flex-end !important;
+}
+
+/* Bubble container should follow row alignment */
+.msgRow.isVisitor .bubbleWrap,
+.msgRow.visitor .bubbleWrap {
+  align-items: flex-start !important;
+}
+
+.msgRow.isStudent .bubbleWrap,
+.msgRow.student .bubbleWrap {
+  align-items: flex-end !important;
+}
+
+/* Ensure bubbles don't stretch and sit on the correct side */
+.msgRow .bubbleWrap {
+  display: flex;
+  flex-direction: column;
+  max-width: min(620px, 70vw);
+}
+
+.msgRow.isStudent .bubbleWrap,
+.msgRow.student .bubbleWrap {
+  text-align: right;
+}
+
+.msgRow.isVisitor .bubbleWrap,
+.msgRow.visitor .bubbleWrap {
+  text-align: left;
+}
+
+/* --- Colors: key point is to style by SIDE, not by slot index --- */
+:root{
+  /* tweak if you want it darker/lighter later */
+  --studentBubble: #2f79c6; /* slightly darker blue */
+  --studentText:   #ffffff;
+  --visitorBubble: #dfe5ee; /* light grey */
+  --visitorText:   #0b1220;
+}
+
+.msgRow.isStudent .bubble,
+.msgRow.student .bubble {
+  background: var(--studentBubble) !important;
+  color: var(--studentText) !important;
+}
+
+.msgRow.isVisitor .bubble,
+.msgRow.visitor .bubble {
+  background: var(--visitorBubble) !important;
+  color: var(--visitorText) !important;
+}
+
+/* If there is any alternating styling via nth-child in the base CSS, kill it */
+.msgRow:nth-child(odd) .bubble,
+.msgRow:nth-child(even) .bubble {
+  background: unset;
+}
+
+/* Keep typing dots readable on both colors */
+.msgRow.isStudent .bubble.typing,
+.msgRow.student .bubble.typing {
+  background: var(--studentBubble) !important;
+}
+
+.msgRow.isVisitor .bubble.typing,
+.msgRow.visitor .bubble.typing {
+  background: var(--visitorBubble) !important;
+}
+
+/* Avatar sizing: make the avatar match the bubble height better */
+.msgRow .avatar{
+  width: 48px !important;
+  height: 48px !important;
+}
+
+/* =========================
+   ID CARD (size + background)
+   ========================= */
+
+/* Do NOT paint a giant white slab behind the ID */
+#idSlot,
+.idSlot,
+.portraitAndId{
+  background: transparent !important;
+}
+
+/* Center the card without stretching the container */
+#idCardWrap,
+.idCardWrap{
+  background: transparent !important;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* Make the ID card bigger and fully white */
+.idCard,
+.idCard.passport{
+  background: #ffffff !important;
+  color: #0b1220 !important;
+  width: min(560px, 92%) !important;
+  border-radius: 14px !important;
+  box-shadow: 0 10px 24px rgba(0,0,0,0.28) !important;
+}
+
+/* Remove inner grey panels if they exist */
+.idCard *{
+  background-color: transparent;
+}
+
+/* Keep the actual outer card white */
+.idCard{ background-color: #ffffff !important; }
+
+/* Readability */
+.idCard .idFields,
+.idCard .idRow{
+  color: #0b1220 !important;
+}
+
+.idCard .idRow .k{
+  color: rgba(11,18,32,0.65) !important;
+  font-weight: 700 !important;
+}
+
+/* Improve ID photo sizing */
+.idCard .idPhoto{
+  width: 112px !important;
+  height: 112px !important;
+  object-fit: cover;
+  border-radius: 10px !important;
+  border: 2px solid rgba(11,18,32,0.12) !important;
+}
+
+/* Stamps: keep them visible on white */
+.idCard .stamp{
+  background: rgba(47,121,198,0.12) !important;
+  color: #1c4f86 !important;
+  border: 1px solid rgba(47,121,198,0.35) !important;
+}
+
