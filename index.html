@@ -129,13 +129,12 @@
       </div>
 
       <div class="idSlot" id="idSlot" aria-label="Hint and ID area">
-        <div class="hintBand" id="hintBand">
-          <div class="dividerLine"></div>
-          <div class="hintText" id="hintBandText">Ask: “Who are you?”</div>
-          <div class="dividerLine"></div>
-        </div>
+        <div class="dividerLine"></div>
 
-        <div class="idCardWrap" id="idCardWrap" hidden>
+        <div class="portraitAndId" aria-label="Portrait and ID">
+          <img id="portraitPhoto" class="portraitPhoto" src="" alt="Visitor portrait" />
+
+          <div class="idCardWrap" id="idCardWrap" hidden>
           <img id="idPhoto" alt="ID photo" />
           <div class="idFields">
             <div class="idRow"><span class="k">Name</span><span id="idName"></span></div>
@@ -143,6 +142,13 @@
             <div class="idRow"><span class="k">Nationality</span><span id="idNat"></span></div>
             <div class="idRow"><span class="k">ID No.</span><span id="idNo"></span></div>
           </div>
+          </div>
+        </div>
+
+        <div class="hintBand" id="hintBand">
+          <div class="dividerLine"></div>
+          <div class="hintText" id="hintBandText">Ask: “Who are you?”</div>
+          <div class="dividerLine"></div>
         </div>
       </div>
 
@@ -211,7 +217,7 @@
     </div>
 <script>
       // Build stamp for cache sanity
-      window.BUILD = { version: "7.4.2", name: "VEVA Ingang/Uitgang Trainer", date: "2026-02-11" };
+      window.BUILD = { version: "7.4.3", name: "VEVA Ingang/Uitgang Trainer", date: "2026-02-11" };
     </script>
 </div>
 

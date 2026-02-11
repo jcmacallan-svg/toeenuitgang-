@@ -41,6 +41,7 @@
   const idSlotHint = $("#idSlotHint");
   const btnReturnId = $("#btnReturnId");
   const idPhoto = $("#idPhoto");
+  const portraitPhoto = $("#portraitPhoto");
   const idName = $("#idName");
   const idDob = $("#idDob");
   const idNat = $("#idNat");
@@ -144,6 +145,7 @@ const hintBand = $("#hintBand");
       if (el) el.src = ID_DATA.photoSrc;
     }
     if (idPhoto) idPhoto.src = ID_DATA.photoSrc;
+    if (portraitPhoto) portraitPhoto.src = ID_DATA.photoSrc;
   }
 
   function showId(){
@@ -291,6 +293,31 @@ function pushVisitor(text){
     state.misses = 0;
     renderHistory();
     updateHintBand();
+  }
+
+  // Add a small delay to visitor replies to feel more natural.
+  const VISITOR_REPLY_DELAY_MS = 2000;
+  const _visitorQueue = [];
+  let _visitorQueueBusy = false;
+
+  function enqueueVisitor(text){
+    const t = String(text || "").trim();
+    if (!t) return;
+    _visitorQueue.push(t);
+    if (!_visitorQueueBusy) drainVisitorQueue();
+  }
+
+  function drainVisitorQueue(){
+    if (!_visitorQueue.length){
+      _visitorQueueBusy = false;
+      return;
+    }
+    _visitorQueueBusy = true;
+    const t = _visitorQueue.shift();
+    setTimeout(() => {
+      pushVisitor(t);
+      drainVisitorQueue();
+    }, VISITOR_REPLY_DELAY_MS);
   }
 
   function pushStudent(text){
@@ -473,6 +500,9 @@ function pushVisitor(text){
 
     // Initial visitor line
     pushVisitor("Hello.");
+
+    // Ensure all visitor portraits show the correct headshot.
+    syncVisitorAvatars();
     hideId();
     updateHintBand(true);
   }
@@ -583,7 +613,7 @@ function spellLastName(){
     // Deny flow
     if (state.stage === "deny_reason"){
       // Any non-empty reason ends it.
-      pushVisitor("Okay. I understand.");
+      enqueueVisitor("Okay. I understand.");
       endConversation();
       return;
     }
@@ -595,12 +625,12 @@ function spellLastName(){
 
     if (intent === "return_id"){
       hideId();
-      pushVisitor(visitorLineResolved("thanks"));
+      enqueueVisitor(visitorLineResolved("thanks"));
       return;
     }
 
     if (intent === "confront_nat"){
-      pushVisitor(noteMismatchNat());
+      enqueueVisitor(noteMismatchNat());
       return;
     }
 
@@ -609,14 +639,14 @@ function spellLastName(){
       case "start":
         if (intent === "greet"){
           state.stage = "help";
-          pushVisitor(visitorLineResolved("need_help"));
+          enqueueVisitor(visitorLineResolved("need_help"));
           return;
         }
         // allow help_open as well
         if (intent === "help_open"){
           state.stage = "purpose";
           state.facts.why = "I need to get onto the base.";
-          pushVisitor(visitorLineResolved("need_base"));
+          enqueueVisitor(visitorLineResolved("need_base"));
           return;
         }
         nudge("Try greeting first.");
@@ -626,11 +656,11 @@ function spellLastName(){
         if (intent === "help_open"){
           state.stage = "purpose";
           state.facts.why = "I need to get onto the base.";
-          pushVisitor(visitorLineResolved("need_base"));
+          enqueueVisitor(visitorLineResolved("need_base"));
           return;
         }
         if (intent === "greet"){
-          pushVisitor(visitorLineResolved("greeting"));
+          enqueueVisitor(visitorLineResolved("greeting"));
           return;
         }
         nudge("Try: “How can I help you?”");
@@ -639,34 +669,34 @@ function spellLastName(){
       case "purpose":
         if (intent === "purpose"){
           state.facts.why = "I have an appointment on base.";
-          pushVisitor("I have an appointment on base.");
+          enqueueVisitor("I have an appointment on base.");
           return;
         }
         if (intent === "has_appointment"){
           state.facts.appt = "yes";
-          pushVisitor(visitorLineResolved("appointment_yes"));
+          enqueueVisitor(visitorLineResolved("appointment_yes"));
           return;
         }
         if (intent === "who_meeting"){
           state.facts.who = "Sergeant de Vries";
-          pushVisitor(visitorLineResolved("who_meeting"));
+          enqueueVisitor(visitorLineResolved("who_meeting"));
           return;
         }
         if (intent === "time_meeting"){
           const t = getMeetingTimeHHMM();
           state.facts.meetingTime = t;
-          pushVisitor(`At ${t}.`);
+          enqueueVisitor(`At ${t}.`);
           return;
         }
         if (intent === "about_meeting"){
           state.facts.about = "delivery";
-          pushVisitor(visitorLineResolved("about_meeting"));
+          enqueueVisitor(visitorLineResolved("about_meeting"));
           return;
         }
         if (intent === "ask_id"){
           showId();
           state.stage = "control_q";
-          pushVisitor("Sure. Here you go.");
+          enqueueVisitor("Sure. Here you go.");
           return;
         }
         nudge("Try 5W questions, or ask for ID.");
@@ -674,22 +704,22 @@ function spellLastName(){
 
       case "control_q":
         if (intent === "dob_q"){
-          pushVisitor(maybeLie(`My date of birth is ${ID_DATA.dob}.`, `My date of birth is 22 Mar 1982.`));
+          enqueueVisitor(maybeLie(`My date of birth is ${ID_DATA.dob}.`, `My date of birth is 22 Mar 1982.`));
           return;
         }
         if (intent === "nat_q"){
           const truth = `My nationality is ${ID_DATA.nat}.`;
           const lie = "My nationality is German.";
-          pushVisitor(maybeLie(truth, lie));
+          enqueueVisitor(maybeLie(truth, lie));
           return;
         }
         if (intent === "spell_last_name"){
-          pushVisitor(spellLastName());
+          enqueueVisitor(spellLastName());
           return;
         }
         if (intent === "ask_id"){
           showId();
-          pushVisitor("I already gave you my ID.");
+          enqueueVisitor("I already gave you my ID.");
           return;
         }
         // Move on when supervisor was called
@@ -699,7 +729,7 @@ function spellLastName(){
       case "search_announce":
         if (intent === "we_search_you"){
           state.stage = "why_searched";
-          pushVisitor(visitorLineResolved("search_why"));
+          enqueueVisitor(visitorLineResolved("search_why"));
           return;
         }
         nudge("Try: “You will be searched.”");
@@ -708,7 +738,7 @@ function spellLastName(){
       case "why_searched":
         if (intent === "everyone_searched" || intent === "due_threat"){
           state.stage = "illegal_items";
-          pushVisitor("Okay.");
+          enqueueVisitor("Okay.");
           return;
         }
         nudge("Try: “Everyone is searched due to an increased threat.”");
@@ -717,7 +747,7 @@ function spellLastName(){
       case "illegal_items":
         if (intent === "illegal_items"){
           state.stage = "clarify_illegal";
-          pushVisitor(visitorLineResolved("illegal_what"));
+          enqueueVisitor(visitorLineResolved("illegal_what"));
           return;
         }
         nudge("Try: “Do you have any illegal items?”");
@@ -736,20 +766,20 @@ function spellLastName(){
 
         if (intent === "illegal_clarify"){
           if (missing.length){
-            pushVisitor(`Anything about ${missing.join(", ")}?`);
+            enqueueVisitor(`Anything about ${missing.join(", ")}?`);
           } else {
             state.stage = "direction";
-            pushVisitor("No. Tell me where to go.");
+            enqueueVisitor("No. Tell me where to go.");
           }
           return;
         }
-        pushVisitor("Clarify: drugs, weapons and alcohol.");
+        enqueueVisitor("Clarify: drugs, weapons and alcohol.");
         return;
       }
 
       case "direction":
         if (intent === "go_person_search"){
-          pushVisitor("Okay.");
+          enqueueVisitor("Okay.");
           // placeholder screen switch later
           return;
         }
@@ -757,7 +787,7 @@ function spellLastName(){
         return;
 
       default:
-        pushVisitor("Okay.");
+        enqueueVisitor("Okay.");
         return;
     }
   }
@@ -903,7 +933,15 @@ function spellLastName(){
 
   function startListen(){
     if (!recognition || isRecognizing) return;
-    try { recognition.start(); } catch {}
+    try {
+      recognition.start();
+    } catch (err){
+      // Most common: NotAllowedError / NotSupportedError.
+      voiceStatus.textContent = "Voice: blocked";
+      // Keep hints helpful without interrupting the flow.
+      state.hint = "Microphone blocked. Allow mic permission or type your sentence.";
+      updateHintBand();
+    }
   }
 
   function stopListen(){
@@ -911,11 +949,34 @@ function spellLastName(){
     try { recognition.stop(); } catch {}
   }
 
-  // Use pointer events so mouse/touch both work
-  holdToTalk.addEventListener("pointerdown", (e) => { e.preventDefault(); startListen(); });
-  holdToTalk.addEventListener("pointerup", (e) => { e.preventDefault(); stopListen(); });
-  holdToTalk.addEventListener("pointercancel", stopListen);
-  holdToTalk.addEventListener("pointerleave", stopListen);
+  // Use multiple event types for reliability across browsers.
+  let _holdActive = false;
+  function _holdStart(e){
+    if (_holdActive) return;
+    _holdActive = true;
+    e?.preventDefault?.();
+    startListen();
+  }
+  function _holdEnd(e){
+    if (!_holdActive) return;
+    _holdActive = false;
+    e?.preventDefault?.();
+    stopListen();
+  }
+
+  if (holdToTalk){
+    holdToTalk.addEventListener("pointerdown", _holdStart);
+    holdToTalk.addEventListener("pointerup", _holdEnd);
+    holdToTalk.addEventListener("pointercancel", _holdEnd);
+    holdToTalk.addEventListener("pointerleave", _holdEnd);
+
+    // Fallbacks
+    holdToTalk.addEventListener("mousedown", _holdStart);
+    holdToTalk.addEventListener("mouseup", _holdEnd);
+    holdToTalk.addEventListener("touchstart", _holdStart, { passive:false });
+    holdToTalk.addEventListener("touchend", _holdEnd, { passive:false });
+    holdToTalk.addEventListener("touchcancel", _holdEnd, { passive:false });
+  }
 
   // ---------- Login ----------
   function tryStart(){
