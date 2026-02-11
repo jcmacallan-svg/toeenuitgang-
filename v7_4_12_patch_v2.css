@@ -1,0 +1,95 @@
+/* v7.4.12 PATCH v2
+   1) Speaker decides alignment (Visitor LEFT, Student/Soldier RIGHT)
+   2) Prevents slot-index classes from overriding alignment
+   3) ID card: fully white interior with dark text
+*/
+
+/* ===== 1) CHAT ALIGNMENT ===== */
+
+/* Base row */
+.chatArea .msgRow{
+  display:flex;
+  align-items:flex-start;
+  gap:14px;
+  margin:18px 0;
+  width:100%;
+}
+
+/* If the app hasn't applied .isVisitor/.isStudent yet, keep current behavior */
+.chatArea .msgRow.visitor:not(.isVisitor):not(.isStudent){
+  justify-content:flex-start;
+  flex-direction:row;
+}
+.chatArea .msgRow.student:not(.isVisitor):not(.isStudent){
+  justify-content:flex-end;
+  flex-direction:row-reverse;
+}
+
+/* Visitor ALWAYS left */
+.chatArea .msgRow.isVisitor{
+  justify-content:flex-start !important;
+  flex-direction:row !important;
+  text-align:left;
+}
+
+/* Student/Soldier ALWAYS right */
+.chatArea .msgRow.isStudent{
+  justify-content:flex-end !important;
+  flex-direction:row-reverse !important; /* keeps avatar on the OUTSIDE (right edge) */
+  text-align:right;
+}
+
+/* Avatar size (matches bubble height visually) */
+.chatArea .msgRow .avatar{
+  width:56px;
+  height:56px;
+  border-radius:999px;
+  object-fit:cover;
+  flex:0 0 56px;
+}
+
+/* Bubble sizing */
+.chatArea .msgRow .bubbleWrap{
+  max-width:min(720px, 70%);
+}
+
+/* Ensure bubble text wraps nicely */
+.chatArea .msgRow .bubble{
+  word-wrap:break-word;
+  overflow-wrap:anywhere;
+}
+
+/* ===== 2) ID CARD WHITE INTERIOR ===== */
+
+/* Make the entire card white (no grey inner panel) */
+#idCardWrap .idCard,
+#idCardWrap .idCard.passport{
+  background:#ffffff !important;
+  color:#0b1220 !important;
+  border:1px solid rgba(0,0,0,0.14) !important;
+  box-shadow:0 12px 30px rgba(0,0,0,0.22) !important;
+}
+
+#idCardWrap .idPhotoWrap{
+  background:#ffffff !important;
+}
+
+#idCardWrap .idFields{
+  background:transparent !important;
+}
+
+#idCardWrap .idRow .k{
+  color:rgba(11,18,32,0.65) !important;
+}
+
+#idCardWrap .idRow span:not(.k){
+  color:#0b1220 !important;
+  font-weight:700;
+}
+
+/* Stamps: keep visible, but slightly darker */
+#idCardWrap .idStamps .stamp{
+  background:rgba(11,18,32,0.06) !important;
+  border:1px solid rgba(11,18,32,0.25) !important;
+  color:#0b1220 !important;
+}
