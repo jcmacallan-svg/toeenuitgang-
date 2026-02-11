@@ -239,9 +239,9 @@
     }
 
     // Ensure config loads before app, then load patch AFTER app
-load('config.js', function(){
-  load('app.js', function(){
-    load('v7_4_12_patch.js');
+      load('config.js', function(){
+      load('app.js', function(){
+      load('v7_4_12_patch.js');
   });
 });
 
