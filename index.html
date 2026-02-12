@@ -33,116 +33,142 @@
     </aside>
 
     <!-- Main -->
-    <main class="main">
+   
 
-      <!-- Optional hint band -->
-      <div id="hintBand" class="hintBand" hidden>
-        <div id="hintBandText"></div>
+     <main class="main">
+
+  <!-- CONTENT GRID WRAPPER (chat / id / hints / input) -->
+  <div class="content">
+
+    <!-- 1) CHAT AREA (top) -->
+    <section class="chatArea chatWrap">
+      <div id="chatSlots" class="chatSlots">
+
+        <div id="slot0" class="chatRow" hidden>
+          <img id="slot0Avatar" class="avatar" alt="" />
+          <div class="bubble">
+            <div id="slot0Text"></div>
+            <div id="slot0Meta" class="meta"></div>
+          </div>
+        </div>
+
+        <div id="slot1" class="chatRow" hidden>
+          <img id="slot1Avatar" class="avatar" alt="" />
+          <div class="bubble">
+            <div id="slot1Text"></div>
+            <div id="slot1Meta" class="meta"></div>
+          </div>
+        </div>
+
+        <div id="slot2" class="chatRow" hidden>
+          <img id="slot2Avatar" class="avatar" alt="" />
+          <div class="bubble">
+            <div id="slot2Text"></div>
+            <div id="slot2Meta" class="meta"></div>
+          </div>
+        </div>
+
+        <div id="slot3" class="chatRow" hidden>
+          <img id="slot3Avatar" class="avatar" alt="" />
+          <div class="bubble">
+            <div id="slot3Text"></div>
+            <div id="slot3Meta" class="meta"></div>
+          </div>
+        </div>
+
+        <div id="slot4" class="chatRow" hidden>
+          <img id="slot4Avatar" class="avatar" alt="" />
+          <div class="bubble">
+            <div id="slot4Text"></div>
+            <div id="slot4Meta" class="meta"></div>
+          </div>
+        </div>
+
+        <div id="slot5" class="chatRow" hidden>
+          <img id="slot5Avatar" class="avatar" alt="" />
+          <div class="bubble">
+            <div id="slot5Text"></div>
+            <div id="slot5Meta" class="meta"></div>
+          </div>
+        </div>
+
       </div>
+    </section>
 
-      <!-- Chat area -->
-      <section class="chatWrap">
+    <!-- 2) PORTRAIT + MOOD + ID PANEL (bottom half) -->
+    <section class="idSlot">
 
-        <!-- Visitor portrait (optional, used as avatar source) -->
-        <img id="portraitPhoto" alt="" style="display:none" />
-        <div id="portraitMood" class="moodLine"></div>
+      <div class="portraitAndId">
 
-        <!-- Slots -->
-        <div id="chatSlots" class="chatSlots">
-          <div id="slot0" class="chatRow" hidden>
-            <img id="slot0Avatar" class="avatar" alt="" />
-            <div class="bubble">
-              <div id="slot0Text"></div>
-              <div id="slot0Meta" class="meta"></div>
-            </div>
-          </div>
-
-          <div id="slot1" class="chatRow" hidden>
-            <img id="slot1Avatar" class="avatar" alt="" />
-            <div class="bubble">
-              <div id="slot1Text"></div>
-              <div id="slot1Meta" class="meta"></div>
-            </div>
-          </div>
-
-          <div id="slot2" class="chatRow" hidden>
-            <img id="slot2Avatar" class="avatar" alt="" />
-            <div class="bubble">
-              <div id="slot2Text"></div>
-              <div id="slot2Meta" class="meta"></div>
-            </div>
-          </div>
-
-          <div id="slot3" class="chatRow" hidden>
-            <img id="slot3Avatar" class="avatar" alt="" />
-            <div class="bubble">
-              <div id="slot3Text"></div>
-              <div id="slot3Meta" class="meta"></div>
-            </div>
-          </div>
-
-          <div id="slot4" class="chatRow" hidden>
-            <img id="slot4Avatar" class="avatar" alt="" />
-            <div class="bubble">
-              <div id="slot4Text"></div>
-              <div id="slot4Meta" class="meta"></div>
-            </div>
-          </div>
-
-          <div id="slot5" class="chatRow" hidden>
-            <img id="slot5Avatar" class="avatar" alt="" />
-            <div class="bubble">
-              <div id="slot5Text"></div>
-              <div id="slot5Meta" class="meta"></div>
-            </div>
-          </div>
+        <!-- Portrait that is also used as avatar source -->
+        <div style="display:flex; align-items:flex-start; gap:12px;">
+          <img id="portraitPhoto" class="portraitPhoto" alt="Visitor portrait" />
+          <div id="portraitMood" class="portraitMood"></div>
         </div>
 
-        <!-- Input bar -->
-        <div class="inputBar">
-          <input id="textInput" type="text" placeholder="Type or speak your English…" />
-          <button id="holdToTalk" type="button">Hold</button>
-          <button id="btnSend" type="button">Send</button>
+        <!-- TRAINING ID CARD (FICTIONAL) -->
+        <!-- IMPORTANT: IDs below match your current app.js (idCardWrap/idPhoto/idName/idDob/idNat/idNo/btnReturnId) -->
+        <div id="idCardWrap" class="trainerIdCard" hidden>
+
+          <div class="idTop">
+            <div class="idBrand">
+              <div class="idTitle">VEVA Visitor Credential</div>
+              <div class="idSub">TRAINING USE ONLY · NOT A REAL DOCUMENT</div>
+            </div>
+            <div class="idMeta">
+              <div class="pill">LEVEL: <span id="idLevel">STANDARD</span></div>
+              <div class="pill">SCENARIO: <span id="idScenario">Checkpoint</span></div>
+            </div>
+          </div>
+
+          <div class="idBody">
+            <div class="idPhotoWrap">
+              <img id="idPhoto" class="idPhoto2" alt="ID photo" />
+              <div class="idWatermark">FICTIONAL</div>
+            </div>
+
+            <div class="idFields">
+              <div class="row"><span class="k">Name</span><span id="idName" class="v"></span></div>
+              <!-- app.js expects surname too; keep it (can be same or empty) -->
+              <div class="row"><span class="k">Surname</span><span id="idSurname" class="v"></span></div>
+              <div class="row"><span class="k">Date of birth</span><span id="idDob" class="v"></span></div>
+              <div class="row"><span class="k">Nationality</span><span id="idNat" class="v"></span></div>
+              <div class="row"><span class="k">Visitor ID</span><span id="idNo" class="v mono"></span></div>
+            </div>
+          </div>
+
+          <div class="idBottom">
+            <div class="barcode mono" id="idBarcode2">VEVA|…</div>
+            <div class="idFine">
+              This credential is generated for training simulation purposes only.
+            </div>
+          </div>
+
+          <div class="idActions">
+            <button id="btnReturnId" type="button" class="sideBtn">Return ID</button>
+          </div>
+
         </div>
+      </div>
+    </section>
 
-      </section>
+    <!-- 3) HINT BAND (small band ABOVE input) -->
+    <div id="hintBand" class="hintBand" hidden>
+      <div class="dividerLine"></div>
+      <div id="hintBandText" class="hintText"></div>
+      <div class="dividerLine"></div>
+    </div>
 
-     <!-- TRAINING ID CARD (FICTIONAL) -->
-<div id="trainerIdCard" class="trainerIdCard" hidden>
-  <div class="idTop">
-    <div class="idBrand">
-      <div class="idTitle">VEVA Visitor Credential</div>
-      <div class="idSub">TRAINING USE ONLY · NOT A REAL DOCUMENT</div>
+    <!-- 4) INPUT BAR (fixed bottom frame) -->
+    <div class="inputBar">
+      <input id="textInput" type="text" placeholder="Type or speak your English…" />
+      <button id="holdToTalk" type="button">Hold</button>
+      <button id="btnSend" type="button">Send</button>
     </div>
-    <div class="idMeta">
-      <div class="pill">LEVEL: <span id="idLevel">STANDARD</span></div>
-      <div class="pill">SCENARIO: <span id="idScenario">Checkpoint</span></div>
-    </div>
+
   </div>
+</main>
 
-  <div class="idBody">
-    <div class="idPhotoWrap">
-      <img id="idPhoto2" class="idPhoto2" alt="" />
-      <div class="idWatermark">FICTIONAL</div>
-    </div>
-
-    <div class="idFields">
-      <div class="row"><span class="k">Name</span><span id="idName2" class="v"></span></div>
-      <div class="row"><span class="k">Date of birth</span><span id="idDob2" class="v"></span></div>
-      <div class="row"><span class="k">Nationality</span><span id="idNat2" class="v"></span></div>
-      <div class="row"><span class="k">Visitor ID</span><span id="idNo2" class="v mono"></span></div>
-      <div class="row"><span class="k">Reason</span><span id="idReason2" class="v"></span></div>
-      <div class="row"><span class="k">Valid until</span><span id="idExp2" class="v"></span></div>
-    </div>
-  </div>
-
-  <div class="idBottom">
-    <div class="barcode mono" id="idBarcode2">VEVA|…</div>
-    <div class="idFine">
-      This credential is generated for training simulation purposes only.
-    </div>
-  </div>
-</div>
 
 
   <!-- Supervisor modal -->
