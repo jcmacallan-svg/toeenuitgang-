@@ -568,3 +568,195 @@ body{
 #main, main, .main, #content, .content {
   width: 100%;
 }
+/* =========================================================
+   OVERRIDE PATCH — restore compact chat bubbles + button look
+   Paste at END of styles.css so it wins.
+========================================================= */
+
+/* Hard-hide support (prevents ghost avatars/rows) */
+[hidden] { display: none !important; }
+.chatRow[hidden] { display: none !important; }
+.chatRow img[hidden] { display: none !important; }
+
+/* --- App layout: full width, centered content column --- */
+.app{
+  width: 100%;
+  max-width: none !important;
+}
+
+.main{
+  width: 100%;
+  max-width: none !important;
+}
+
+/* Center the chat region in the available main space */
+.chatWrap{
+  width: 100%;
+  max-width: 1200px;       /* <-- controls how wide the chat area can become */
+  margin: 0 auto;          /* center */
+  padding: 12px 18px;
+}
+
+/* Chat slots should not stretch bubbles; just provide a centered column */
+.chatSlots{
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+/* --- Chat rows: left/right alignment like before --- */
+.chatRow{
+  width: 100%;
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  margin: 14px 0;          /* space between bubbles */
+}
+
+.chatRow.left{
+  justify-content: flex-start;
+}
+
+.chatRow.right{
+  justify-content: flex-end;
+}
+
+/* --- Avatars (keep size consistent; no empty circles) --- */
+.avatar{
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: transparent !important;
+  box-shadow: 0 2px 10px rgba(0,0,0,.25);
+}
+
+/* --- Bubble: compact again, readable, not full width --- */
+.bubble{
+  width: auto !important;          /* IMPORTANT: stops full-width bubbles */
+  max-width: 560px;               /* <-- bubble max width (adjust if you want) */
+  padding: 12px 14px;
+  border-radius: 14px;
+  line-height: 1.35;
+  font-size: 16px;
+  color: #e6edf3;
+  background: rgba(255,255,255,0.10);
+  border: 1px solid rgba(255,255,255,0.10);
+  box-shadow: 0 8px 22px rgba(0,0,0,.25);
+  backdrop-filter: blur(6px);
+}
+
+/* If your bubble text container is #slotXText inside bubble */
+.bubble > div{
+  color: inherit;
+}
+
+/* Different tone per side (like earlier) */
+.chatRow.left .bubble{
+  background: rgba(255,255,255,0.10);
+}
+
+.chatRow.right .bubble{
+  background: rgba(110,168,254,0.18); /* subtle blue */
+  border-color: rgba(110,168,254,0.25);
+}
+
+/* Typing dots should sit nicely */
+.typingDots{
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+.typingDots span{
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(230,237,243,0.85);
+  animation: vevaDot 1s infinite ease-in-out;
+}
+.typingDots span:nth-child(2){ animation-delay: .15s; }
+.typingDots span:nth-child(3){ animation-delay: .3s; }
+
+@keyframes vevaDot{
+  0%, 80%, 100% { transform: translateY(0); opacity: .55; }
+  40% { transform: translateY(-4px); opacity: 1; }
+}
+
+/* --- Input bar: keep compact & aligned --- */
+.inputBar{
+  width: 100%;
+  max-width: 1200px;
+  margin: 14px auto 0;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+#textInput{
+  flex: 1;
+  min-width: 260px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(0,0,0,0.25);
+  color: #e6edf3;
+  outline: none;
+}
+
+#textInput::placeholder{
+  color: rgba(230,237,243,0.55);
+}
+
+/* --- Restore “dark UI buttons” (sidebar + actions) --- */
+.sideBtn{
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.10);
+  color: #e6edf3;
+  cursor: pointer;
+  transition: transform .08s ease, background .12s ease, border-color .12s ease;
+}
+
+.sideBtn:hover{
+  background: rgba(255,255,255,0.10);
+  border-color: rgba(255,255,255,0.16);
+}
+
+.sideBtn:active{
+  transform: translateY(1px);
+}
+
+.sideBtn.danger{
+  background: rgba(255,77,77,0.10);
+  border-color: rgba(255,77,77,0.35);
+}
+
+.sideBtn.ghost{
+  background: rgba(255,255,255,0.03);
+  border-color: rgba(255,255,255,0.08);
+}
+
+/* Buttons in input bar */
+#holdToTalk, #btnSend{
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.06);
+  color: #e6edf3;
+  cursor: pointer;
+}
+#holdToTalk.listening{
+  border-color: rgba(110,168,254,0.55);
+  background: rgba(110,168,254,0.12);
+}
+
+/* Optional: pills styling stays subtle */
+.pill{
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.10);
+  color: #e6edf3;
+  border-radius: 999px;
+  padding: 6px 10px;
+}
