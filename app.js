@@ -1786,22 +1786,24 @@
     };
 
     recognition.onend = () => {
-      setVoiceStatusSafe("Voice: ready");
-      isRecognizing = false;
-      holdToTalk?.classList.remove("listening");
-      if (state && state.typing){ state.typing.student = false; }
-      renderHistory();
+  setVoiceStatusSafe("Voice: ready");
+  isRecognizing = false;
+  holdToTalk?.classList.remove("listening");
+  if (state && state.typing){ state.typing.student = false; }
+  renderHistory();
 
-      if (VOICE_AUTOSEND && state?._voiceSessionActive){
-        const toSend = (textInput.value || "").trim();
-        if (toSend){
-          handleStudent(toSend);
-          textInput.value = "";
-        }
-      }
-      if (state) state._voiceSessionActive = false;
-    };
+  // ✅ FIX: no invalid optional chaining
+  if (VOICE_AUTOSEND && state && state._voiceSessionActive){
+    const toSend = (textInput.value || "").trim();
+    if (toSend){
+      handleStudent(toSend);
+      textInput.value = "";
+    }
   }
+
+  if (state) state._voiceSessionActive = false;
+};
+
 
   async function startListen(){
     if (!recognition || isRecognizing) return;
