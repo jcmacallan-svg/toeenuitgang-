@@ -114,6 +114,41 @@ const hintBand = $("#hintBand");
       .replace(/\s+/g, " ")
       .trim();
   }
+// ---------- Visitor TTS ----------
+let VISITOR_TTS_ENABLED = true;
+let _ttsReady = false;
+
+function primeTTS(){
+  try{
+    if (!("speechSynthesis" in window)) return;
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.resume?.();
+    const u = new SpeechSynthesisUtterance(" ");
+    u.volume = 0;
+    u.lang = "en-GB";
+    window.speechSynthesis.speak(u);
+    window.speechSynthesis.cancel();
+    _ttsReady = true;
+  }catch{}
+}
+
+function speakVisitor(text){
+  try{
+    if (!VISITOR_TTS_ENABLED) return;
+    if (!("speechSynthesis" in window)) return;
+    if (!_ttsReady) return;
+    const t = String(text||"").trim();
+    if (!t) return;
+
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(t);
+    u.lang = "en-GB";
+    u.rate = 1.0;
+    u.pitch = 1.0;
+    u.volume = 1.0;
+    window.speechSynthesis.speak(u);
+  }catch{}
+}
 
   // ---------- Session ----------
   const STUDENT_KEY = "veva.student.v2";
@@ -1177,6 +1212,7 @@ textInput.addEventListener("input", () => {
     resetScenario();
     textInput.focus();
   }
+primeTTS();
 
   btnStartTraining.addEventListener("click", tryStart);
   studentSurnameInput.addEventListener("keydown", (e) => { if (e.key === "Enter") tryStart(); });
@@ -1195,4 +1231,6 @@ textInput.addEventListener("input", () => {
   setupSpeech();
   loginModal.hidden = false;
   renderHistory();
+  speakVisitor(text);
+
 })();
