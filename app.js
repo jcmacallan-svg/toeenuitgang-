@@ -323,12 +323,21 @@ const hintBand = $("#hintBand");
       }
 
       rowEl.hidden = false;
-      rowEl.classList.toggle("isVisitor", msg.side === "visitor");
-      rowEl.classList.toggle("isStudent", msg.side === "student");
 
-      // Side alignment (visitor LEFT, student RIGHT)
-      rowEl.classList.toggle("left", msg.side === "visitor");
-      rowEl.classList.toggle("right", msg.side === "student");
+// 1) Speaker flags (already used by your CSS)
+rowEl.classList.toggle("isVisitor", msg.side === "visitor");
+rowEl.classList.toggle("isStudent", msg.side === "student");
+
+// 2) IMPORTANT: overwrite the *static* slot classes so CSS can never mis-style a row.
+//    This prevents “everything moves right” when a visitor message lands in a row
+//    that was originally class="student" in the HTML (slot1/slot3/slot5).
+rowEl.classList.remove("visitor", "student");
+rowEl.classList.add(msg.side === "visitor" ? "visitor" : "student");
+
+// 3) Optional: keep these if you still use them somewhere
+rowEl.classList.toggle("left", msg.side === "visitor");
+rowEl.classList.toggle("right", msg.side === "student");
+
 
       // Avatar
       if (slot.av){
