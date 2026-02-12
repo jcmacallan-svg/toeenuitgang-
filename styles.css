@@ -1084,3 +1084,157 @@ body{
 #holdToTalk, #btnSend {
   white-space: nowrap;
 }
+/* =========================================================
+   FIXED LAYOUT: Chat (top) + Portrait/ID (50%) + Hints + Input (bottom)
+   Paste at VERY END so it overrides everything above
+========================================================= */
+
+/* Safety: hidden really means hidden */
+[hidden] { display: none !important; }
+
+/* MAIN should fill viewport */
+.main{
+  height: 100vh;
+  min-height: 0;
+}
+
+/* CONTENT becomes a 4-row grid (top->bottom):
+   1) chat
+   2) portrait/id panel (about 50% of viewport)
+   3) hint band
+   4) input bar
+*/
+.content{
+  flex: 1;
+  min-height: 0;
+
+  display: grid !important;
+  grid-template-rows:
+    1fr
+    minmax(260px, 50vh)
+    auto
+    auto;
+
+  gap: 0 !important;
+  padding: 0 !important;
+}
+
+/* 1) CHAT AREA (top) */
+.chatArea{
+  grid-row: 1;
+  min-height: 0;
+  overflow-y: auto;           /* mag scrollen als je ooit meer toont */
+  overflow-x: hidden;
+  padding: 16px 18px 12px 18px;
+
+  /* jouw chat gebruikt “slots”, dus we hoeven niet full-width bubbles */
+}
+
+/* 2) PORTRAIT + MOOD + ID SLOT (bottom half) */
+.idSlot{
+  grid-row: 2;
+
+  min-height: 0;
+  overflow: hidden;
+  padding: 14px 18px;
+
+  border-top: 1px solid rgba(255,255,255,0.10);
+  background: rgba(0,0,0,0.10);
+}
+
+/* Zorg dat portrait + mood netjes staan */
+.portraitAndId{
+  height: 100%;
+  align-items: flex-start;
+}
+
+/* Maak portrait/mood visueel “panel-achtig” */
+.portraitPhoto{
+  width: 140px;
+  height: 140px;
+  border-radius: 18px;
+}
+
+/* Mood tekst iets duidelijker */
+.portraitMood{
+  margin-left: 12px;
+  font-size: 16px;
+  line-height: 1.25;
+  color: rgba(255,255,255,0.78);
+  max-width: 320px;
+}
+
+/* ID card: blijft hidden totdat JS hem toont */
+#idCardWrap{
+  display: none;                 /* default: niet zichtbaar */
+}
+#idCardWrap:not([hidden]){
+  display: block;                /* wordt zichtbaar als JS hidden weghaalt */
+}
+
+/* 3) HINT BAND (small area above input, with divider lines) */
+.hintBand{
+  grid-row: 3;
+
+  padding: 10px 18px;
+  background: rgba(255,255,255,0.04);
+  min-height: 52px;
+
+  position: relative;
+}
+
+/* divider line above and below hint band */
+.hintBand::before,
+.hintBand::after{
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: rgba(255,255,255,0.10);
+}
+.hintBand::before{ top: 0; }
+.hintBand::after{ bottom: 0; }
+
+/* hint text: iets rustiger dan je 24px (kan je aanpassen) */
+.hintText{
+  font-size: 18px !important;
+  font-weight: 800;
+  line-height: 1.25;
+  color: rgba(255,255,255,0.92);
+}
+
+/* 4) INPUT BAR: always fixed as its own bottom frame */
+.inputBar{
+  grid-row: 4;
+
+  position: static !important;  /* override sticky */
+  bottom: auto !important;
+
+  margin: 0 !important;
+  width: 100%;
+  padding: 12px 18px;
+
+  border-top: 1px solid rgba(255,255,255,0.10);
+  background: linear-gradient(180deg, rgba(22,27,34,.88), rgba(22,27,34,.98));
+  backdrop-filter: blur(8px);
+  z-index: 20;
+}
+
+/* Keep input usable */
+.textInput, #textInput{
+  font-size: 18px;
+}
+
+/* =========================================================
+   IMPORTANT: stop bubbles from becoming full-width
+   (you said earlier look was perfect: compact bubbles)
+========================================================= */
+.bubble{
+  width: auto !important;
+  max-width: 560px !important;
+}
+
+/* Ensure left/right stays left/right */
+.msg.left, .chatRow.left, .msgRow.visitor { justify-content: flex-start; }
+.msg.right, .chatRow.right, .msgRow.student { justify-content: flex-end; }
