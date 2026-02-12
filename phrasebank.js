@@ -1,6 +1,6 @@
-// v7_4_12_patch_person_search_en.js
-// Person Search Q/A set (EN) with mood bands: cautious / evasive / open
-// Uses placeholders resolved by app.js:
+// phrasebank.js
+// Person Search / dialogue phrasebank (EN) with mood bands: cautious / evasive / open
+// Placeholders resolved by app.js:
 // {name} {first} {last} {dob} {nat} {idNo} {meetingTime}
 // Optional scenario placeholders:
 // {claimedName} {claimedFirst} {claimedLast}
@@ -16,9 +16,6 @@ window.PS_PATCH = {
   },
 
   QA: {
-    // -------------------------
-    // Identity basics
-    // -------------------------
     ask_name: {
       cautious: [
         "{claimedName}.",
@@ -145,9 +142,6 @@ window.PS_PATCH = {
       open: ["Thank you very much.", "Thanks — I appreciate it.", "Great, thank you.", "Thanks for your help.", "Thank you. Have a good day."]
     },
 
-    // -------------------------
-    // Visit / appointment
-    // -------------------------
     purpose: {
       cautious: [
         "I’m here for a meeting.",
@@ -262,9 +256,6 @@ window.PS_PATCH = {
       ]
     },
 
-    // -------------------------
-    // Scenario branches: mismatches / expired / no ID
-    // -------------------------
     confront_name_mismatch: {
       cautious: [
         "Oh — I use a different surname sometimes.",
@@ -373,9 +364,6 @@ window.PS_PATCH = {
       ]
     },
 
-    // -------------------------
-    // Next step
-    // -------------------------
     ps_direct_signin: {
       cautious: ["Okay — where do I sign in?", "Where is the sign-in office?", "Alright — where do I go to sign in?", "Do I need to check in first?", "Okay — which way to reception?"],
       evasive: ["Why can’t I just go in?", "Do I really have to sign in?", "This is too much bureaucracy.", "Can’t you just let me pass?", "Fine — where is it then?"],

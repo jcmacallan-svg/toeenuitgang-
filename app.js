@@ -1,4 +1,4 @@
-// app.js (FULL WORKING SET)
+// app.js (phrasebank-enabled)
 (() => {
   "use strict";
 
@@ -12,16 +12,13 @@
   const HEADSHOT_PREFIX = CFG.headshotPrefix || "headshot_";
   const HEADSHOT_COUNT = Number(CFG.headshotCount || 10);
 
-  // Support both legacy keys (voiceAutoSend) and new keys (voiceAutosend)
   const _voiceCfg = (CFG.voiceAutosend !== undefined) ? CFG.voiceAutosend
                   : (CFG.voiceAutoSend !== undefined) ? CFG.voiceAutoSend
                   : undefined;
   const VOICE_AUTOSEND = (_voiceCfg === undefined) ? true : !!_voiceCfg;
 
-  // Only show the last N bubbles (you asked for 4)
   const MAX_VISIBLE_BUBBLES = 4;
 
-  // 1x1 transparent pixel (prevents broken-image “Soldier” circles)
   const TRANSPARENT_PX =
     "data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=";
 
@@ -48,37 +45,24 @@
   const textInput = $("#textInput");
   const btnSend = $("#btnSend");
 
-  function setInputEnabled(on){
-    const enabled = !!on;
-    if (textInput) textInput.disabled = !enabled;
-    if (btnSend) btnSend.disabled = !enabled;
-    if (holdToTalk) holdToTalk.disabled = !enabled;
-  }
-
-
-  // Portrait UI
-  const portraitPhoto = $("#portraitPhoto");
-  const portraitMood = $("#portraitMood");
-
-  // ID UI (training card)
+  // ID UI
   const idCardWrap = $("#idCardWrap");
   const btnReturnId = $("#btnReturnId");
   const idPhoto = $("#idPhoto");
+  const portraitPhoto = $("#portraitPhoto");
+  const portraitMood = $("#portraitMood");
+
   const idName = $("#idName");
   const idSurname = $("#idSurname");
   const idDob = $("#idDob");
   const idNat = $("#idNat");
   const idNo = $("#idNo");
-
   const idBarcode2 = $("#idBarcode2");
-  const idLevel = $("#idLevel");
-  const idScenario = $("#idScenario");
 
-  // Hint band
   const hintBand = $("#hintBand");
   const hintBandText = $("#hintBandText");
 
-  // Supervisor modal
+  // Supervisor modal (optional)
   const supervisorModal = $("#supervisorModal");
   const btnCloseSupervisor = $("#btnCloseSupervisor");
   const btnSupervisorCheck = $("#btnSupervisorCheck");
@@ -96,17 +80,14 @@
   const svNote = $("#svNote");
 
   // Chat slots
-  const slotEls = [0,1,2,3,4,5].map(i => {
-    const row = $(`#slot${i}`);
-    return {
-      row,
-      av: $(`#slot${i}Avatar`),
-      bubble: row ? row.querySelector(".bubble") : null,
-      txt: $(`#slot${i}Text`),
-      meta: $(`#slot${i}Meta`)
-    };
-  });
-
+  const slotEls = [
+    { row: $("#slot0"), av: $("#slot0Avatar"), txt: $("#slot0Text"), meta: $("#slot0Meta") },
+    { row: $("#slot1"), av: $("#slot1Avatar"), txt: $("#slot1Text"), meta: $("#slot1Meta") },
+    { row: $("#slot2"), av: $("#slot2Avatar"), txt: $("#slot2Text"), meta: $("#slot2Meta") },
+    { row: $("#slot3"), av: $("#slot3Avatar"), txt: $("#slot3Text"), meta: $("#slot3Meta") },
+    { row: $("#slot4"), av: $("#slot4Avatar"), txt: $("#slot4Text"), meta: $("#slot4Meta") },
+    { row: $("#slot5"), av: $("#slot5Avatar"), txt: $("#slot5Text"), meta: $("#slot5Meta") },
+  ];
   const MAX_SLOTS = slotEls.length;
 
   // -------- Version banner --------
@@ -119,6 +100,11 @@
   const randInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
   const pad2 = (n) => String(n).padStart(2, "0");
 
+  function pick(arr){
+    if (!Array.isArray(arr) || !arr.length) return "";
+    return arr[Math.floor(Math.random() * arr.length)];
+  }
+
   function normalize(s){
     return String(s || "")
       .toLowerCase()
@@ -127,17 +113,11 @@
       .trim();
   }
 
-  function pick(arr){
-    if (!Array.isArray(arr) || !arr.length) return "";
-    return arr[Math.floor(Math.random() * arr.length)];
-  }
-
   // -------- Assets / Avatars --------
   const soldierAvatar = new Image();
   soldierAvatar.src = `${ASSET_BASE}/soldier.png`;
   soldierAvatar.onerror = () => { soldierAvatar.src = TRANSPARENT_PX; };
 
-  // visitor avatar uses portraitPhoto
   const visitorAvatar = portraitPhoto || { src: "" };
 
   // -------- Session (student) --------
@@ -167,8 +147,6 @@
 
   function makeRandomId(){
     const idx = randInt(1, HEADSHOT_COUNT);
-
-    // MALE only
     const FIRST = ["Liam","Noah","James","Oliver","Lucas","Milan","Daan","Sem","Jayden","Finn","Benjamin","Ethan","Jack","Thomas"];
     const LAST  = ["Miller","Bakker","de Vries","Jansen","Visser","Smit","Bos","van Dijk","de Jong","Meijer"];
     const NATS  = ["Dutch","German","Belgian","French","British"];
@@ -195,6 +173,12 @@
 
   let ID_DATA = makeRandomId();
 
+  function syncVisitorAvatars(){
+    if (portraitPhoto) portraitPhoto.src = ID_DATA.photoSrc;
+    visitorAvatar.src = ID_DATA.photoSrc;
+    if (idPhoto) idPhoto.src = ID_DATA.photoSrc;
+  }
+
   // -------- Mood --------
   const MOODS = [
     { key:"relaxed",  line:"The visitor looks relaxed.",  liarBias:0.08 },
@@ -204,59 +188,82 @@
     { key:"irritated",line:"The visitor looks irritated.",liarBias:0.28 }
   ];
   let currentMood = MOODS[1];
-
   function syncMoodUI(){
     if (portraitMood) portraitMood.textContent = currentMood?.line || "";
   }
 
-  // -------- Scenario state --------
-  let state = null;
+  // -------- Phrasebank integration --------
+  const PS = window.PS_PATCH || null;
 
-  // -------- Training ID card sync --------
-  function makeBarcodeString(v){
-    const safe = (s) => String(s || "").replace(/\s+/g, " ").trim();
-    const parts = [
-      "VEVA",
-      safe(v?.idNo),
-      safe(v?.last),
-      safe(v?.first),
-      safe(v?.dob),
-      safe(v?.nat),
-      safe(state?.facts?.meetingTime || "")
-    ].filter(Boolean);
-    return parts.join(" | ");
+  function currentBand(){
+    try{
+      const k = currentMood?.key || "neutral";
+      return (PS && typeof PS.bandFromMoodKey === "function") ? (PS.bandFromMoodKey(k) || "cautious") : "cautious";
+    }catch{
+      return "cautious";
+    }
   }
 
-  function syncTrainingIdCard(){
-    const v = state?.visitor || ID_DATA;
-    if (!v) return;
+  function placeholderMap(){
+    const v = (state?.visitor) ? state.visitor : ID_DATA;
+    const meetingTime = (state?.facts?.meetingTime && /^\d{2}:\d{2}$/.test(state.facts.meetingTime))
+      ? state.facts.meetingTime
+      : (state ? getMeetingTimeHHMM() : "");
 
-    if (idLevel) idLevel.textContent = String(session?.difficulty || "standard").toUpperCase();
-    if (idScenario) idScenario.textContent = "Checkpoint";
+    const claimed = state?.claimed || { name: v.name, first: v.first, last: v.last };
 
-    if (idName) idName.textContent = v.name || "";
-    if (idSurname) idSurname.textContent = v.last || "";
-    if (idDob) idDob.textContent = v.dob || "";
-    if (idNat) idNat.textContent = v.nat || "";
-    if (idNo) idNo.textContent = v.idNo || "";
-    if (idPhoto) idPhoto.src = v.photoSrc || TRANSPARENT_PX;
-
-    if (idBarcode2) idBarcode2.textContent = makeBarcodeString(v);
+    return {
+      name: v?.name || "",
+      first: v?.first || "",
+      last: v?.last || "",
+      dob: v?.dob || "",
+      nat: v?.nat || "",
+      idNo: v?.idNo || "",
+      meetingTime: meetingTime || "",
+      claimedName: claimed?.name || (v?.name || ""),
+      claimedFirst: claimed?.first || (v?.first || ""),
+      claimedLast: claimed?.last || (v?.last || ""),
+    };
   }
 
-  function syncVisitorAvatars(){
-    if (portraitPhoto) portraitPhoto.src = ID_DATA.photoSrc;
-    visitorAvatar.src = ID_DATA.photoSrc;
-    syncTrainingIdCard();
+  function resolvePlaceholders(s){
+    const map = placeholderMap();
+    return String(s || "").replace(/\{([A-Za-z0-9_]+)\}/g, (m, key) => {
+      return (map[key] !== undefined) ? String(map[key]) : m;
+    });
+  }
+
+  function pickBank(key, fallbackArr){
+    const band = currentBand();
+    const arr =
+      PS?.QA?.[key]?.[band] ||
+      PS?.QA?.[key]?.cautious ||
+      PS?.QA?.[key]?.open ||
+      PS?.QA?.[key]?.evasive ||
+      fallbackArr;
+
+    const line = pick(arr) || "";
+    return resolvePlaceholders(line);
   }
 
   // -------- ID card show/hide --------
+  let state = null;
+
   function showId(){
     if (!idCardWrap || !state?.visitor) return;
-    syncTrainingIdCard();
+
+    if (idName) idName.textContent = state.visitor.name || "";
+    if (idSurname) idSurname.textContent = state.visitor.last || "";
+    if (idDob) idDob.textContent = state.visitor.dob || "";
+    if (idNat) idNat.textContent = state.visitor.nat || "";
+    if (idNo) idNo.textContent = state.visitor.idNo || "";
+    if (idPhoto) idPhoto.src = state.visitor.photoSrc || TRANSPARENT_PX;
+    if (idBarcode2) idBarcode2.textContent = `VEVA|${state.visitor.idNo}|${state.visitor.dob}|${state.visitor.nat}`;
+
     idCardWrap.hidden = false;
     idCardWrap.style.display = "";
     state.idVisible = true;
+
     if (hintBand) hintBand.hidden = true;
   }
 
@@ -269,16 +276,14 @@
     updateHintBand(true);
   }
 
-  // -------- Hint band --------
+  // -------- Hint band (optional) --------
   function shouldShowHints(){
     return (session?.difficulty || "standard") !== "advanced";
   }
-
   function setHintText(t){
     if (!hintBandText) return;
     hintBandText.textContent = t || "";
   }
-
   function getNextHint(){
     const f = state?.facts || {};
     if (!f.name) return 'Ask: “Who are you?”';
@@ -290,10 +295,8 @@
       if (!f.about) return 'Ask: “What is the appointment about?”';
     }
     if (!state?.idChecked) return 'Ask: “Can I see your ID, please?”';
-    if (!state?.supervisorOk) return 'Say: “I’ll contact my supervisor.”';
     return "Continue the procedure.";
   }
-
   function updateHintBand(force=false){
     if (!hintBand) return;
     if (!shouldShowHints()){
@@ -320,7 +323,6 @@
     hintBand.style.display = "";
     setHintText(getNextHint());
   }
-
   function nudge(t){
     if (!state) return;
     state.misses = (state.misses || 0) + 1;
@@ -339,19 +341,16 @@
     if (!slot?.row) return;
     slot.row.hidden = true;
     slot.row.style.display = "none";
-    slot.row.classList.remove("left","right","isVisitor","isStudent");
+
     if (slot.av){
       slot.av.hidden = true;
       slot.av.style.display = "none";
       slot.av.src = TRANSPARENT_PX;
       slot.av.alt = "";
     }
-    if (slot.bubble){
-      slot.bubble.classList.remove("typing");
-    }
     if (slot.txt){
+      slot.txt.classList.remove("typing");
       slot.txt.textContent = "";
-      slot.txt.innerHTML = "";
     }
     if (slot.meta) slot.meta.textContent = "";
   }
@@ -387,11 +386,10 @@
 
       showRow(slot);
 
-      slot.row.classList.toggle("isVisitor", msg.side === "visitor");
-      slot.row.classList.toggle("isStudent", msg.side === "student");
       slot.row.classList.toggle("left", msg.side === "visitor");
       slot.row.classList.toggle("right", msg.side === "student");
 
+      // avatar
       if (slot.av){
         if (msg.side === "visitor"){
           slot.av.src = visitorAvatar.src || TRANSPARENT_PX;
@@ -403,9 +401,9 @@
       }
 
       if (slot.meta) slot.meta.textContent = "";
-      if (slot.bubble) slot.bubble.classList.toggle("typing", !!msg.typing);
 
       if (slot.txt){
+        slot.txt.classList.toggle("typing", !!msg.typing);
         if (msg.typing){
           slot.txt.innerHTML =
             '<span class="typingDots" aria-label="Typing"><span></span><span></span><span></span></span>';
@@ -442,8 +440,6 @@
   const VISITOR_REPLY_DELAY_MS = 900;
   const _visitorQueue = [];
   let _visitorTimer = null;
-  let _approachTimer = null;
-
 
   function enqueueVisitor(text){
     const t = String(text || "").trim();
@@ -493,10 +489,10 @@
     return letters.length ? letters.join("-") : ln.toUpperCase();
   }
 
-  // -------- Visitor lines --------
-  const VISITOR = {
+  // -------- Fallback visitor lines (only when phrasebank lacks a key) --------
+  const VISITOR_FALLBACK = {
     greeting: ["Hello."],
-    need_help: ["Hi, I need help."],
+    need_help: ["I… need help."],
     need_base: ["I need to get onto the base."],
     appointment_yes: ["Yes, I have an appointment."],
     who_meeting: ["I’m meeting Sergeant de Vries."],
@@ -504,11 +500,8 @@
     search_why: ["Why am I being searched?"],
     illegal_what: ["What do you mean by illegal items?"],
     deny_why: ["Why are you denying me?"],
-    thanks: ["Thanks."],
-    handover_ok: ["Okay, I'll hand it over."]
+    thanks: ["Thanks."]
   };
-
-  function visitorLine(key){ return pick(VISITOR[key]) || "Okay."; }
 
   // -------- Intents --------
   const INTENTS = [
@@ -525,13 +518,11 @@
     { key:"nat_q", rx:/\b(nationality|what\s+is\s+your\s+nationality|where\s+are\s+you\s+from)\b/i },
     { key:"spell_last_name", rx:/\b(spell\s+(your\s+)?(last\s+name|surname)|how\s+do\s+you\s+spell)\b/i },
     { key:"return_id", rx:/\b(return\s+your\s+id|here\'?s\s+your\s+id\s+back)\b/i },
-    { key:"contact_supervisor", rx:/\b(contact\s+my\s+supervisor|i\'?ll\s+contact\s+my\s+supervisor|call\s+my\s+supervisor|supervisor\s+check)\b/i },
-    { key:"we_search_you", rx:/\b(you\s+will\s+be\s+searched|we\s+will\s+search\s+you|you(\'?re|\s+are)\s+going\s+to\s+get\s+searched)\b/i },
+    { key:"we_search_you", rx:/\b(you\s+will\s+be\s+searched|we\s+will\s+search\s+you)\b/i },
     { key:"everyone_searched", rx:/\b(everyone\s+is\s+searched|routine\s+search)\b/i },
     { key:"due_threat", rx:/\b(heightened\s+security|increased\s+threat|security\s+reasons)\b/i },
     { key:"illegal_items", rx:/\b(any\s+illegal\s+items|anything\s+illegal|contraband|prohibited)\b/i },
     { key:"illegal_clarify", rx:/\b(weapons?|drugs?|alcohol|knife|gun)\b/i },
-    { key:"hand_in", rx:/\b(hand\s+it\s+in|hand\s+it\s+over|please\s+hand\s+it\s+over|you\s+must\s+hand\s+it\s+over|you\s+have\s+to\s+hand\s+it\s+in|you\'?ll\s+get\s+it\s+back)\b/i },
     { key:"go_person_search", rx:/\b(go\s+to\s+(the\s+)?person\s+search|person\s+search)\b/i },
   ];
 
@@ -543,92 +534,7 @@
     return "unknown";
   }
 
-  // -------- Supervisor modal logic --------
-  function openSupervisorModal(){
-    if (!supervisorModal) return;
-    state._stageBeforeSupervisor = state.stage;
-
-    if (svWhy) svWhy.value = "";
-    if (svAppt) svAppt.value = "";
-    if (svWho) svWho.value = "";
-    if (svTime) svTime.value = "";
-    if (svAbout) svAbout.value = "";
-
-    if (svWhyStatus) svWhyStatus.textContent = "";
-    if (svApptStatus) svApptStatus.textContent = "";
-    if (svWhoStatus) svWhoStatus.textContent = "";
-    if (svTimeStatus) svTimeStatus.textContent = "";
-    if (svAboutStatus) svAboutStatus.textContent = "";
-
-    if (svNote) svNote.textContent = "Fill the 5W/H fields with what the visitor actually said, then send.";
-    supervisorModal.hidden = false;
-    supervisorModal.style.display = "";
-  }
-
-  function closeSupervisorModal(){
-    if (!supervisorModal) return;
-    supervisorModal.hidden = true;
-    supervisorModal.style.display = "none";
-    if (state && state._stageBeforeSupervisor) state.stage = state._stageBeforeSupervisor;
-  }
-
-  function checkSupervisorForm(){
-    const v = state?.visitor || {};
-    const mt = String(state?.facts?.meetingTime || "").trim();
-
-    const nameExpected = normalize(v.name);
-    const apptExpected = "yes";
-    const whoExpected  = normalize("Sergeant de Vries");
-    const aboutTokens = ["delivery","workshop","tools","spare","parts"];
-    const timeExpected = normalize(mt);
-
-    const nameGot = normalize(svWhy?.value);
-    const apptGot = normalize(svAppt?.value);
-    const whoGot  = normalize(svWho?.value);
-    const aboutGot= normalize(svAbout?.value);
-    const timeGot = normalize(svTime?.value);
-
-    const okName = nameGot && (nameGot.includes(nameExpected) || nameExpected.includes(nameGot));
-    const okAppt = apptGot === apptExpected || apptGot === "y";
-    const okWho  = whoGot && (whoGot.includes(whoExpected) || whoExpected.includes(whoGot));
-    const okTime = timeExpected ? timeGot.includes(timeExpected) : !!timeGot;
-    const okAbout = aboutGot && aboutTokens.some(tok => aboutGot.includes(tok));
-
-    const setStatus = (el, ok) => { if (el) el.textContent = ok ? "" : "Does not match visitor info."; };
-    setStatus(svWhyStatus, okName);
-    setStatus(svApptStatus, okAppt);
-    setStatus(svWhoStatus, okWho);
-    setStatus(svTimeStatus, okTime);
-    setStatus(svAboutStatus, okAbout);
-
-    const allOk = okName && okAppt && okWho && okTime && okAbout;
-    if (svNote) svNote.textContent = allOk ? "Looks good. You can send this to your supervisor." : "Some fields do not match what the visitor said. Correct them, then send.";
-    return allOk;
-  }
-
-  // -------- Contraband generation --------
-  function pickContraband(){
-    const weapons = Math.random() < 0.18;
-    const drugs   = Math.random() < 0.10;
-    const alcohol = Math.random() < 0.12;
-    const count = [weapons,drugs,alcohol].filter(Boolean).length;
-    if (count >= 3 && Math.random() < 0.65){
-      const pickIdx = randInt(0,2);
-      return { weapons: pickIdx !== 0, drugs: pickIdx !== 1, alcohol: pickIdx !== 2 };
-    }
-    return { weapons, drugs, alcohol };
-  }
-
-  function contrabandList(){
-    const c = state?.contraband || {};
-    const items = [];
-    if (c.weapons) items.push("a pocket knife");
-    if (c.drugs) items.push("some drugs");
-    if (c.alcohol) items.push("alcohol");
-    return items;
-  }
-
-  // -------- Scenario reset --------
+  // -------- Scenario state --------
   function resetScenario(){
     currentMood = MOODS[randInt(0, MOODS.length - 1)];
     syncMoodUI();
@@ -637,50 +543,25 @@
     syncVisitorAvatars();
 
     history.length = 0;
-    _visitorQueue.length = 0;
-    if (_visitorTimer){ clearTimeout(_visitorTimer); _visitorTimer = null; }
-    if (_approachTimer){ clearTimeout(_approachTimer); _approachTimer = null; }
-
 
     state = {
       stage: "start",
       misses: 0,
       typing: { visitor:false, student:false },
+      contraband: { weapons:false, drugs:false, alcohol:false },
       idVisible: false,
       idChecked: false,
-      supervisorOk: false,
       visitor: { ...ID_DATA },
-      facts: { name:"", purpose:"", appt:"", who:"", time:"", about:"", meetingTime:"" },
-      contraband: pickContraband(),
-      willLie: (Math.random() < currentMood.liarBias)
+      claimed: { name: ID_DATA.name, first: ID_DATA.first, last: ID_DATA.last },
+      facts: { name:"", purpose:"", appt:"", who:"", time:"", about:"", meetingTime:"" }
     };
 
     hideId();
     updateHintBand(true);
-    syncTrainingIdCard();
 
-    // Approach cue: give the student a moment to observe before the first "Hello".
-    setInputEnabled(false);
-
-    if (portraitMood){
-      portraitMood.textContent = "A visitor is walking up to the checkpoint…";
-      portraitMood.style.display = "";
-    }
-
-    state.stage = "approach";
-    renderHistory(); // ensure no bubbles/avatars are visible yet
-
-    _approachTimer = setTimeout(() => {
-      _approachTimer = null;
-      if (!state || state.stage !== "approach") return;
-
-      // Restore the real mood line and start the dialogue.
-      syncMoodUI();
-      state.stage = "start";
-      setInputEnabled(true);
-      pushVisitor(visitorLine("greeting"));
-      try { textInput?.focus(); } catch {}
-    }, 5000);
+    // Start: one bubble after a short "approach" delay (gives students time)
+    const hello = pickBank("greeting", VISITOR_FALLBACK.greeting);
+    setTimeout(() => pushVisitor(hello), 5000);
   }
 
   // -------- Dialogue --------
@@ -688,17 +569,9 @@
     const clean = String(raw || "").trim();
     if (!clean || !state || state.stage === "ended") return;
 
-    // During the "approach" cue (before the first hello), ignore input to keep the UI clean.
-    if (state.stage === "approach") return;
-
     pushStudent(clean);
 
     const intent = detectIntent(clean);
-
-    if (intent === "contact_supervisor"){
-      openSupervisorModal();
-      return;
-    }
 
     // progress tracking (for hints)
     if (intent === "ask_name") state.facts.name = state.visitor.name;
@@ -713,12 +586,13 @@
       case "start":
         if (intent === "greet"){
           state.stage = "help";
-          enqueueVisitor(visitorLine("need_help"));
+          enqueueVisitor(pickBank("need_help", VISITOR_FALLBACK.need_help));
           return;
         }
         if (intent === "help_open"){
           state.stage = "purpose";
-          enqueueVisitor(visitorLine("need_base"));
+          state.facts.purpose = "pending";
+          enqueueVisitor(pickBank("purpose", VISITOR_FALLBACK.need_base));
           return;
         }
         nudge("Try greeting first.");
@@ -727,11 +601,11 @@
       case "help":
         if (intent === "help_open"){
           state.stage = "purpose";
-          enqueueVisitor(visitorLine("need_base"));
+          enqueueVisitor(pickBank("purpose", VISITOR_FALLBACK.need_base));
           return;
         }
         if (intent === "greet"){
-          enqueueVisitor(visitorLine("greeting"));
+          enqueueVisitor(pickBank("greeting", VISITOR_FALLBACK.greeting));
           return;
         }
         nudge('Try: “How can I help you?”');
@@ -739,32 +613,32 @@
 
       case "purpose":
         if (intent === "purpose"){
-          enqueueVisitor("I have an appointment on base.");
+          enqueueVisitor(pickBank("purpose", ["I have an appointment on base."]));
           return;
         }
         if (intent === "has_appointment"){
-          enqueueVisitor(visitorLine("appointment_yes"));
+          state.facts.appt = "yes";
+          enqueueVisitor(pickBank("has_appointment_yes", VISITOR_FALLBACK.appointment_yes));
           return;
         }
         if (intent === "who_meeting"){
-          enqueueVisitor(visitorLine("who_meeting"));
+          enqueueVisitor(pickBank("who_meeting", VISITOR_FALLBACK.who_meeting));
           return;
         }
         if (intent === "time_meeting"){
           const t = getMeetingTimeHHMM();
           state.facts.meetingTime = t;
-          syncTrainingIdCard();
-          enqueueVisitor(`At ${t}.`);
+          enqueueVisitor(pickBank("time_meeting", [`At ${t}.`]));
           return;
         }
         if (intent === "about_meeting"){
-          enqueueVisitor(visitorLine("about_meeting"));
+          enqueueVisitor(pickBank("about_meeting", VISITOR_FALLBACK.about_meeting));
           return;
         }
         if (intent === "ask_id"){
           showId();
           state.stage = "control_q";
-          enqueueVisitor("Sure. Here you go.");
+          enqueueVisitor(pickBank("ask_id", ["Sure. Here you go."]));
           return;
         }
         nudge("Try 5W questions, or ask for ID.");
@@ -772,34 +646,30 @@
 
       case "control_q":
         if (intent === "dob_q"){
-          enqueueVisitor(`My date of birth is ${ID_DATA.dob}.`);
+          enqueueVisitor(pickBank("dob_q", [`My date of birth is ${ID_DATA.dob}.`]));
           return;
         }
         if (intent === "nat_q"){
-          enqueueVisitor(`My nationality is ${ID_DATA.nat}.`);
+          enqueueVisitor(pickBank("nat_q", [`My nationality is ${ID_DATA.nat}.`]));
           return;
         }
         if (intent === "spell_last_name"){
-          enqueueVisitor(spellLastName());
+          enqueueVisitor(pickBank("spell_last_name", [spellLastName()]));
           return;
         }
         if (intent === "return_id"){
           hideId();
-          enqueueVisitor(visitorLine("thanks"));
-          state.stage = "supervisor";
+          enqueueVisitor(pickBank("return_id", VISITOR_FALLBACK.thanks));
+          state.stage = "search_announce";
           return;
         }
         nudge("Try a control question, or return the ID.");
         return;
 
-      case "supervisor":
-        nudge('Say: “I’ll contact my supervisor.”');
-        return;
-
       case "search_announce":
         if (intent === "we_search_you"){
           state.stage = "why_searched";
-          enqueueVisitor(visitorLine("search_why"));
+          enqueueVisitor(pick(VISITOR_FALLBACK.search_why));
           return;
         }
         nudge('Try: “You will be searched.”');
@@ -817,43 +687,35 @@
       case "illegal_items":
         if (intent === "illegal_items"){
           state.stage = "clarify_illegal";
-          enqueueVisitor(visitorLine("illegal_what"));
+          enqueueVisitor(pick(VISITOR_FALLBACK.illegal_what));
           return;
         }
         nudge("Ask: illegal items / contraband.");
         return;
 
-      case "clarify_illegal":
+      case "clarify_illegal": {
+        const t = clean.toLowerCase();
+        if (t.includes("weapon") || t.includes("knife") || t.includes("gun")) state.contraband.weapons = true;
+        if (t.includes("drug")) state.contraband.drugs = true;
+        if (t.includes("alcohol") || t.includes("beer") || t.includes("wine")) state.contraband.alcohol = true;
+
+        const missing = [];
+        if (!state.contraband.weapons) missing.push("weapons");
+        if (!state.contraband.drugs) missing.push("drugs");
+        if (!state.contraband.alcohol) missing.push("alcohol");
+
         if (intent === "illegal_clarify"){
-          const items = contrabandList();
-
-          if (!items.length){
+          if (missing.length){
+            enqueueVisitor(`Anything about ${missing.join(", ")}?`);
+          } else {
             state.stage = "direction";
-            enqueueVisitor("No.");
-            return;
+            enqueueVisitor("No. Tell me where to go.");
           }
-
-          if (state.willLie){
-            state.stage = "direction";
-            enqueueVisitor("No.");
-            return;
-          }
-
-          state.stage = "handover_request";
-          enqueueVisitor(`Yes. I have ${items.join(" and ")}.`);
           return;
         }
         enqueueVisitor("Clarify: drugs, weapons and alcohol.");
         return;
-
-      case "handover_request":
-        if (intent === "hand_in"){
-          state.stage = "direction";
-          enqueueVisitor(visitorLine("handover_ok"));
-          return;
-        }
-        nudge("Tell him to hand it over and he will get it back at the end of the visit.");
-        return;
+      }
 
       case "direction":
         if (intent === "go_person_search"){
@@ -869,19 +731,25 @@
     }
   }
 
-  // After supervisor approves: continue
-  function supervisorApproved(){
-    if (!state) return;
-    state.supervisorOk = true;
-    state.stage = "search_announce";
-    updateHintBand(true);
-  }
-
   // -------- Sidebar buttons --------
-  btnDeny?.addEventListener("click", () => enqueueVisitor(visitorLine("deny_why")));
-  btnNewScenario?.addEventListener("click", () => resetScenario());
+  btnDeny?.addEventListener("click", () => {
+    enqueueVisitor(pickBank("deny_why", VISITOR_FALLBACK.deny_why));
+  });
+
+  btnNewScenario?.addEventListener("click", () => {
+    if (!textInput || !btnSend || !holdToTalk) return;
+    textInput.disabled = false;
+    btnSend.disabled = false;
+    holdToTalk.disabled = false;
+    resetScenario();
+  });
+
   btnReset?.addEventListener("click", () => {
-    if (loginModal) loginModal.hidden = false;
+    loginModal.hidden = false;
+    if (textInput) textInput.disabled = false;
+    if (btnSend) btnSend.disabled = false;
+    if (holdToTalk) holdToTalk.disabled = false;
+
     history.length = 0;
     renderHistory();
     hideId();
@@ -895,8 +763,7 @@
 
   btnReturnId?.addEventListener("click", () => {
     hideId();
-    enqueueVisitor(visitorLine("thanks"));
-    state.stage = "supervisor";
+    enqueueVisitor(pickBank("return_id", VISITOR_FALLBACK.thanks));
   });
 
   // -------- Input --------
@@ -907,7 +774,9 @@
     handleStudent(t);
   });
 
-  textInput?.addEventListener("keydown", (e) => { if (e.key === "Enter") btnSend?.click(); });
+  textInput?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") btnSend?.click();
+  });
 
   textInput?.addEventListener("input", () => {
     if (!state?.typing) return;
@@ -919,7 +788,9 @@
   let recognition = null;
   let isRecognizing = false;
 
-  function setVoiceStatusSafe(text){ if (voiceStatus) voiceStatus.textContent = text; }
+  function setVoiceStatusSafe(text){
+    if (voiceStatus) voiceStatus.textContent = text;
+  }
 
   async function ensureMicPermission(){
     try{
@@ -927,7 +798,9 @@
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       stream.getTracks().forEach(t => t.stop());
       return true;
-    }catch{ return false; }
+    }catch{
+      return false;
+    }
   }
 
   function voiceSupported(){
@@ -937,7 +810,10 @@
   function setupSpeech(){
     if (!voiceSupported()){
       setVoiceStatusSafe("Voice: not supported");
-      if (holdToTalk){ holdToTalk.disabled = true; holdToTalk.title = "SpeechRecognition not supported."; }
+      if (holdToTalk){
+        holdToTalk.disabled = true;
+        holdToTalk.title = "SpeechRecognition not supported in this browser.";
+      }
       return;
     }
 
@@ -945,7 +821,10 @@
     const okContext = window.isSecureContext || location.protocol === "https:" || isLocalhost;
     if (!okContext){
       setVoiceStatusSafe("Voice: use https/localhost");
-      if (holdToTalk){ holdToTalk.disabled = true; holdToTalk.title = "Voice requires https:// or http://localhost."; }
+      if (holdToTalk){
+        holdToTalk.disabled = true;
+        holdToTalk.title = "Voice requires https:// or http://localhost (not file://).";
+      }
       return;
     }
 
@@ -957,7 +836,10 @@
 
     recognition.onstart = () => {
       isRecognizing = true;
-      if (state?.typing){ state.typing.student = true; state.typing.visitor = false; }
+      if (state?.typing){
+        state.typing.student = true;
+        state.typing.visitor = false;
+      }
       renderHistory();
       if (state) state._voiceSessionActive = true;
       setVoiceStatusSafe("Voice: listening…");
@@ -997,6 +879,7 @@
           if (textInput) textInput.value = "";
         }
       }
+
       if (state) state._voiceSessionActive = false;
     };
   }
@@ -1004,13 +887,16 @@
   async function startListen(){
     if (!recognition || isRecognizing) return;
     const ok = await ensureMicPermission();
-    if (!ok){ setVoiceStatusSafe("Voice: blocked"); return; }
-    try{ recognition.start(); } catch {}
+    if (!ok){
+      setVoiceStatusSafe("Voice: blocked");
+      return;
+    }
+    try { recognition.start(); } catch {}
   }
 
   function stopListen(){
     if (!recognition || !isRecognizing) return;
-    try{ recognition.stop(); } catch {}
+    try { recognition.stop(); } catch {}
   }
 
   holdToTalk?.addEventListener("pointerdown", (e) => { e.preventDefault(); startListen(); });
@@ -1018,7 +904,7 @@
   holdToTalk?.addEventListener("pointercancel", stopListen);
   holdToTalk?.addEventListener("pointerleave", stopListen);
 
-  // -------- Visitor TTS --------
+  // -------- Visitor TTS (male-ish) --------
   let VISITOR_TTS_ENABLED = true;
   let _ttsReady = false;
 
@@ -1030,7 +916,9 @@
         /male|daniel|george|arthur|fred|guy/i.test(v.name)
       );
       return preferred || voices.find(v => /en/i.test(v.lang)) || null;
-    }catch{ return null; }
+    }catch{
+      return null;
+    }
   }
 
   function primeTTS(){
@@ -1052,6 +940,7 @@
       if (!VISITOR_TTS_ENABLED) return;
       if (!("speechSynthesis" in window)) return;
       if (!_ttsReady) return;
+
       const t = String(text || "").trim();
       if (!t) return;
 
@@ -1059,27 +948,15 @@
       const u = new SpeechSynthesisUtterance(t);
       const v = pickMaleishVoice();
       if (v) u.voice = v;
+
       u.lang = (v?.lang) || "en-GB";
       u.rate = 1.0;
       u.pitch = 0.75;
       u.volume = 1.0;
+
       window.speechSynthesis.speak(u);
     }catch{}
   }
-
-  // -------- Supervisor modal listeners --------
-  btnCloseSupervisor?.addEventListener("click", closeSupervisorModal);
-  btnReturnToVisitor?.addEventListener("click", closeSupervisorModal);
-
-  btnSupervisorCheck?.addEventListener("click", () => {
-    const ok = checkSupervisorForm();
-    if (!ok) return;
-    closeSupervisorModal();
-    supervisorApproved();
-    enqueueVisitor("Okay.");
-  });
-
-  [svWhy, svAppt, svWho, svTime, svAbout].forEach(el => el?.addEventListener("input", () => { checkSupervisorForm(); }));
 
   // -------- Login --------
   function tryStart(){
@@ -1098,7 +975,9 @@
     updateStudentPill();
 
     if (loginModal) loginModal.hidden = true;
-    primeTTS(); // unlock after gesture
+
+    primeTTS();
+
     resetScenario();
     textInput?.focus();
   }
@@ -1127,9 +1006,10 @@
     stage: "idle",
     typing: { visitor:false, student:false },
     visitor: { ...ID_DATA },
+    claimed: { name: ID_DATA.name, first: ID_DATA.first, last: ID_DATA.last },
     facts: {},
-    misses: 0,
-    contraband: { weapons:false, drugs:false, alcohol:false }
+    misses: 0
   };
   renderHistory();
+
 })();

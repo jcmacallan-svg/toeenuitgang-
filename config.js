@@ -1,8 +1,8 @@
 // config.js
-// Tweak these without touching app.js
+// Optional runtime config. Override these in your own fork if needed.
 window.CONFIG = {
-  voiceAutoSend: true,
   assetBase: "assets/photos",
   headshotPrefix: "headshot_",
-  headshotCount: 10
+  headshotCount: 10,
+  voiceAutosend: true
 };

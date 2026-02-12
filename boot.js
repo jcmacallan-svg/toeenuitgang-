@@ -16,9 +16,10 @@ window.BUILD = { version: "7.4.12", name: "VEVA Ingang/Uitgang Trainer", date: "
   }
 
   load("config.js", function () {
-    // Load Person Search patch BEFORE app.js so PS_PATCH is ready immediately
+    // Phrasebank BEFORE app.js so window.PS_PATCH is ready immediately
     load("phrasebank.js", function () {
       load("app.js", function () {
+        // optional extra patches (safe if missing)
         load("v7_4_12_patch_v2.js");
       });
     });

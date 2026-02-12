@@ -34,10 +34,12 @@
 
     <!-- Main -->
     <main class="main">
+
+      <!-- CONTENT GRID WRAPPER (chat / id / hints / input) -->
       <div class="content">
 
-        <!-- 1) CHAT (top) -->
-        <section class="chatArea">
+        <!-- 1) CHAT AREA (top) -->
+        <section class="chatArea chatWrap">
           <div id="chatSlots" class="chatSlots">
 
             <div id="slot0" class="chatRow" hidden>
@@ -91,10 +93,12 @@
           </div>
         </section>
 
-        <!-- 2) PORTRAIT + MOOD + ID PANEL -->
+        <!-- 2) PORTRAIT + MOOD + ID PANEL (bottom half) -->
         <section class="idSlot">
           <div class="portraitAndId">
-            <div class="portraitBlock">
+
+            <!-- Portrait that is also used as avatar source -->
+            <div style="display:flex; align-items:flex-start; gap:12px;">
               <img id="portraitPhoto" class="portraitPhoto" alt="Visitor portrait" />
               <div id="portraitMood" class="portraitMood"></div>
             </div>
@@ -141,14 +145,14 @@
           </div>
         </section>
 
-        <!-- 3) HINT BAND -->
+        <!-- 3) HINT BAND (small band ABOVE input) -->
         <div id="hintBand" class="hintBand" hidden>
           <div class="dividerLine"></div>
           <div id="hintBandText" class="hintText"></div>
           <div class="dividerLine"></div>
         </div>
 
-        <!-- 4) INPUT BAR -->
+        <!-- 4) INPUT BAR (fixed bottom frame) -->
         <div class="inputBar">
           <input id="textInput" type="text" placeholder="Type or speak your English…" />
           <button id="holdToTalk" type="button">Hold</button>
@@ -160,7 +164,7 @@
   </div>
 
   <!-- Supervisor modal -->
-  <div id="supervisorModal" class="modal" hidden>
+  <div id="supervisorModal" class="modal" hidden style="display:none">
     <div class="modalCard">
       <div class="modalHeader">
         <div class="modalTitle">Supervisor Check — 5W/H</div>
@@ -202,15 +206,15 @@
       <div id="svNote" class="note"></div>
 
       <div class="modalActions">
-        <button id="btnReturnToVisitor" type="button" class="sideBtn ghost">Return to visitor</button>
-        <button id="btnSupervisorCheck" type="button" class="sideBtn">Send to supervisor</button>
+        <button id="btnReturnToVisitor" type="button">Return to visitor</button>
+        <button id="btnSupervisorCheck" type="button" class="primary">Send to supervisor</button>
       </div>
     </div>
   </div>
 
   <!-- Login modal -->
   <div id="loginModal" class="modal" hidden>
-    <div class="modalCard loginCard">
+    <div class="modalCard">
       <div class="modalTitle">Start training</div>
 
       <label>Surname
@@ -234,10 +238,11 @@
       </label>
 
       <div id="loginError" style="display:none">Please fill surname + group.</div>
-      <button id="btnStartTraining" type="button" class="primaryBtn">Start</button>
+      <button id="btnStartTraining" type="button" class="primary">Start</button>
     </div>
   </div>
 
-  <script src="app.js"></script>
+  <!-- IMPORTANT: use boot loader (handles cache-busting + load order) -->
+  <script src="boot.js"></script>
 </body>
 </html>
