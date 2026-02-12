@@ -514,3 +514,47 @@ body{
 .chatRow.right .bubble {
   background: #d6ecff;
 }
+/* =========================
+   PATCH: chat spacing + full width
+   ========================= */
+
+/* Laat main pane echt de resterende ruimte pakken */
+#app { width: 100%; }
+#main, main, .main, #content, .content {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* Verwijder eventuele max-width die het paneel “klein” houdt */
+#stage, .stage, #chatWrap, .chatWrap, #chatPanel, .chatPanel, #chatArea, .chatArea {
+  width: 100% !important;
+  max-width: none !important;
+}
+
+/* Als er een inner wrapper is die centreert met max-width, kill die ook */
+.container, .containerWide, .wrap, .wrapper {
+  max-width: none !important;
+  width: 100% !important;
+}
+
+/* Meer ruimte tussen chatregels (visitor/soldier) */
+[id^="slot"]{
+  margin: 0 0 18px 0;   /* ruimte tussen bubbels */
+}
+
+/* Als je bubbles in een stream-container zitten: liever gap dan margins */
+#chatStream, .chatStream, #chatList, .chatList, #chat, .chat {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+/* Zorg dat de chat niet “smal” wordt door een te kleine vaste breedte */
+#chatStream, .chatStream {
+  align-items: flex-start;
+}
+
+/* Optioneel: bubble mag best wat breder (voelt minder 25%) */
+.bubble, .msgBubble, .chatBubble {
+  max-width: 70vw;
+}
