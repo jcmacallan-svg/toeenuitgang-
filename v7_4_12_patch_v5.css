@@ -160,4 +160,57 @@
   color: #1c4f86 !important;
   border: 1px solid rgba(47,121,198,0.35) !important;
 }
+/* =========================
+   VEVA miniPatch v6
+   - Max 4 bubbles visible
+   - Layout 50/50 chat vs ID area
+   ========================= */
+
+/* 1) Max 4 bubbles: hide slot4/slot5 ALWAYS */
+#slot4, #slot5 {
+  display: none !important;
+}
+
+/* 2) 50/50 layout: chat left, portrait/ID right, input spans full width */
+.content {
+  display: grid !important;
+  grid-template-columns: 1fr 1fr !important;  /* 50/50 */
+  grid-template-rows: 1fr auto !important;
+  gap: 16px !important;
+  align-items: start !important;
+}
+
+/* Keep chat and ID area in their columns */
+#chatArea {
+  grid-column: 1 !important;
+  grid-row: 1 !important;
+  min-width: 0 !important;
+}
+
+#idSlot {
+  grid-column: 2 !important;
+  grid-row: 1 !important;
+  min-width: 0 !important;
+}
+
+/* Input bar across BOTH columns */
+.inputBar {
+  grid-column: 1 / -1 !important;
+  grid-row: 2 !important;
+}
+
+/* (optioneel) iets meer “presence” voor het rechter paneel */
+#idSlot {
+  padding-left: 10px !important;
+}
+
+/* 3) Kleur-garantie: soldier altijd blauw, visitor altijd lichtgrijs */
+.msgRow.student .bubble {
+  background: #2f6fec !important; /* iets donkerder blauw */
+  color: #ffffff !important;
+}
+.msgRow.visitor .bubble {
+  background: #e6e9ef !important; /* lichtgrijs */
+  color: #0b1220 !important;
+}
 
