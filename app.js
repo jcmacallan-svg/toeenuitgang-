@@ -593,6 +593,8 @@ rowEl.classList.toggle("right", msg.side === "student");
     { key:"illegal_items", rx:/\b(do\s+you\s+have\s+any\s+illegal\s+items|anything\s+illegal|contraband|prohibited\s+items)\b/i },
     { key:"illegal_clarify", rx:/\b(weapons?|drugs?|alcohol|knife|gun)\b/i },
     { key:"go_person_search", rx:/\b(let\'?s\s+go\s+to\s+(the\s+)?person\s+search|go\s+to\s+person\s+search)\b/i }
+    { key:"go_sign_in", rx:/\b(go\s+to\s+(the\s+)?sign[\s-]*in(\s+office)?|go\s+to\s+reception|sign[\s-]*in\s+office)\b/i },
+
   ];
 
   function detectIntent(text){
