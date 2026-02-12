@@ -1,4 +1,4 @@
-// app.js (CLEAN REPLACEMENT)
+// app.js (FULL REPLACEMENT — supervisor + search + contraband + no ghost bubbles)
 (() => {
   "use strict";
 
@@ -69,11 +69,11 @@
   const btnCloseSupervisor = $("#btnCloseSupervisor");
   const btnSupervisorCheck = $("#btnSupervisorCheck");
   const btnReturnToVisitor = $("#btnReturnToVisitor");
-  const svWhy = $("#svWhy");
-  const svAppt = $("#svAppt");
-  const svWho = $("#svWho");
-  const svAbout = $("#svAbout");
-  const svTime = $("#svTime");
+  const svWhy = $("#svWhy");     // "Who at the gate"
+  const svAppt = $("#svAppt");   // "Appointment yes/no"
+  const svWho = $("#svWho");     // "With whom"
+  const svAbout = $("#svAbout"); // "What is it about"
+  const svTime = $("#svTime");   // "Time"
   const svWhyStatus = $("#svWhyStatus");
   const svApptStatus = $("#svApptStatus");
   const svWhoStatus = $("#svWhoStatus");
@@ -91,7 +91,6 @@
     { row: $("#slot5"), av: $("#slot5Avatar"), txt: $("#slot5Text"), meta: $("#slot5Meta") },
   ];
 
-  // We’ll render at most slotEls.length rows, but only keep MAX_VISIBLE_BUBBLES messages
   const MAX_SLOTS = slotEls.length;
 
   // -------- Version banner --------
@@ -117,12 +116,20 @@
     return arr[Math.floor(Math.random() * arr.length)];
   }
 
+  // "contains" match, forgiving
+  function softMatch(a, b){
+    const A = normalize(a);
+    const B = normalize(b);
+    if (!A || !B) return false;
+    return A.includes(B) || B.includes(A);
+  }
+
   // -------- Assets / Avatars --------
   const soldierAvatar = new Image();
   soldierAvatar.src = `${ASSET_BASE}/soldier.png`;
   soldierAvatar.onerror = () => { soldierAvatar.src = TRANSPARENT_PX; };
 
-  // visitor avatar uses portraitPhoto if present, else a dummy object
+  // visitor avatar uses portraitPhoto if present, else dummy object
   const visitorAvatar = portraitPhoto || { src: "" };
 
   // -------- Session (student) --------
@@ -153,7 +160,6 @@
   function makeRandomId(){
     const idx = randInt(1, HEADSHOT_COUNT);
 
-    // MALE only for now (you said you’ll add female later)
     const FIRST = ["Liam","Noah","James","Oliver","Lucas","Milan","Daan","Sem","Jayden","Finn","Benjamin","Ethan","Jack","Thomas"];
     const LAST  = ["Miller","Bakker","de Vries","Jansen","Visser","Smit","Bos","van Dijk","de Jong","Meijer"];
     const NATS  = ["Dutch","German","Belgian","French","British"];
@@ -181,14 +187,9 @@
   let ID_DATA = makeRandomId();
 
   function syncVisitorAvatars(){
-    // Keep visitor avatar consistent everywhere
     if (portraitPhoto) portraitPhoto.src = ID_DATA.photoSrc;
     visitorAvatar.src = ID_DATA.photoSrc;
-
     if (idPhoto) idPhoto.src = ID_DATA.photoSrc;
-
-    // IMPORTANT: do NOT prefill other slot avatars here;
-    // renderHistory controls visibility.
   }
 
   // -------- Mood --------
@@ -218,7 +219,7 @@
     if (idPhoto) idPhoto.src = state.visitor.photoSrc || TRANSPARENT_PX;
 
     idCardWrap.hidden = false;
-    idCardWrap.style.display = ""; // allow CSS
+    idCardWrap.style.display = "";
     state.idVisible = true;
 
     if (hintBand) hintBand.hidden = true;
@@ -227,7 +228,7 @@
   function hideId(){
     if (idCardWrap){
       idCardWrap.hidden = true;
-      idCardWrap.style.display = "none"; // force hide
+      idCardWrap.style.display = "none";
     }
     if (state) state.idVisible = false;
     updateHintBand(true);
@@ -252,6 +253,7 @@
       if (!f.about) return 'Ask: “What is the appointment about?”';
     }
     if (!state?.idChecked) return 'Ask: “Can I see your ID, please?”';
+    if (!state?.supervisor?.done) return 'Say: “I’ll contact my supervisor.”';
     return "Continue the procedure.";
   }
   function updateHintBand(force=false){
@@ -292,18 +294,16 @@
   }
 
   // -------- Chat history --------
-  // Keep only last MAX_VISIBLE_BUBBLES messages (plus transient typing bubble)
   let history = []; // newest first: {side, text}
 
   function hardHideRow(slot){
     if (!slot?.row) return;
     slot.row.hidden = true;
-    slot.row.style.display = "none"; // force hide even if CSS overrides [hidden]
+    slot.row.style.display = "none";
 
     if (slot.av){
       slot.av.hidden = true;
       slot.av.style.display = "none";
-      // prevent broken image / alt text
       slot.av.src = TRANSPARENT_PX;
       slot.av.alt = "";
     }
@@ -317,7 +317,7 @@
   function showRow(slot){
     if (!slot?.row) return;
     slot.row.hidden = false;
-    slot.row.style.display = ""; // back to CSS layout
+    slot.row.style.display = "";
     if (slot.av){
       slot.av.hidden = false;
       slot.av.style.display = "";
@@ -325,9 +325,6 @@
   }
 
   function renderHistory(){
-    const slots = slotEls;
-
-    // Only keep last MAX_VISIBLE_BUBBLES messages in view
     const base = history.slice(0, Math.min(MAX_VISIBLE_BUBBLES, MAX_SLOTS));
 
     const typingMsg =
@@ -335,12 +332,11 @@
       (state?.typing?.student) ? { side:"student", typing:true } :
       null;
 
-    // Typing bubble should appear as the newest bubble
     const view = typingMsg ? [typingMsg, ...base].slice(0, Math.min(MAX_VISIBLE_BUBBLES, MAX_SLOTS)) : base;
 
     for (let i = 0; i < MAX_SLOTS; i++){
       const msg = view[i];
-      const slot = slots[i];
+      const slot = slotEls[i];
       if (!slot?.row) continue;
 
       if (!msg){
@@ -350,13 +346,11 @@
 
       showRow(slot);
 
-      // side classes (your CSS can position left/right)
       slot.row.classList.toggle("isVisitor", msg.side === "visitor");
       slot.row.classList.toggle("isStudent", msg.side === "student");
       slot.row.classList.toggle("left", msg.side === "visitor");
       slot.row.classList.toggle("right", msg.side === "student");
 
-      // avatar
       if (slot.av){
         if (msg.side === "visitor"){
           slot.av.src = visitorAvatar.src || TRANSPARENT_PX;
@@ -367,10 +361,8 @@
         }
       }
 
-      // meta
       if (slot.meta) slot.meta.textContent = "";
 
-      // bubble text / typing dots
       if (slot.txt){
         slot.txt.classList.toggle("typing", !!msg.typing);
         if (msg.typing){
@@ -458,14 +450,12 @@
     return letters.length ? letters.join("-") : ln.toUpperCase();
   }
 
-  // -------- Visitor lines (simple) --------
+  // -------- Visitor lines (base) --------
   const VISITOR = {
     greeting: ["Hello."],
     need_help: ["I… need help."],
     need_base: ["I need to get onto the base."],
     appointment_yes: ["Yes, I have an appointment."],
-    who_meeting: ["I’m meeting Sergeant de Vries."],
-    about_meeting: ["It’s a delivery for the workshop—tools and spare parts."],
     search_why: ["Why am I being searched?"],
     illegal_what: ["What do you mean by illegal items?"],
     deny_why: ["Why are you denying me?"],
@@ -480,22 +470,40 @@
   const INTENTS = [
     { key:"greet", rx:/\b(hi|hello|good\s*(morning|afternoon|evening))\b/i },
     { key:"help_open", rx:/\b(how\s+can\s+i\s+help(\s+you(\s+today)?)?|what\s+do\s+you\s+need|how\s+may\s+i\s+help)\b/i },
+
     { key:"purpose", rx:/\b(why\s+are\s+you\s+here|what\s+is\s+the\s+purpose|reason\s+for\s+your\s+visit)\b/i },
     { key:"has_appointment", rx:/\b(do\s+you\s+have\s+an\s+appointment|do\s+you\s+have\s+a\s+meeting|is\s+your\s+visit\s+scheduled)\b/i },
     { key:"ask_name", rx:/\b(who\s+are\s+you|what\s+is\s+your\s+name|your\s+name\s*,?\s+please)\b/i },
     { key:"who_meeting", rx:/\b(who\s+are\s+you\s+(meeting|seeing)|who\s+do\s+you\s+have\s+an?\s+(appointment|meeting)\s+with)\b/i },
     { key:"time_meeting", rx:/\b(what\s+time\s+is\s+(the\s+)?(appointment|meeting)|when\s+is\s+(the\s+)?(appointment|meeting))\b/i },
     { key:"about_meeting", rx:/\b(what\s+is\s+(the\s+)?(appointment|meeting)\s+about|what\s+are\s+you\s+delivering)\b/i },
+
     { key:"ask_id", rx:/\b(can\s+i\s+see\s+your\s+id|show\s+me\s+your\s+id|id\s+please|passport)\b/i },
     { key:"dob_q", rx:/\b(date\s+of\s+birth|dob|when\s+were\s+you\s+born)\b/i },
     { key:"nat_q", rx:/\b(nationality|what\s+is\s+your\s+nationality|where\s+are\s+you\s+from)\b/i },
     { key:"spell_last_name", rx:/\b(spell\s+(your\s+)?(last\s+name|surname)|how\s+do\s+you\s+spell)\b/i },
     { key:"return_id", rx:/\b(return\s+your\s+id|here\'?s\s+your\s+id\s+back)\b/i },
-    { key:"we_search_you", rx:/\b(you\s+will\s+be\s+searched|we\s+will\s+search\s+you)\b/i },
-    { key:"everyone_searched", rx:/\b(everyone\s+is\s+searched|routine\s+search)\b/i },
+
+    // supervisor trigger
+    { key:"contact_supervisor", rx:/\b(contact|call)\s+(my\s+)?supervisor\b|\b(i('| a)m|i\s+will)\s+contact\s+(my\s+)?supervisor\b/i },
+
+    // search + threat in one line
+    { key:"search_and_threat", rx:/\b(search(ed)?|frisk|pat\s*down)\b.*\b(increased\s+threat|heightened\s+security)\b|\b(increased\s+threat|heightened\s+security)\b.*\b(search(ed)?|frisk|pat\s*down)\b/i },
+
+    { key:"we_search_you", rx:/\b(you\s+will\s+be\s+searched|we\s+will\s+search\s+you|we\'?re\s+going\s+to\s+search\s+you|you\'?re\s+going\s+to\s+get\s+searched|we\'?re\s+going\s+to\s+frisk\s+you|we\'?re\s+going\s+to\s+pat\s+you\s+down)\b/i },
+    { key:"everyone_searched", rx:/\b(everyone\s+is\s+searched|routine\s+search|standard\s+procedure)\b/i },
     { key:"due_threat", rx:/\b(heightened\s+security|increased\s+threat|security\s+reasons)\b/i },
+
     { key:"illegal_items", rx:/\b(any\s+illegal\s+items|anything\s+illegal|contraband|prohibited)\b/i },
-    { key:"illegal_clarify", rx:/\b(weapons?|drugs?|alcohol|knife|gun)\b/i },
+
+    // category questions
+    { key:"ask_weapons", rx:/\b(weapons?|knife|gun|firearm)\b/i },
+    { key:"ask_drugs", rx:/\b(drugs?|narcotics?)\b/i },
+    { key:"ask_alcohol", rx:/\b(alcohol|beer|wine|liquor)\b/i },
+
+    // hand in
+    { key:"hand_in", rx:/\b(hand\s+in|hand\s+over|turn\s+it\s+in|leave\s+it\s+here)\b|\b(get\s+it\s+back\s+at\s+the\s+end)\b/i },
+
     { key:"go_person_search", rx:/\b(go\s+to\s+(the\s+)?person\s+search|person\s+search)\b/i },
   ];
 
@@ -507,6 +515,106 @@
     return "unknown";
   }
 
+  // -------- Supervisor modal helpers --------
+  function openSupervisorModal(){
+    if (!supervisorModal) return;
+
+    // clear fields
+    if (svWhy) svWhy.value = "";
+    if (svAppt) svAppt.value = "";
+    if (svWho) svWho.value = "";
+    if (svTime) svTime.value = "";
+    if (svAbout) svAbout.value = "";
+    if (svNote) svNote.textContent = "";
+
+    [svWhyStatus, svApptStatus, svWhoStatus, svAboutStatus, svTimeStatus].forEach(el => {
+      if (el) el.textContent = "";
+    });
+
+    supervisorModal.hidden = false;
+    supervisorModal.style.display = "";
+
+    // no typing while modal open
+    if (state?.typing){
+      state.typing.student = false;
+      state.typing.visitor = false;
+      renderHistory();
+    }
+  }
+
+  function closeSupervisorModal(){
+    if (!supervisorModal) return;
+    supervisorModal.hidden = true;
+    supervisorModal.style.display = "none";
+  }
+
+  function validateSupervisorForm(){
+    const t = state?.truth;
+    if (!t) return { ok:false, msg:"No truth data loaded." };
+
+    const whoAtGate = (svWhy?.value || "").trim();
+    const appt      = (svAppt?.value || "").trim();
+    const withWhom  = (svWho?.value || "").trim();
+    const time      = (svTime?.value || "").trim();
+    const about     = (svAbout?.value || "").trim();
+
+    const missing = [];
+    if (!whoAtGate) missing.push("Who at the gate");
+    if (!appt) missing.push("Appointment (yes/no)");
+    if (!withWhom) missing.push("With whom");
+    if (!time) missing.push("Time");
+    if (!about) missing.push("About");
+
+    if (missing.length){
+      return { ok:false, msg:`Please fill: ${missing.join(", ")}.` };
+    }
+
+    const whoOK = softMatch(whoAtGate, t.whoAtGate);
+
+    const apptOK = (() => {
+      const A = normalize(appt);
+      // Expect "yes"
+      return A.includes("yes") || A === "y" || A.includes("have an appointment") || A.includes("appointment yes");
+    })();
+
+    const withOK  = softMatch(withWhom, t.withWhom);
+    const timeOK  = softMatch(time, t.time);
+    const aboutOK = softMatch(about, t.about);
+
+    if (svWhyStatus) svWhyStatus.textContent = whoOK ? "OK" : "Mismatch";
+    if (svApptStatus) svApptStatus.textContent = apptOK ? "OK" : "Mismatch";
+    if (svWhoStatus) svWhoStatus.textContent = withOK ? "OK" : "Mismatch";
+    if (svTimeStatus) svTimeStatus.textContent = timeOK ? "OK" : "Mismatch";
+    if (svAboutStatus) svAboutStatus.textContent = aboutOK ? "OK" : "Mismatch";
+
+    const allOK = whoOK && apptOK && withOK && timeOK && aboutOK;
+    if (!allOK){
+      return { ok:false, msg:"Some entries do not match what the visitor told you. Ask again and correct the form." };
+    }
+
+    return { ok:true, msg:"Supervisor approved." };
+  }
+
+  btnCloseSupervisor?.addEventListener("click", closeSupervisorModal);
+  btnReturnToVisitor?.addEventListener("click", closeSupervisorModal);
+
+  btnSupervisorCheck?.addEventListener("click", () => {
+    const res = validateSupervisorForm();
+    if (svNote) svNote.textContent = res.msg;
+
+    if (!res.ok) return;
+
+    // Always approve (your request)
+    if (!state.supervisor) state.supervisor = { done:false };
+    state.supervisor.done = true;
+
+    closeSupervisorModal();
+
+    // Back to main screen; now student can announce search
+    state.stage = "search_announce";
+    updateHintBand(true);
+  });
+
   // -------- Scenario state --------
   function resetScenario(){
     currentMood = MOODS[randInt(0, MOODS.length - 1)];
@@ -517,15 +625,51 @@
 
     history.length = 0;
 
+    // create base state first (so helpers using "state" are safe)
     state = {
       stage: "start",
       misses: 0,
       typing: { visitor:false, student:false },
-      contraband: { weapons:false, drugs:false, alcohol:false },
+
       idVisible: false,
       idChecked: false,
+
       visitor: { ...ID_DATA },
-      facts: { name:"", purpose:"", appt:"", who:"", time:"", about:"", meetingTime:"" }
+
+      supervisor: { done:false },
+
+      // what student has gathered (for hints)
+      facts: { name:"", purpose:"", appt:"", who:"", time:"", about:"", meetingTime:"" },
+
+      // contraband state
+      carry: { weapons:false, drugs:false, alcohol:false }, // real items (hidden)
+      contraband: { weapons:false, drugs:false, alcohol:false }, // admitted items (for flow)
+      truth: null
+    };
+
+    // determine what visitor REALLY has (chance-based)
+    state.carry = {
+      weapons: Math.random() < 0.12,
+      drugs:   Math.random() < 0.08,
+      alcohol: Math.random() < 0.22
+    };
+
+    // truth data for appointment
+    const meetingTime = getMeetingTimeHHMM();
+    const withWhom = "Sergeant de Vries";
+    const about = pick([
+      "It’s a delivery for the workshop—tools and spare parts.",
+      "It’s a scheduled maintenance check for equipment.",
+      "It’s paperwork and access for a contractor delivery."
+    ]);
+
+    state.truth = {
+      whoAtGate: ID_DATA.name,
+      purpose: "Appointment on base",
+      hasAppointment: "yes",
+      withWhom,
+      time: meetingTime,
+      about
     };
 
     hideId();
@@ -544,8 +688,15 @@
 
     const intent = detectIntent(clean);
 
+    // Supervisor trigger (always available once scenario started)
+    if (intent === "contact_supervisor"){
+      // Must have ID checked + information gathered? You asked for 5W/H popup — we allow opening anytime.
+      openSupervisorModal();
+      return;
+    }
+
     // progress tracking (for hints)
-    if (intent === "ask_name") state.facts.name = state.visitor.name;
+    if (intent === "ask_name") state.facts.name = state.truth?.whoAtGate || state.visitor.name;
     if (intent === "purpose") state.facts.purpose = "known";
     if (intent === "has_appointment") state.facts.appt = "yes";
     if (intent === "who_meeting") state.facts.who = "known";
@@ -584,7 +735,7 @@
 
       case "purpose":
         if (intent === "purpose"){
-          enqueueVisitor("I have an appointment on base.");
+          enqueueVisitor(`I have an appointment on base.`);
           return;
         }
         if (intent === "has_appointment"){
@@ -592,17 +743,21 @@
           return;
         }
         if (intent === "who_meeting"){
-          enqueueVisitor(visitorLine("who_meeting"));
+          enqueueVisitor(`I’m meeting ${state.truth.withWhom}.`);
           return;
         }
         if (intent === "time_meeting"){
-          const t = getMeetingTimeHHMM();
+          const t = state.truth.time;
           state.facts.meetingTime = t;
           enqueueVisitor(`At ${t}.`);
           return;
         }
         if (intent === "about_meeting"){
-          enqueueVisitor(visitorLine("about_meeting"));
+          enqueueVisitor(state.truth.about);
+          return;
+        }
+        if (intent === "ask_name"){
+          enqueueVisitor(`My name is ${state.truth.whoAtGate}.`);
           return;
         }
         if (intent === "ask_id"){
@@ -630,19 +785,38 @@
         if (intent === "return_id"){
           hideId();
           enqueueVisitor(visitorLine("thanks"));
-          state.stage = "search_announce";
+          // after ID return, student should contact supervisor first
+          state.stage = "post_id";
+          updateHintBand(true);
           return;
         }
         nudge("Try a control question, or return the ID.");
         return;
 
+      case "post_id":
+        // Here we want them to contact supervisor to open 5W/H popup
+        if (!state.supervisor?.done){
+          nudge('Say: “I’ll contact my supervisor.”');
+          return;
+        }
+        // If supervisor already done, proceed
+        state.stage = "search_announce";
+        updateHintBand(true);
+        return;
+
       case "search_announce":
+        // If they combine search + threat in one sentence, skip "why" stage.
+        if (intent === "search_and_threat"){
+          state.stage = "illegal_items";
+          enqueueVisitor("Okay.");
+          return;
+        }
         if (intent === "we_search_you"){
           state.stage = "why_searched";
           enqueueVisitor(visitorLine("search_why"));
           return;
         }
-        nudge('Try: “You will be searched.”');
+        nudge('Try: “You are going to be searched.”');
         return;
 
       case "why_searched":
@@ -651,7 +825,7 @@
           enqueueVisitor("Okay.");
           return;
         }
-        nudge("Explain: routine search / heightened security.");
+        nudge("Explain: routine search / due to an increased threat.");
         return;
 
       case "illegal_items":
@@ -664,28 +838,60 @@
         return;
 
       case "clarify_illegal": {
-        const t = clean.toLowerCase();
-        if (t.includes("weapon") || t.includes("knife") || t.includes("gun")) state.contraband.weapons = true;
-        if (t.includes("drug")) state.contraband.drugs = true;
-        if (t.includes("alcohol") || t.includes("beer") || t.includes("wine")) state.contraband.alcohol = true;
+        const askedWeapons = (intent === "ask_weapons");
+        const askedDrugs   = (intent === "ask_drugs");
+        const askedAlcohol = (intent === "ask_alcohol");
 
-        const missing = [];
-        if (!state.contraband.weapons) missing.push("weapons");
-        if (!state.contraband.drugs) missing.push("drugs");
-        if (!state.contraband.alcohol) missing.push("alcohol");
-
-        if (intent === "illegal_clarify"){
-          if (missing.length){
-            enqueueVisitor(`Anything about ${missing.join(", ")}?`);
-          } else {
-            state.stage = "direction";
-            enqueueVisitor("No. Tell me where to go.");
-          }
+        if (!askedWeapons && !askedDrugs && !askedAlcohol){
+          nudge("Clarify: weapons, drugs and alcohol.");
           return;
         }
-        enqueueVisitor("Clarify: drugs, weapons and alcohol.");
+
+        // mood-driven honesty
+        const honesty = Math.random() > (currentMood?.liarBias ?? 0.2);
+
+        const admits = { weapons:false, drugs:false, alcohol:false };
+
+        if (askedWeapons){
+          admits.weapons = state.carry.weapons && honesty;
+          enqueueVisitor(admits.weapons ? "Yes… I have a small pocket knife." : "No weapons.");
+        }
+        if (askedDrugs){
+          admits.drugs = state.carry.drugs && honesty;
+          enqueueVisitor(admits.drugs ? "…Yes. I have something on me." : "No drugs.");
+        }
+        if (askedAlcohol){
+          admits.alcohol = state.carry.alcohol && honesty;
+          enqueueVisitor(admits.alcohol ? "Yes, I have alcohol in my bag." : "No alcohol.");
+        }
+
+        // track admitted
+        state.contraband.weapons = state.contraband.weapons || admits.weapons;
+        state.contraband.drugs   = state.contraband.drugs   || admits.drugs;
+        state.contraband.alcohol = state.contraband.alcohol || admits.alcohol;
+
+        if (state.contraband.weapons || state.contraband.drugs || state.contraband.alcohol){
+          state.stage = "hand_in_step";
+          return;
+        }
+
+        state.stage = "direction";
+        enqueueVisitor("Okay.");
         return;
       }
+
+      case "hand_in_step":
+        if (intent === "hand_in"){
+          // visitor hands it over -> clear
+          state.carry = { weapons:false, drugs:false, alcohol:false };
+          state.contraband = { weapons:false, drugs:false, alcohol:false };
+
+          enqueueVisitor("Okay. I’ll hand it over.");
+          state.stage = "direction";
+          return;
+        }
+        nudge("Tell them: hand in any contraband; you will get it back at the end of your visit.");
+        return;
 
       case "direction":
         if (intent === "go_person_search"){
@@ -715,7 +921,7 @@
   });
 
   btnReset?.addEventListener("click", () => {
-    loginModal.hidden = false;
+    if (loginModal) loginModal.hidden = false;
     if (textInput) textInput.disabled = false;
     if (btnSend) btnSend.disabled = false;
     if (holdToTalk) holdToTalk.disabled = false;
@@ -734,6 +940,10 @@
   btnReturnId?.addEventListener("click", () => {
     hideId();
     enqueueVisitor(visitorLine("thanks"));
+    if (state && state.stage === "control_q"){
+      state.stage = "post_id";
+      updateHintBand(true);
+    }
   });
 
   // -------- Input --------
@@ -869,7 +1079,6 @@
     try { recognition.stop(); } catch {}
   }
 
-  // Hold-to-talk
   holdToTalk?.addEventListener("pointerdown", (e) => { e.preventDefault(); startListen(); });
   holdToTalk?.addEventListener("pointerup", (e) => { e.preventDefault(); stopListen(); });
   holdToTalk?.addEventListener("pointercancel", stopListen);
@@ -882,7 +1091,6 @@
   function pickMaleishVoice(){
     try{
       const voices = window.speechSynthesis?.getVoices?.() || [];
-      // Prefer English voices that often sound more “male” (heuristic only)
       const preferred = voices.find(v =>
         /en(-|_)(GB|US|AU|IE|NZ)/i.test(v.lang) &&
         /male|daniel|george|arthur|fred|guy/i.test(v.name)
@@ -921,7 +1129,6 @@
       const v = pickMaleishVoice();
       if (v) u.voice = v;
 
-      // You said the voice is good now; keep it steady and slightly lower pitch.
       u.lang = (v?.lang) || "en-GB";
       u.rate = 1.0;
       u.pitch = 0.75;
@@ -982,9 +1189,9 @@
     typing: { visitor:false, student:false },
     visitor: { ...ID_DATA },
     facts: {},
-    misses: 0
+    misses: 0,
+    supervisor: { done:false }
   };
   renderHistory();
 
 })();
-
