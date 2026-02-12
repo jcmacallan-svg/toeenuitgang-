@@ -22,9 +22,8 @@ body{
 }
 .topPills{
   position:fixed; top:10px; left:10px;
-  display:none;
-  //display:flex; gap:8px; z-index:50;
-  }
+  display:flex; gap:8px; z-index:50;
+}
 .pill{
   background:rgba(11,18,32,.9);
   border:1px solid var(--border);

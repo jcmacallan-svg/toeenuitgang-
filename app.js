@@ -438,7 +438,10 @@
 
   // Visitor delayed replies with typing dots
   const VISITOR_REPLY_DELAY_MS = 900;
+  const VISITOR_APPROACH_DELAY_MS = 5000;
   const _visitorQueue = [];
+  let _approachTimer = null;
+
   let _visitorTimer = null;
 
   function enqueueVisitor(text){
@@ -504,15 +507,20 @@
   };
 
   // -------- Intents --------
+  // Order matters: we match *specific* questions before generic ones (e.g. "With whom do you have an appointment?")
   const INTENTS = [
     { key:"greet", rx:/\b(hi|hello|good\s*(morning|afternoon|evening))\b/i },
     { key:"help_open", rx:/\b(how\s+can\s+i\s+help(\s+you(\s+today)?)?|what\s+do\s+you\s+need|how\s+may\s+i\s+help)\b/i },
-    { key:"purpose", rx:/\b(why\s+are\s+you\s+here|what\s+is\s+the\s+purpose|reason\s+for\s+your\s+visit)\b/i },
-    { key:"has_appointment", rx:/\b(do\s+you\s+have\s+an\s+appointment|do\s+you\s+have\s+a\s+meeting|is\s+your\s+visit\s+scheduled)\b/i },
     { key:"ask_name", rx:/\b(who\s+are\s+you|what\s+is\s+your\s+name|your\s+name\s*,?\s+please)\b/i },
-    { key:"who_meeting", rx:/\b(who\s+are\s+you\s+(meeting|seeing)|who\s+do\s+you\s+have\s+an?\s+(appointment|meeting)\s+with)\b/i },
-    { key:"time_meeting", rx:/\b(what\s+time\s+is\s+(the\s+)?(appointment|meeting)|when\s+is\s+(the\s+)?(appointment|meeting))\b/i },
-    { key:"about_meeting", rx:/\b(what\s+is\s+(the\s+)?(appointment|meeting)\s+about|what\s+are\s+you\s+delivering)\b/i },
+    { key:"purpose", rx:/\b(why\s+are\s+you\s+here|what\s+is\s+the\s+purpose|reason\s+for\s+your\s+visit)\b/i },
+
+    // Appointment follow-ups (must be BEFORE "has_appointment")
+    { key:"who_meeting", rx:/\b(with\s+whom\s+do\s+you\s+have\s+an?\s+(appointment|meeting)|with\s+who(m)?\s+do\s+you\s+have\s+an?\s+(appointment|meeting)|who(m)?\s+is\s+your\s+(appointment|meeting)\s+with|who\s+are\s+you\s+(meeting|seeing)|who\s+do\s+you\s+have\s+an?\s+(appointment|meeting)\s+with)\b/i },
+    { key:"time_meeting", rx:/\b(what\s+time\s+is\s+(your|the)\s+(appointment|meeting)|when\s+is\s+(your|the)\s+(appointment|meeting))\b/i },
+    { key:"about_meeting", rx:/\b(what\s+is\s+(your|the)\s+(appointment|meeting)\s+about|what\s+is\s+(your|the)\s+meeting\s+about|what\s+are\s+you\s+delivering)\b/i },
+
+    { key:"has_appointment", rx:/\b(do\s+you\s+have\s+an\s+appointment|do\s+you\s+have\s+a\s+meeting|is\s+your\s+visit\s+scheduled)\b/i },
+
     { key:"ask_id", rx:/\b(can\s+i\s+see\s+your\s+id|show\s+me\s+your\s+id|id\s+please|passport)\b/i },
     { key:"dob_q", rx:/\b(date\s+of\s+birth|dob|when\s+were\s+you\s+born)\b/i },
     { key:"nat_q", rx:/\b(nationality|what\s+is\s+your\s+nationality|where\s+are\s+you\s+from)\b/i },
@@ -545,7 +553,7 @@
     history.length = 0;
 
     state = {
-      stage: "start",
+      stage: "approach",
       misses: 0,
       typing: { visitor:false, student:false },
       contraband: { weapons:false, drugs:false, alcohol:false },
@@ -559,15 +567,29 @@
     hideId();
     updateHintBand(true);
 
-    // Start: one bubble after a short "approach" delay (gives students time)
+    // Start: show an "approach" cue first, then greet after a delay (gives students time)
+    if (portraitMood){
+      const moodLine = currentMood?.line || "";
+      portraitMood.textContent = `A visitor walks up to the gate. ${moodLine}`;
+    }
     const hello = pickBank("greeting", VISITOR_FALLBACK.greeting);
-    setTimeout(() => pushVisitor(hello), 5000);
+
+    // clear any previous scheduled greeting
+    if (_approachTimer) { try{ clearTimeout(_approachTimer); }catch{} _approachTimer = null; }
+    _approachTimer = setTimeout(() => {
+      _approachTimer = null;
+      if (state) state.stage = "start";
+      pushVisitor(hello);
+    }, VISITOR_APPROACH_DELAY_MS);
   }
 
   // -------- Dialogue --------
   function handleStudent(raw){
     const clean = String(raw || "").trim();
     if (!clean || !state || state.stage === "ended") return;
+
+    // During the approach delay we ignore input (prevents weird pre-greeting dialogue)
+    if (state.stage === "approach") return;
 
     pushStudent(clean);
 
