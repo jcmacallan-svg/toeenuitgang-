@@ -552,15 +552,38 @@
   }
 
   function psPickAnswer(intentKey, ctx={}){
-    const qa = window.PS_PATCH?.QA?.[intentKey];
-    if (!qa) return "Okay.";
-    const band = psBand();
-    const arr = qa[band] || qa.cautious || [];
-    let line = pick(arr);
+  const qa = window.PS_PATCH?.QA?.[intentKey];
+  if (!qa) return "Okay.";
+  const band = psBand();
+  const arr = qa[band] || qa.cautious || [];
+  let line = pick(arr);
 
-    if (ctx.meetingTime) line = line.replace(/\{meetingTime\}/g, ctx.meetingTime);
-    return String(line || "Okay.").trim();
-  }
+  const v = state?.visitor || {};
+  const claimedFirst = v.claimedFirst || v.first || "";
+  const claimedLast  = v.claimedLast  || v.last  || "";
+  const claimedName  = v.claimedName  || v.name  || "";
+
+  const rep = (key, val) => {
+    const re = new RegExp("\\{" + key + "\\}", "g");
+    line = String(line || "").replace(re, String(val ?? ""));
+  };
+
+  rep("meetingTime", ctx.meetingTime || v.meetingTime || "");
+  rep("name", v.name || "");
+  rep("first", v.first || "");
+  rep("last", v.last || "");
+  rep("dob", v.dob || "");
+  rep("nat", v.nat || "");
+  rep("idNo", v.idNo || "");
+
+  // Scenario-friendly “claimed” fields (default = ID)
+  rep("claimedFirst", claimedFirst);
+  rep("claimedLast", claimedLast);
+  rep("claimedName", claimedName);
+
+  return String(line || "Okay.").trim();
+}
+
 
   function handlePersonSearch(clean, intent){
     state.ps = state.ps || { name:false, dob:false, id:false };
