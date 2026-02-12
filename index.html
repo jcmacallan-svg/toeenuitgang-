@@ -107,23 +107,43 @@
 
       </section>
 
-      <!-- ID card (optional) -->
-      <section id="idCardWrap" class="idCardWrap" hidden style="display:none">
-        <div class="idCard">
-          <img id="idPhoto" alt="ID Photo" />
-          <div class="idFields">
-            <div><b>Name:</b> <span id="idName"></span></div>
-            <div><b>Surname:</b> <span id="idSurname"></span></div>
-            <div><b>DOB:</b> <span id="idDob"></span></div>
-            <div><b>Nationality:</b> <span id="idNat"></span></div>
-            <div><b>ID No:</b> <span id="idNo"></span></div>
-          </div>
-        </div>
-        <button id="btnReturnId" type="button">Return ID</button>
-      </section>
-
-    </main>
+     <!-- TRAINING ID CARD (FICTIONAL) -->
+<div id="trainerIdCard" class="trainerIdCard" hidden>
+  <div class="idTop">
+    <div class="idBrand">
+      <div class="idTitle">VEVA Visitor Credential</div>
+      <div class="idSub">TRAINING USE ONLY · NOT A REAL DOCUMENT</div>
+    </div>
+    <div class="idMeta">
+      <div class="pill">LEVEL: <span id="idLevel">STANDARD</span></div>
+      <div class="pill">SCENARIO: <span id="idScenario">Checkpoint</span></div>
+    </div>
   </div>
+
+  <div class="idBody">
+    <div class="idPhotoWrap">
+      <img id="idPhoto2" class="idPhoto2" alt="" />
+      <div class="idWatermark">FICTIONAL</div>
+    </div>
+
+    <div class="idFields">
+      <div class="row"><span class="k">Name</span><span id="idName2" class="v"></span></div>
+      <div class="row"><span class="k">Date of birth</span><span id="idDob2" class="v"></span></div>
+      <div class="row"><span class="k">Nationality</span><span id="idNat2" class="v"></span></div>
+      <div class="row"><span class="k">Visitor ID</span><span id="idNo2" class="v mono"></span></div>
+      <div class="row"><span class="k">Reason</span><span id="idReason2" class="v"></span></div>
+      <div class="row"><span class="k">Valid until</span><span id="idExp2" class="v"></span></div>
+    </div>
+  </div>
+
+  <div class="idBottom">
+    <div class="barcode mono" id="idBarcode2">VEVA|…</div>
+    <div class="idFine">
+      This credential is generated for training simulation purposes only.
+    </div>
+  </div>
+</div>
+
 
   <!-- Supervisor modal -->
   <div id="supervisorModal" class="modal" hidden style="display:none">
