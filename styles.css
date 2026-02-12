@@ -760,3 +760,98 @@ body{
   border-radius: 999px;
   padding: 6px 10px;
 }
+.trainerIdCard{
+  width: 520px;
+  max-width: 92vw;
+  border-radius: 18px;
+  padding: 14px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.14);
+  box-shadow: 0 18px 40px rgba(0,0,0,.35);
+  backdrop-filter: blur(10px);
+  color: #e6edf3;
+}
+
+.idTop{
+  display:flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items:flex-start;
+  margin-bottom: 12px;
+}
+
+.idTitle{ font-size: 18px; font-weight: 800; letter-spacing: .3px; }
+.idSub{ font-size: 12px; opacity: .75; margin-top: 2px; }
+
+.pill{
+  display:inline-block;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.12);
+  font-size: 12px;
+  margin-left: 6px;
+}
+
+.idBody{
+  display:flex;
+  gap: 14px;
+}
+
+.idPhotoWrap{
+  position:relative;
+  width: 150px;
+  height: 190px;
+  border-radius: 14px;
+  overflow:hidden;
+  border: 1px solid rgba(255,255,255,0.14);
+  background: rgba(0,0,0,0.25);
+}
+
+.idPhoto2{
+  width:100%;
+  height:100%;
+  object-fit: cover;
+}
+
+.idWatermark{
+  position:absolute;
+  inset:auto 8px 8px 8px;
+  text-align:center;
+  font-weight:900;
+  letter-spacing: 3px;
+  font-size: 14px;
+  padding: 6px 8px;
+  border-radius: 10px;
+  background: rgba(255,77,77,0.14);
+  border: 1px solid rgba(255,77,77,0.35);
+}
+
+.idFields{ flex:1; display:flex; flex-direction:column; gap: 8px; }
+.row{ display:flex; justify-content:space-between; gap: 10px; }
+.k{ opacity:.70; font-size: 12px; }
+.v{ font-size: 14px; font-weight: 700; }
+.mono{ font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+
+.idBottom{
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255,255,255,0.10);
+  display:flex;
+  justify-content: space-between;
+  align-items:flex-end;
+  gap: 12px;
+}
+
+.barcode{
+  opacity:.9;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.idFine{
+  max-width: 240px;
+  font-size: 11px;
+  opacity: .65;
+  text-align:right;
+}
