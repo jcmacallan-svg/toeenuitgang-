@@ -1,234 +1,209 @@
 <!doctype html>
-<html lang="nl">
+<html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>VEVA Ingang/Uitgang Trainer</title>
-  <link rel="icon" href="favicon.ico" />
-  <link rel="stylesheet" href="styles.css">
-  <link rel="stylesheet" href="patchv1.css">
-  <link rel="stylesheet" href="veva_patch.css">
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>VEVA Trainer</title>
+  <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-  <div class="app" id="app">
 
-    <aside class="sidebar" aria-label="Controls">
+  <!-- Top pills -->
+  <div class="topPills">
+    <div id="versionPill" class="pill">v—</div>
+    <div id="studentPill" class="pill">Student: —</div>
+    <div id="voiceStatus" class="pill">Voice: ready</div>
+  </div>
+
+  <div class="app">
+
+    <!-- Sidebar -->
+    <aside class="sidebar">
       <div class="brand">
-        <div class="brand__title">VEVA Checkpoint</div>
-        <div class="brand__subtitle">Ingang/Uitgang Trainer</div>
+        <div class="brandTitle">VEVA Checkpoint</div>
+        <div class="brandSub">Ingang/Uitgang Trainer</div>
       </div>
 
-      <div class="controls">
-        <button class="btn" id="btnReturn" type="button">Return</button>
-        <button class="btn" id="btnPersonSearch" type="button">Go to Person Search</button>
-        <button class="btn" id="btnSignIn" type="button">Go to sign-in office</button>
-        <button class="btn btn--danger btn--dangerStrong" id="btnDeny" type="button">Deny entrance</button>
-        <button class="btn" id="btnNewScenario" type="button">Start new scenario</button>
-      </div>
+      <button id="btnReturn" class="sideBtn">Return</button>
+      <button id="btnPersonSearch" class="sideBtn">Go to Person Search</button>
+      <button id="btnSignIn" class="sideBtn">Go to sign-in office</button>
+      <button id="btnDeny" class="sideBtn danger">Deny entrance</button>
+      <button id="btnNewScenario" class="sideBtn">Start new scenario</button>
+      <button id="btnReset" class="sideBtn ghost">Reset</button>
     </aside>
 
+    <!-- Main -->
     <main class="main">
-      <div class="topbar">
-        <div class="pills">
-          <div class="pill pill--muted">Last-bubble-only</div>
-          <div class="pill" id="studentPill">Student: —</div>
-          <div class="pill" id="versionPill">vdev</div>
-          <div class="pill" id="voiceStatus">Voice: ready</div>
-        </div>
-        <button class="btn" id="btnReset" type="button" style="width:auto;">Reset</button>
+
+      <!-- Optional hint band -->
+      <div id="hintBand" class="hintBand" hidden>
+        <div id="hintBandText"></div>
       </div>
 
-      <div class="content">
+      <!-- Chat area -->
+      <section class="chatWrap">
 
-        <!-- Login overlay -->
-        <div class="modal" id="loginModal">
-          <div class="modalCard">
-            <div class="modalTitle">Start training</div>
-            <div class="svGrid">
-              <div class="svRow">
-                <label for="studentSurname">Student surname (required)</label>
-                <input id="studentSurname" autocomplete="off" />
-              </div>
-              <div class="svRow">
-                <label for="studentGroup">Group (required)</label>
-                <select id="studentGroup">
-                  <option value="">Choose…</option>
-                  <option>Alpha</option>
-                  <option>Bravo</option>
-                  <option>Charlie</option>
-                  <option>Delta</option>
-                </select>
-              </div>
-              <div class="svRow">
-                <label for="studentDifficulty">Difficulty</label>
-                <select id="studentDifficulty">
-                  <option value="basic">Basic</option>
-                  <option value="standard" selected>Standard</option>
-                  <option value="advanced">Advanced</option>
-                </select>
-              </div>
-              <div class="svRow">
-                <label>&nbsp;</label>
-                <button class="btn" id="btnStartTraining" type="button">Start</button>
-                <div class="note" id="loginError" style="display:none;color:var(--danger);font-weight:800;margin-top:8px;">
-                  Please enter your surname and select a group.
-                </div>
-              </div>
+        <!-- Visitor portrait (optional, used as avatar source) -->
+        <img id="portraitPhoto" alt="" style="display:none" />
+        <div id="portraitMood" class="moodLine"></div>
+
+        <!-- Slots -->
+        <div id="chatSlots" class="chatSlots">
+          <div id="slot0" class="chatRow" hidden>
+            <img id="slot0Avatar" class="avatar" alt="" />
+            <div class="bubble">
+              <div id="slot0Text"></div>
+              <div id="slot0Meta" class="meta"></div>
+            </div>
+          </div>
+
+          <div id="slot1" class="chatRow" hidden>
+            <img id="slot1Avatar" class="avatar" alt="" />
+            <div class="bubble">
+              <div id="slot1Text"></div>
+              <div id="slot1Meta" class="meta"></div>
+            </div>
+          </div>
+
+          <div id="slot2" class="chatRow" hidden>
+            <img id="slot2Avatar" class="avatar" alt="" />
+            <div class="bubble">
+              <div id="slot2Text"></div>
+              <div id="slot2Meta" class="meta"></div>
+            </div>
+          </div>
+
+          <div id="slot3" class="chatRow" hidden>
+            <img id="slot3Avatar" class="avatar" alt="" />
+            <div class="bubble">
+              <div id="slot3Text"></div>
+              <div id="slot3Meta" class="meta"></div>
+            </div>
+          </div>
+
+          <div id="slot4" class="chatRow" hidden>
+            <img id="slot4Avatar" class="avatar" alt="" />
+            <div class="bubble">
+              <div id="slot4Text"></div>
+              <div id="slot4Meta" class="meta"></div>
+            </div>
+          </div>
+
+          <div id="slot5" class="chatRow" hidden>
+            <img id="slot5Avatar" class="avatar" alt="" />
+            <div class="bubble">
+              <div id="slot5Text"></div>
+              <div id="slot5Meta" class="meta"></div>
             </div>
           </div>
         </div>
 
-        <!-- Chat ladder: 4 slots -->
-              <div class="chatArea" id="chatArea" aria-label="Conversation">
-        <!-- Newest message is shown at the TOP (slot0). Up to 6 bubbles are kept. -->
-        <div class="msgRow visitor" id="slot0">
-          <img class="avatar" id="slot0Avatar" alt="Visitor"/>
-          <div class="bubbleWrap">
-            <div class="bubble" id="slot0Text"></div>
-            <div class="meta" id="slot0Meta"></div>
+        <!-- Input bar -->
+        <div class="inputBar">
+          <input id="textInput" type="text" placeholder="Type or speak your English…" />
+          <button id="holdToTalk" type="button">Hold</button>
+          <button id="btnSend" type="button">Send</button>
+        </div>
+
+      </section>
+
+      <!-- ID card (optional) -->
+      <section id="idCardWrap" class="idCardWrap" hidden style="display:none">
+        <div class="idCard">
+          <img id="idPhoto" alt="ID Photo" />
+          <div class="idFields">
+            <div><b>Name:</b> <span id="idName"></span></div>
+            <div><b>Surname:</b> <span id="idSurname"></span></div>
+            <div><b>DOB:</b> <span id="idDob"></span></div>
+            <div><b>Nationality:</b> <span id="idNat"></span></div>
+            <div><b>ID No:</b> <span id="idNo"></span></div>
           </div>
         </div>
+        <button id="btnReturnId" type="button">Return ID</button>
+      </section>
 
-        <div class="msgRow student" id="slot1">
-          <img class="avatar" id="slot1Avatar" alt="Soldier"/>
-          <div class="bubbleWrap">
-            <div class="bubble" id="slot1Text"></div>
-            <div class="meta" id="slot1Meta"></div>
-          </div>
-        </div>
-
-        <div class="msgRow visitor" id="slot2">
-          <img class="avatar" id="slot2Avatar" alt="Visitor"/>
-          <div class="bubbleWrap">
-            <div class="bubble" id="slot2Text"></div>
-            <div class="meta" id="slot2Meta"></div>
-          </div>
-        </div>
-
-        <div class="msgRow student" id="slot3">
-          <img class="avatar" id="slot3Avatar" alt="Soldier"/>
-          <div class="bubbleWrap">
-            <div class="bubble" id="slot3Text"></div>
-            <div class="meta" id="slot3Meta"></div>
-          </div>
-        </div>
-
-        <div class="msgRow visitor" id="slot4">
-          <img class="avatar" id="slot4Avatar" alt="Visitor"/>
-          <div class="bubbleWrap">
-            <div class="bubble" id="slot4Text"></div>
-            <div class="meta" id="slot4Meta"></div>
-          </div>
-        </div>
-
-        <div class="msgRow student" id="slot5">
-          <img class="avatar" id="slot5Avatar" alt="Soldier"/>
-          <div class="bubbleWrap">
-            <div class="bubble" id="slot5Text"></div>
-            <div class="meta" id="slot5Meta"></div>
-          </div>
-        </div>
-      </div>
-
-      <div class="idSlot" id="idSlot" aria-label="Hint and ID area">
-        <div class="dividerLine"></div>
-
-        <div class="portraitAndId" aria-label="Portrait and ID">
-          <img id="portraitPhoto" class="portraitPhoto" src="" alt="Visitor portrait" />
-<div id="portraitMood" class="portraitMood">The visitor looks neutral.</div>
-
-          <div class="idCardWrap" id="idCardWrap" hidden>
-            <div class="idCard passport">
-              <div class="idPhotoWrap">
-                <img id="idPhoto" class="idPhoto" alt="ID photo" />
-                <div class="idStamps" aria-hidden="true">
-                  <span class="stamp">NL</span>
-                  <span class="stamp">VALID</span>
-                </div>
-              </div>
-              <div class="idFields">
-                <div class="idRow"><span class="k">Name</span><span id="idName"></span></div>
-                <div class="idRow"><span class="k">Surname</span><span id="idSurname"></span></div>
-                <div class="idRow"><span class="k">DOB</span><span id="idDob"></span></div>
-                <div class="idRow"><span class="k">Nationality</span><span id="idNat"></span></div>
-                <div class="idRow"><span class="k">ID No.</span><span id="idNo"></span></div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="hintBand" id="hintBand">
-          <div class="dividerLine"></div>
-          <div class="hintText" id="hintBandText">Ask: “Who are you?”</div>
-          <div class="dividerLine"></div>
-        </div>
-      </div>
-
-<div class="inputBar" aria-label="Input">
-  <div class="inputWrap">
-    <input class="textInput" id="textInput" placeholder="Type or speak your English sentence…" autocomplete="off" />
-    <button class="holdBtn holdBtn--inline" id="holdToTalk" type="button" aria-label="Hold to talk">Hold</button>
-    <button class="sendBtn" id="btnSend" type="button" aria-label="Send">Send</button>
-  </div>
-</div>
-
-
-      </div>
     </main>
+  </div>
 
-    <!-- Supervisor modal -->
-    <div class="modal" id="supervisorModal" hidden>
-      <div class="modalCard">
-        <div class="modalTitle">Supervisor check (5W/H)</div>
+  <!-- Supervisor modal -->
+  <div id="supervisorModal" class="modal" hidden style="display:none">
+    <div class="modalCard">
+      <div class="modalHeader">
+        <div class="modalTitle">Supervisor Check — 5W/H</div>
+        <button id="btnCloseSupervisor" class="modalClose" type="button">✕</button>
+      </div>
 
-        <div class="svGrid">
-          <div class="svRow">
-            <label for="svWhy">Why are you here?</label>
-            <input id="svWhy" autocomplete="off" />
-            <div class="svStatus" id="svWhyStatus">—</div>
-          </div>
+      <div class="modalGrid">
+        <label>
+          Who is at the gate?
+          <input id="svWhy" type="text" />
+          <div id="svWhyStatus" class="status"></div>
+        </label>
 
-          <div class="svRow">
-            <label for="svAppt">Do you have an appointment?</label>
-            <select id="svAppt">
-              <option value="yes">Yes</option>
-              <option value="no">No</option>
-            </select>
-            <div class="svStatus" id="svApptStatus">—</div>
-          </div>
+        <label>
+          Do they have an appointment? (yes/no)
+          <input id="svAppt" type="text" />
+          <div id="svApptStatus" class="status"></div>
+        </label>
 
-          <div class="svRow">
-            <label for="svWho">With whom?</label>
-            <input id="svWho" autocomplete="off" />
-            <div class="svStatus" id="svWhoStatus">—</div>
-          </div>
+        <label>
+          With whom?
+          <input id="svWho" type="text" />
+          <div id="svWhoStatus" class="status"></div>
+        </label>
 
-          <div class="svRow">
-            <label for="svAbout">What is it about?</label>
-            <input id="svAbout" autocomplete="off" />
-            <div class="svStatus" id="svAboutStatus">—</div>
-          </div>
+        <label>
+          What time?
+          <input id="svTime" type="text" placeholder="HH:MM" />
+          <div id="svTimeStatus" class="status"></div>
+        </label>
 
-          <div class="svRow">
-            <label for="svTime">What time is the appointment?</label>
-            <input id="svTime" autocomplete="off" />
-            <div class="svStatus" id="svTimeStatus">—</div>
-          </div>
+        <label class="span2">
+          What is it about?
+          <input id="svAbout" type="text" />
+          <div id="svAboutStatus" class="status"></div>
+        </label>
+      </div>
 
-          <div class="svRow">
-            <label>Actions</label>
-            <button class="btn" id="btnSupervisorCheck" type="button">Run checks</button>
-            <button class="btn" id="btnReturnToVisitor" type="button" style="margin-top:10px;">Return to Visitor</button>
-            <button class="btn" id="btnCloseSupervisor" type="button" style="margin-top:10px;">Close</button>
-            <div class="note" id="svNote">Fill in the answers, run checks, then return to the visitor.</div>
-          </div>
-        </div>
+      <div id="svNote" class="note"></div>
+
+      <div class="modalActions">
+        <button id="btnReturnToVisitor" type="button">Return to visitor</button>
+        <button id="btnSupervisorCheck" type="button" class="primary">Send to supervisor</button>
       </div>
     </div>
+  </div>
 
-      
-  <script src="boot.js" defer></script>
+  <!-- Login modal (basic, optional) -->
+  <div id="loginModal" class="modal" hidden>
+    <div class="modalCard">
+      <div class="modalTitle">Start training</div>
 
+      <label>Surname
+        <input id="studentSurname" type="text" />
+      </label>
 
+      <label>Group
+        <select id="studentGroup">
+          <option value="">Select…</option>
+          <option>Alpha</option>
+          <option>Bravo</option>
+        </select>
+      </label>
+
+      <label>Difficulty
+        <select id="studentDifficulty">
+          <option value="basic">Basic</option>
+          <option value="standard" selected>Standard</option>
+          <option value="advanced">Advanced</option>
+        </select>
+      </label>
+
+      <div id="loginError" style="display:none">Please fill surname + group.</div>
+      <button id="btnStartTraining" type="button" class="primary">Start</button>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
 </body>
 </html>
