@@ -127,44 +127,121 @@
     return arr[Math.floor(Math.random() * arr.length)];
   }
 
-  // -------------------------
-  // Visitor TTS (optional)
-  // -------------------------
-  let VISITOR_TTS_ENABLED = true;
-  let _ttsReady = false;
+ // ---- Visitor TTS (male voice selector) ----
+let VISITOR_TTS_ENABLED = true;
+let _ttsReady = false;
+let _visitorVoice = null;
 
-  function primeTTS() {
-    try {
-      if (!("speechSynthesis" in window)) return;
-      window.speechSynthesis.cancel();
-      window.speechSynthesis.resume?.();
-      const u = new SpeechSynthesisUtterance(" ");
-      u.volume = 0;
-      u.lang = "en-GB";
-      window.speechSynthesis.speak(u);
-      window.speechSynthesis.cancel();
-      _ttsReady = true;
-    } catch {}
+function _pickMaleVoice(langPref = ["en-GB","en-US","en"]) {
+  if (!("speechSynthesis" in window)) return null;
+
+  const voices = window.speechSynthesis.getVoices() || [];
+  if (!voices.length) return null;
+
+  const scoreVoice = (v) => {
+    const name = (v.name || "").toLowerCase();
+    const voiceURI = (v.voiceURI || "").toLowerCase();
+    const lang = (v.lang || "").toLowerCase();
+
+    // Language preference
+    let langScore = 0;
+    for (let i = 0; i < langPref.length; i++){
+      const lp = langPref[i].toLowerCase();
+      if (lang.startsWith(lp)) { langScore = 30 - i * 5; break; }
+    }
+
+    // Male hints in common voice names
+    const maleHints = [
+      "male","man","masculine",
+      "daniel","alex","fred","oliver","tom","thomas","john","david",
+      "guy","george","mark","james"
+    ];
+    const femaleHints = [
+      "female","woman","feminine",
+      "samantha","victoria","karen","zira","tessa","susan","anna","emma",
+      "google uk english female"
+    ];
+
+    let genderScore = 0;
+    for (const h of maleHints) if (name.includes(h) || voiceURI.includes(h)) genderScore += 15;
+    for (const h of femaleHints) if (name.includes(h) || voiceURI.includes(h)) genderScore -= 20;
+
+    // Prefer non-compact voices (often higher quality)
+    const qualityScore = name.includes("premium") ? 10 : 0;
+
+    // Slight preference for default voice if it also scores male
+    const defaultScore = v.default ? 3 : 0;
+
+    return langScore + genderScore + qualityScore + defaultScore;
+  };
+
+  // Pick best scoring voice
+  let best = null;
+  let bestScore = -1e9;
+  for (const v of voices){
+    const s = scoreVoice(v);
+    if (s > bestScore){ bestScore = s; best = v; }
   }
 
-  function speakVisitor(text) {
-    try {
-      if (!VISITOR_TTS_ENABLED) return;
-      if (!("speechSynthesis" in window)) return;
-      if (!_ttsReady) return;
+  return best;
+}
 
-      const t = String(text || "").trim();
-      if (!t) return;
+function primeTTS(){
+  try{
+    if (!("speechSynthesis" in window)) return;
 
-      window.speechSynthesis.cancel();
-      const u = new SpeechSynthesisUtterance(t);
-      u.lang = "en-GB";
-      u.rate = 1.0;
-      u.pitch = 1.0;
-      u.volume = 1.0;
-      window.speechSynthesis.speak(u);
-    } catch {}
-  }
+    // Some browsers load voices async — hook once
+    if (!window.__TTS_VOICES_HOOKED__){
+      window.__TTS_VOICES_HOOKED__ = true;
+      window.speechSynthesis.onvoiceschanged = () => {
+        _visitorVoice = _pickMaleVoice();
+      };
+    }
+
+    // attempt immediate voice selection too
+    _visitorVoice = _pickMaleVoice();
+
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.resume?.();
+
+    const u = new SpeechSynthesisUtterance(" ");
+    u.volume = 0;
+    u.lang = "en-GB";
+    if (_visitorVoice) u.voice = _visitorVoice;
+
+    window.speechSynthesis.speak(u);
+    window.speechSynthesis.cancel();
+    _ttsReady = true;
+  }catch{}
+}
+
+function speakVisitor(text){
+  try{
+    if (!VISITOR_TTS_ENABLED) return;
+    if (!("speechSynthesis" in window)) return;
+    if (!_ttsReady) return;
+
+    const t = String(text||"").trim();
+    if (!t) return;
+
+    // refresh voice if still null and voices became available
+    if (!_visitorVoice) _visitorVoice = _pickMaleVoice();
+
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(t);
+
+    // Pick a consistent male-ish sound
+    u.lang = "en-GB";
+    if (_visitorVoice) u.voice = _visitorVoice;
+
+    // These help but can't override the selected voice gender
+    u.rate = 0.98;    // slightly slower = “heavier”
+    u.pitch = 0.75;   // lower pitch
+    u.volume = 1.0;
+
+    window.speechSynthesis.speak(u);
+  }catch{}
+}
 
   // -------------------------
   // Session
