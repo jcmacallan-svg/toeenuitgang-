@@ -388,6 +388,29 @@ function speakVisitor(text){
         slot.row.hidden = true;
         continue;
       }
+function initChatSlotsHidden(){
+  for (const slot of slotEls){
+    if (!slot) continue;
+
+    // Hide the whole row until it's actually used
+    if (slot.row) slot.row.hidden = true;
+
+    // Ensure avatar isn't visible (prevents empty circles)
+    if (slot.av){
+      slot.av.src = "";
+      slot.av.alt = "";
+      slot.av.style.display = "none";
+    }
+
+    // Clear text/meta
+    if (slot.txt){
+      slot.txt.classList.remove("typing");
+      slot.txt.textContent = "";
+      slot.txt.innerHTML = "";
+    }
+    if (slot.meta) slot.meta.textContent = "";
+  }
+}
 
       const msg = view[i];
       if (!msg) {
