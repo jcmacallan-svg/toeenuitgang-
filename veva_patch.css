@@ -1,10 +1,10 @@
-/* veva_patch.css (CLEAN)
-   - Visitor altijd LINKS
-   - Student altijd RECHTS
-   - Student bubble altijd BLAUW, visitor altijd LICHTGRIJS
-   - Max 4 bubbles zichtbaar (slot0..slot3)
-   - Layout: CONTENT boven/onder 50/50 (chat boven, ID+hint onder)
-   - ID card: volledig wit, groter, donkere tekst, geen full-width witte achtergrond
+/* veva_patch.css (CLEAN v2)
+   Fixes:
+   - Visitor altijd LINKS, Student altijd RECHTS (NO slot-based leakage)
+   - Kleuren per SIDE (visitor lichtgrijs, student blauw) altijd consistent
+   - Max 4 bubbles (slot0..slot3)
+   - Layout: 50/50 boven/onder (chat boven, ID+hint onder)
+   - ID card: volledig wit, groter, donkere tekst, geen full-width witte slab
 */
 
 /* ============ 0) Max 4 bubbles ============ */
@@ -41,7 +41,7 @@
   flex: 0 0 auto !important;
 }
 
-/* ============ 3) Alignment links/rechts ============ */
+/* ============ 3) ROW base ============ */
 .chatArea .msgRow{
   display: flex !important;
   align-items: flex-start !important;
@@ -50,23 +50,35 @@
   margin: 14px 0 !important;
 }
 
+/* ============================================================
+   3A) Alignment ONLY by JS speaker classes: .isVisitor/.isStudent
+   ============================================================ */
+
 /* Visitor links */
-.chatArea .msgRow.isVisitor,
-.chatArea .msgRow.visitor{
+.chatArea .msgRow.isVisitor{
   justify-content: flex-start !important;
   flex-direction: row !important;
 }
 
 /* Student rechts, avatar buiten (rechts) */
-.chatArea .msgRow.isStudent,
-.chatArea .msgRow.student{
+.chatArea .msgRow.isStudent{
   justify-content: flex-end !important;
   flex-direction: row !important;
 }
-.chatArea .msgRow.isStudent .avatar,
-.chatArea .msgRow.student .avatar{ order: 2 !important; }
-.chatArea .msgRow.isStudent .bubbleWrap,
-.chatArea .msgRow.student .bubbleWrap{ order: 1 !important; }
+.chatArea .msgRow.isStudent .avatar{ order: 2 !important; }
+.chatArea .msgRow.isStudent .bubbleWrap{ order: 1 !important; }
+
+/* Fallback (alleen als JS nog niets gezet heeft): gebruik de HTML class */
+.chatArea .msgRow:not(.isVisitor):not(.isStudent).visitor{
+  justify-content: flex-start !important;
+  flex-direction: row !important;
+}
+.chatArea .msgRow:not(.isVisitor):not(.isStudent).student{
+  justify-content: flex-end !important;
+  flex-direction: row !important;
+}
+.chatArea .msgRow:not(.isVisitor):not(.isStudent).student .avatar{ order: 2 !important; }
+.chatArea .msgRow:not(.isVisitor):not(.isStudent).student .bubbleWrap{ order: 1 !important; }
 
 /* bubbleWrap */
 .chatArea .msgRow .bubbleWrap{
@@ -74,18 +86,17 @@
   flex-direction: column !important;
   max-width: min(720px, 70%) !important;
 }
-.chatArea .msgRow.isStudent .bubbleWrap,
-.chatArea .msgRow.student .bubbleWrap{
+
+.chatArea .msgRow.isStudent .bubbleWrap{
   align-items: flex-end !important;
   text-align: right !important;
 }
-.chatArea .msgRow.isVisitor .bubbleWrap,
-.chatArea .msgRow.visitor .bubbleWrap{
+.chatArea .msgRow.isVisitor .bubbleWrap{
   align-items: flex-start !important;
   text-align: left !important;
 }
 
-/* Avatar iets groter en netjes */
+/* Avatar */
 .chatArea .msgRow .avatar{
   width: 56px !important;
   height: 56px !important;
@@ -94,7 +105,7 @@
   flex: 0 0 56px !important;
 }
 
-/* ============ 4) Kleuren altijd per side ============ */
+/* ============ 4) Colors ALWAYS by speaker (isVisitor/isStudent) ============ */
 :root{
   --studentBubble: #2f6fec;
   --studentText:   #ffffff;
@@ -102,34 +113,53 @@
   --visitorText:   #0b1220;
 }
 
-.chatArea .msgRow.isStudent .bubble,
-.chatArea .msgRow.student .bubble{
+.chatArea .msgRow.isStudent .bubble{
   background: var(--studentBubble) !important;
   color: var(--studentText) !important;
 }
-
-.chatArea .msgRow.isVisitor .bubble,
-.chatArea .msgRow.visitor .bubble{
+.chatArea .msgRow.isVisitor .bubble{
   background: var(--visitorBubble) !important;
   color: var(--visitorText) !important;
 }
 
-/* ============ 5) ID card wit, groter, geen witte slab ============ */
+/* Fallback colors only when no isVisitor/isStudent exists yet */
+.chatArea .msgRow:not(.isVisitor):not(.isStudent).student .bubble{
+  background: var(--studentBubble) !important;
+  color: var(--studentText) !important;
+}
+.chatArea .msgRow:not(.isVisitor):not(.isStudent).visitor .bubble{
+  background: var(--visitorBubble) !important;
+  color: var(--visitorText) !important;
+}
+
+/* ============ 5) ID card: hidden means REALLY hidden ============ */
+#idCardWrap[hidden]{ display:none !important; }
+
+/* wrapper */
 #idCardWrap, .idCardWrap{
   background: transparent !important;
   width: 100% !important;
   display: flex !important;
   justify-content: center !important;
+  align-items: center !important;
 }
 
-/* Card zelf */
+/* When visible, let it fill most of the bottom half */
+#idCardWrap:not([hidden]){
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+}
+
+/* Card zelf: groter (≈2x gevoel) */
 .idCard, .idCard.passport{
   background: #ffffff !important;
   color: #0b1220 !important;
-  width: min(600px, 95%) !important;
+  width: min(820px, 96%) !important;
+  height: min(420px, 92%) !important;
   border-radius: 14px !important;
   border: 1px solid rgba(0,0,0,0.12) !important;
   box-shadow: 0 10px 24px rgba(0,0,0,0.25) !important;
+  padding: 18px !important;
 }
 
 /* Geen grijze binnenpanelen */
@@ -141,33 +171,9 @@
 
 /* Photo */
 .idCard .idPhoto{
-  width: 120px !important;
-  height: 120px !important;
+  width: 140px !important;
+  height: 140px !important;
   object-fit: cover !important;
   border-radius: 10px !important;
   border: 2px solid rgba(11,18,32,0.12) !important;
-}
-/* Bottom area should let the card grow */
-#idSlot { display:flex; flex-direction:column; min-height:0; }
-
-/* When ID is visible: make the wrapper take all available height */
-#idCardWrap:not([hidden]) {
-  display:flex !important;
-  flex: 1 1 auto !important;
-  align-items: center !important;
-  justify-content: center !important;
-  min-height: 0 !important;
-}
-
-/* Make the ID card itself fill most of the bottom half */
-#idCardWrap:not([hidden]) .idCard {
-  width: min(820px, 96%) !important;
-  height: min(380px, 92%) !important;   /* bigger: roughly ~2x */
-  padding: 18px !important;
-}
-
-/* Ensure the ID photo scales nicely inside the bigger card */
-#idCardWrap:not([hidden]) .idPhoto {
-  width: 140px !important;
-  height: 140px !important;
 }
