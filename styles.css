@@ -558,3 +558,13 @@ body{
 .bubble, .msgBubble, .chatBubble {
   max-width: 70vw;
 }
+/* Center the chat stream dynamically */
+#chatStream, .chatStream, #chatList, .chatList, #chatArea, .chatArea {
+  width: min(1200px, calc(100% - 80px));
+  margin: 0 auto;
+}
+
+/* Zorg dat het hoofd-paneel zelf ook echt de ruimte pakt */
+#main, main, .main, #content, .content {
+  width: 100%;
+}
