@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>VEVA Trainer</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+  <!-- Top pills -->
+  <div class="topPills">
+    <div id="versionPill" class="pill">v—</div>
+    <div id="studentPill" class="pill">Student: —</div>
+    <div id="voiceStatus" class="pill">Voice: ready</div>
+  </div>
+
+  <div class="app">
+
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brandTitle">VEVA Checkpoint</div>
+        <div class="brandSub">Ingang/Uitgang Trainer</div>
+      </div>
+
+      <button id="btnReturn" class="sideBtn">Return</button>
+      <button id="btnPersonSearch" class="sideBtn">Go to Person Search</button>
+      <button id="btnSignIn" class="sideBtn">Go to sign-in office</button>
+      <button id="btnDeny" class="sideBtn danger">Deny entrance</button>
+      <button id="btnNewScenario" class="sideBtn">Start new scenario</button>
+      <button id="btnReset" class="sideBtn ghost">Reset</button>
+    </aside>
+
+    <!-- Main -->
+    <main class="main">
+      <div class="content">
+
+        <!-- 1) CHAT (top) -->
+        <section class="chatArea">
+          <div id="chatSlots" class="chatSlots">
+
+            <div id="slot0" class="chatRow" hidden>
+              <img id="slot0Avatar" class="avatar" alt="" />
+              <div class="bubble">
+                <div id="slot0Text"></div>
+                <div id="slot0Meta" class="meta"></div>
+              </div>
+            </div>
+
+            <div id="slot1" class="chatRow" hidden>
+              <img id="slot1Avatar" class="avatar" alt="" />
+              <div class="bubble">
+                <div id="slot1Text"></div>
+                <div id="slot1Meta" class="meta"></div>
+              </div>
+            </div>
+
+            <div id="slot2" class="chatRow" hidden>
+              <img id="slot2Avatar" class="avatar" alt="" />
+              <div class="bubble">
+                <div id="slot2Text"></div>
+                <div id="slot2Meta" class="meta"></div>
+              </div>
+            </div>
+
+            <div id="slot3" class="chatRow" hidden>
+              <img id="slot3Avatar" class="avatar" alt="" />
+              <div class="bubble">
+                <div id="slot3Text"></div>
+                <div id="slot3Meta" class="meta"></div>
+              </div>
+            </div>
+
+            <div id="slot4" class="chatRow" hidden>
+              <img id="slot4Avatar" class="avatar" alt="" />
+              <div class="bubble">
+                <div id="slot4Text"></div>
+                <div id="slot4Meta" class="meta"></div>
+              </div>
+            </div>
+
+            <div id="slot5" class="chatRow" hidden>
+              <img id="slot5Avatar" class="avatar" alt="" />
+              <div class="bubble">
+                <div id="slot5Text"></div>
+                <div id="slot5Meta" class="meta"></div>
+              </div>
+            </div>
+
+          </div>
+        </section>
+
+        <!-- 2) PORTRAIT + MOOD + ID PANEL -->
+        <section class="idSlot">
+          <div class="portraitAndId">
+            <div class="portraitBlock">
+              <img id="portraitPhoto" class="portraitPhoto" alt="Visitor portrait" />
+              <div id="portraitMood" class="portraitMood"></div>
+            </div>
+
+            <!-- TRAINING ID CARD (FICTIONAL) -->
+            <div id="idCardWrap" class="trainerIdCard" hidden>
+              <div class="idTop">
+                <div class="idBrand">
+                  <div class="idTitle">VEVA Visitor Credential</div>
+                  <div class="idSub">TRAINING USE ONLY · NOT A REAL DOCUMENT</div>
+                </div>
+                <div class="idMeta">
+                  <div class="pill">LEVEL: <span id="idLevel">STANDARD</span></div>
+                  <div class="pill">SCENARIO: <span id="idScenario">Checkpoint</span></div>
+                </div>
+              </div>
+
+              <div class="idBody">
+                <div class="idPhotoWrap">
+                  <img id="idPhoto" class="idPhoto2" alt="ID photo" />
+                  <div class="idWatermark">FICTIONAL</div>
+                </div>
+
+                <div class="idFields">
+                  <div class="row"><span class="k">Name</span><span id="idName" class="v"></span></div>
+                  <div class="row"><span class="k">Surname</span><span id="idSurname" class="v"></span></div>
+                  <div class="row"><span class="k">Date of birth</span><span id="idDob" class="v"></span></div>
+                  <div class="row"><span class="k">Nationality</span><span id="idNat" class="v"></span></div>
+                  <div class="row"><span class="k">Visitor ID</span><span id="idNo" class="v mono"></span></div>
+                </div>
+              </div>
+
+              <div class="idBottom">
+                <div class="barcode mono" id="idBarcode2">VEVA|…</div>
+                <div class="idFine">
+                  This credential is generated for training simulation purposes only.
+                </div>
+              </div>
+
+              <div class="idActions">
+                <button id="btnReturnId" type="button" class="sideBtn">Return ID</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 3) HINT BAND -->
+        <div id="hintBand" class="hintBand" hidden>
+          <div class="dividerLine"></div>
+          <div id="hintBandText" class="hintText"></div>
+          <div class="dividerLine"></div>
+        </div>
+
+        <!-- 4) INPUT BAR -->
+        <div class="inputBar">
+          <input id="textInput" type="text" placeholder="Type or speak your English…" />
+          <button id="holdToTalk" type="button">Hold</button>
+          <button id="btnSend" type="button">Send</button>
+        </div>
+
+      </div>
+    </main>
+  </div>
+
+  <!-- Supervisor modal -->
+  <div id="supervisorModal" class="modal" hidden>
+    <div class="modalCard">
+      <div class="modalHeader">
+        <div class="modalTitle">Supervisor Check — 5W/H</div>
+        <button id="btnCloseSupervisor" class="modalClose" type="button">✕</button>
+      </div>
+
+      <div class="modalGrid">
+        <label>
+          Who is at the gate?
+          <input id="svWhy" type="text" />
+          <div id="svWhyStatus" class="status"></div>
+        </label>
+
+        <label>
+          Do they have an appointment? (yes/no)
+          <input id="svAppt" type="text" />
+          <div id="svApptStatus" class="status"></div>
+        </label>
+
+        <label>
+          With whom?
+          <input id="svWho" type="text" />
+          <div id="svWhoStatus" class="status"></div>
+        </label>
+
+        <label>
+          What time?
+          <input id="svTime" type="text" placeholder="HH:MM" />
+          <div id="svTimeStatus" class="status"></div>
+        </label>
+
+        <label class="span2">
+          What is it about?
+          <input id="svAbout" type="text" />
+          <div id="svAboutStatus" class="status"></div>
+        </label>
+      </div>
+
+      <div id="svNote" class="note"></div>
+
+      <div class="modalActions">
+        <button id="btnReturnToVisitor" type="button" class="sideBtn ghost">Return to visitor</button>
+        <button id="btnSupervisorCheck" type="button" class="sideBtn">Send to supervisor</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Login modal -->
+  <div id="loginModal" class="modal" hidden>
+    <div class="modalCard loginCard">
+      <div class="modalTitle">Start training</div>
+
+      <label>Surname
+        <input id="studentSurname" type="text" />
+      </label>
+
+      <label>Group
+        <select id="studentGroup">
+          <option value="">Select…</option>
+          <option>Alpha</option>
+          <option>Bravo</option>
+        </select>
+      </label>
+
+      <label>Difficulty
+        <select id="studentDifficulty">
+          <option value="basic">Basic</option>
+          <option value="standard" selected>Standard</option>
+          <option value="advanced">Advanced</option>
+        </select>
+      </label>
+
+      <div id="loginError" style="display:none">Please fill surname + group.</div>
+      <button id="btnStartTraining" type="button" class="primaryBtn">Start</button>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
