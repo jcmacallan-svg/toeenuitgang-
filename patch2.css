@@ -1,0 +1,50 @@
+/* veva-miniPatch-v6-verticalSplit.css */
+/* Goal: split CONTENT area top/bottom 50/50 (chat on top, ID+hint bottom) */
+
+.content{
+  /* Zorg dat dit element echt de beschikbare hoogte pakt */
+  height: 100%;
+  min-height: 0;
+
+  display: flex;
+  flex-direction: column;
+}
+
+/* Chat boven: neemt 50% van de ruimte (excl. inputbar) */
+.chatArea{
+  flex: 1 1 0;
+  min-height: 0;
+  overflow: auto;
+
+  /* Belangrijk: niet “centeren”; gewoon normaal links in het content vlak */
+  justify-content: flex-start;
+}
+
+/* ID + hint onder: neemt ook 50% van de ruimte (excl. inputbar) */
+.idSlot{
+  flex: 1 1 0;
+  min-height: 0;
+  overflow: auto;
+
+  /* Houd dezelfde achtergrond als de app; geen “witte strook” */
+  background: transparent;
+}
+
+/* Inputbar altijd onderaan, vaste hoogte */
+.inputBar{
+  flex: 0 0 auto;
+  margin-top: 0;
+}
+
+/* Als je eerdere patches een links-rechts grid/flex op idSlot zetten:
+   forceer dat idSlot intern weer normaal (stacked) blijft */
+.idSlot .portraitAndId{
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* Hintband onderin netjes zichtbaar */
+.hintBand{
+  margin-top: 10px;
+}
