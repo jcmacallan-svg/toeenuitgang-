@@ -2459,7 +2459,7 @@
     loginModal.hidden = true;
 
     // NEW: unlock visitor TTS after user gesture
-    primeTTS();
+    if (typeof primeTTS === "function") primeTTS();
 
     resetScenario();
     textInput.focus();
