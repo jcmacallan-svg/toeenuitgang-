@@ -1014,3 +1014,73 @@ body{
 
 /* Zorg dat de modal weg is als hidden */
 #loginModal[hidden] { display: none !important; }
+/* ============================
+   CHAT INPUT BAR ALWAYS BOTTOM
+   ============================ */
+
+/* 1) Zorg dat de rechter main content een kolom layout is */
+#app,
+.app,
+.main,
+#main,
+#content,
+#mainContent {
+  /* Alleen effect als jouw main container één van deze selectors matcht.
+     Als je precies weet welke container de chat + input bevat, zet hem daar. */
+}
+
+/* Kies 1 echte container die jouw chat + input bevat en zet dáár dit op: */
+#mainContent, #content, .mainContent, .content {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;          /* of 100% als parent al 100vh is */
+  min-height: 0;          /* belangrijk voor flex scroll */
+}
+
+/* 2) Chatlog moet kunnen scrollen en alle ruimte pakken */
+#chatArea, #chat, #chatLog, .chatArea, .chatLog {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-bottom: 84px;   /* ruimte voor input bar zodat bubbles niet erachter vallen */
+}
+
+/* 3) Input bar blijft onderaan in beeld */
+#inputBar, #chatInputBar, #composer, .inputBar, .chatInputBar, .composer {
+  flex: 0 0 auto;
+  position: sticky;       /* blijft aan onderkant van de scroll-container */
+  bottom: 0;
+  z-index: 50;
+
+  /* achtergrond zodat hij niet “doorzichtig” over chat heen ligt */
+  background: rgba(10, 20, 36, 0.92);
+  backdrop-filter: blur(6px);
+
+  border-top: 1px solid rgba(90, 140, 220, 0.18);
+  padding: 10px 12px;
+}
+
+/* 4) Als jouw input bar niet sticky “pakt”, gebruik fixed (fallback)
+   -> Alleen gebruiken als sticky niet werkt, anders weglaten. */
+/*
+#inputBar, #chatInputBar, #composer, .inputBar, .chatInputBar, .composer {
+  position: fixed;
+  left: var(--sidebarW, 340px);
+  right: 0;
+  bottom: 0;
+}
+#chatArea, #chat, #chatLog, .chatArea, .chatLog {
+  padding-bottom: 96px;
+}
+*/
+
+/* 5) Maak input zelf netjes */
+#textInput {
+  width: 100%;
+}
+
+/* Optioneel: buttons netjes */
+#holdToTalk, #btnSend {
+  white-space: nowrap;
+}
