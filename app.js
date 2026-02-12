@@ -48,6 +48,14 @@
   const textInput = $("#textInput");
   const btnSend = $("#btnSend");
 
+  function setInputEnabled(on){
+    const enabled = !!on;
+    if (textInput) textInput.disabled = !enabled;
+    if (btnSend) btnSend.disabled = !enabled;
+    if (holdToTalk) holdToTalk.disabled = !enabled;
+  }
+
+
   // Portrait UI
   const portraitPhoto = $("#portraitPhoto");
   const portraitMood = $("#portraitMood");
@@ -434,6 +442,8 @@
   const VISITOR_REPLY_DELAY_MS = 900;
   const _visitorQueue = [];
   let _visitorTimer = null;
+  let _approachTimer = null;
+
 
   function enqueueVisitor(text){
     const t = String(text || "").trim();
@@ -627,6 +637,10 @@
     syncVisitorAvatars();
 
     history.length = 0;
+    _visitorQueue.length = 0;
+    if (_visitorTimer){ clearTimeout(_visitorTimer); _visitorTimer = null; }
+    if (_approachTimer){ clearTimeout(_approachTimer); _approachTimer = null; }
+
 
     state = {
       stage: "start",
@@ -645,14 +659,37 @@
     updateHintBand(true);
     syncTrainingIdCard();
 
-    // EXACTLY one bubble at start
-    pushVisitor(visitorLine("greeting"));
+    // Approach cue: give the student a moment to observe before the first "Hello".
+    setInputEnabled(false);
+
+    if (portraitMood){
+      portraitMood.textContent = "A visitor is walking up to the checkpoint…";
+      portraitMood.style.display = "";
+    }
+
+    state.stage = "approach";
+    renderHistory(); // ensure no bubbles/avatars are visible yet
+
+    _approachTimer = setTimeout(() => {
+      _approachTimer = null;
+      if (!state || state.stage !== "approach") return;
+
+      // Restore the real mood line and start the dialogue.
+      syncMoodUI();
+      state.stage = "start";
+      setInputEnabled(true);
+      pushVisitor(visitorLine("greeting"));
+      try { textInput?.focus(); } catch {}
+    }, 5000);
   }
 
   // -------- Dialogue --------
   function handleStudent(raw){
     const clean = String(raw || "").trim();
     if (!clean || !state || state.stage === "ended") return;
+
+    // During the "approach" cue (before the first hello), ignore input to keep the UI clean.
+    if (state.stage === "approach") return;
 
     pushStudent(clean);
 
