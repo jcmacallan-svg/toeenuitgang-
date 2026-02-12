@@ -226,3 +226,108 @@
 
 /* Safety: if a bubble is truly empty, hide the whole row (best-effort). */
 .msgRow .bubble:empty { display:none !important; }
+
+/* v7.4.12 PATCH v3
+   Fixes student/right alignment bug introduced by row-reverse + flex-end.
+   Also flips visual flow so NEWEST (slot0) appears at the BOTTOM (chat flows top→bottom).
+
+   What this assumes:
+   - app.js toggles .isVisitor / .isStudent on each .msgRow (it does in your code)
+   - your rows have the structure: .msgRow > img.avatar + .bubbleWrap
+*/
+
+/* ===== 0) Flow direction: newest at bottom ===== */
+/* app.js currently renders newest into #slot0. By reversing the visual order of children,
+   #slot0 will be displayed at the bottom, so the conversation grows downward. */
+#chatArea.chatArea{
+  display:flex;
+  flex-direction:column-reverse;
+}
+
+/* ===== 1) Base row layout ===== */
+.chatArea .msgRow{
+  display:flex;
+  align-items:flex-start;
+  gap:14px;
+  margin:18px 0;
+  width:100%;
+}
+
+/* ===== 2) Visitor ALWAYS left (avatar outside/left) ===== */
+.chatArea .msgRow.isVisitor,
+.chatArea .msgRow.visitor:not(.isVisitor):not(.isStudent){
+  justify-content:flex-start !important;
+  flex-direction:row !important;
+  text-align:left;
+}
+
+/* ===== 3) Student/Soldier ALWAYS right (avatar outside/right) ===== */
+/* IMPORTANT: do NOT use row-reverse here, because justify-content:flex-end would then
+   push content visually to the left. Instead we keep row, and reorder the avatar. */
+.chatArea .msgRow.isStudent,
+.chatArea .msgRow.student:not(.isVisitor):not(.isStudent){
+  justify-content:flex-end !important;
+  flex-direction:row !important;
+  text-align:left; /* keep bubble text readable */
+}
+
+/* Put avatar on the outside (right edge) for student rows */
+.chatArea .msgRow.isStudent .avatar,
+.chatArea .msgRow.student:not(.isVisitor):not(.isStudent) .avatar{
+  order:2;
+}
+.chatArea .msgRow.isStudent .bubbleWrap,
+.chatArea .msgRow.student:not(.isVisitor):not(.isStudent) .bubbleWrap{
+  order:1;
+}
+
+/* ===== 4) Avatar sizing (match bubble height better) ===== */
+.chatArea .msgRow .avatar{
+  width:56px;
+  height:56px;
+  border-radius:999px;
+  object-fit:cover;
+  flex:0 0 56px;
+}
+
+/* ===== 5) Bubble sizing ===== */
+.chatArea .msgRow .bubbleWrap{
+  max-width:min(720px, 70%);
+}
+
+.chatArea .msgRow .bubble{
+  word-wrap:break-word;
+  overflow-wrap:anywhere;
+}
+
+/* ===== 6) ID card: full white interior + dark text ===== */
+#idCardWrap .idCard,
+#idCardWrap .idCard.passport{
+  background:#ffffff !important;
+  color:#0b1220 !important;
+  border:1px solid rgba(0,0,0,0.14) !important;
+  box-shadow:0 12px 30px rgba(0,0,0,0.22) !important;
+}
+
+#idCardWrap .idPhotoWrap{
+  background:#ffffff !important;
+}
+
+#idCardWrap .idFields{
+  background:transparent !important;
+}
+
+#idCardWrap .idRow .k{
+  color:rgba(11,18,32,0.65) !important;
+}
+
+#idCardWrap .idRow span:not(.k){
+  color:#0b1220 !important;
+  font-weight:700;
+}
+
+#idCardWrap .idStamps .stamp{
+  background:rgba(11,18,32,0.06) !important;
+  border:1px solid rgba(11,18,32,0.25) !important;
+  color:#0b1220 !important;
+}
