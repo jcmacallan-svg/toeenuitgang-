@@ -58,7 +58,7 @@
   const idDob = $("#idDob");
   const idNat = $("#idNat");
   const idNo = $("#idNo");
-const hintBand = $("#hintBand");
+  const hintBand = $("#hintBand");
   const hintBandText = $("#hintBandText");
 
   // Supervisor modal
@@ -114,41 +114,44 @@ const hintBand = $("#hintBand");
       .replace(/\s+/g, " ")
       .trim();
   }
-// ---------- Visitor TTS ----------
-let VISITOR_TTS_ENABLED = true;
-let _ttsReady = false;
 
-function primeTTS(){
-  try{
-    if (!("speechSynthesis" in window)) return;
-    window.speechSynthesis.cancel();
-    window.speechSynthesis.resume?.();
-    const u = new SpeechSynthesisUtterance(" ");
-    u.volume = 0;
-    u.lang = "en-GB";
-    window.speechSynthesis.speak(u);
-    window.speechSynthesis.cancel();
-    _ttsReady = true;
-  }catch{}
-}
+  // ---------- Visitor TTS (NEW) ----------
+  let VISITOR_TTS_ENABLED = true;
+  let _ttsReady = false;
 
-function speakVisitor(text){
-  try{
-    if (!VISITOR_TTS_ENABLED) return;
-    if (!("speechSynthesis" in window)) return;
-    if (!_ttsReady) return;
-    const t = String(text||"").trim();
-    if (!t) return;
+  function primeTTS(){
+    // Unlock speech synthesis after user gesture (Start button)
+    try{
+      if (!("speechSynthesis" in window)) return;
+      window.speechSynthesis.cancel();
+      window.speechSynthesis.resume?.();
+      const u = new SpeechSynthesisUtterance(" ");
+      u.volume = 0;
+      u.lang = "en-GB";
+      window.speechSynthesis.speak(u);
+      window.speechSynthesis.cancel();
+      _ttsReady = true;
+    }catch{}
+  }
 
-    window.speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(t);
-    u.lang = "en-GB";
-    u.rate = 1.0;
-    u.pitch = 1.0;
-    u.volume = 1.0;
-    window.speechSynthesis.speak(u);
-  }catch{}
-}
+  function speakVisitor(text){
+    try{
+      if (!VISITOR_TTS_ENABLED) return;
+      if (!("speechSynthesis" in window)) return;
+      if (!_ttsReady) return;
+
+      const t = String(text||"").trim();
+      if (!t) return;
+
+      window.speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(t);
+      u.lang = "en-GB";
+      u.rate = 1.0;
+      u.pitch = 1.0;
+      u.volume = 1.0;
+      window.speechSynthesis.speak(u);
+    }catch{}
+  }
 
   // ---------- Session ----------
   const STUDENT_KEY = "veva.student.v2";
@@ -174,10 +177,14 @@ function speakVisitor(text){
     return `${ASSET_BASE}/${HEADSHOT_PREFIX}${pad2(index)}.png`;
   }
 
+  function pick(arr){
+    if (!Array.isArray(arr) || !arr.length) return "";
+    return arr[Math.floor(Math.random() * arr.length)];
+  }
+
   function makeRandomId(){
     const idx = randInt(1, HEADSHOT_COUNT);
-    // Simple gender heuristic based on the headshot index (lets us keep names consistent
-    // without needing separate metadata).
+    // Simple gender heuristic based on the headshot index
     const gender = (idx % 2 === 0) ? "female" : "male";
     const FIRST = {
       male:   ["Liam","Noah","James","Oliver","Lucas","Milan","Daan","Sem","Jayden","Finn"],
@@ -219,10 +226,12 @@ function speakVisitor(text){
     if (portraitPhoto) portraitPhoto.src = ID_DATA.photoSrc;
   }
 
+  let state = null;
+
   function showId(){
     if (!idCardWrap) return;
-    // `state` only exists after Start; keep this safe during boot/login.
     if (!state || !state.visitor) return;
+
     idName.textContent = state.visitor.name;
     if (idSurname) idSurname.textContent = state.visitor.last || "";
     idDob.textContent  = state.visitor.dob;
@@ -237,9 +246,7 @@ function speakVisitor(text){
 
   function hideId(){
     if (idCardWrap) idCardWrap.hidden = true;
-    // hideId() is also called during boot, before `state` exists.
     if (state) state.idVisible = false;
-    // updateHintBand reads `state`, so call it only once state is present.
     if (state) updateHintBand(true);
   }
 
@@ -258,9 +265,8 @@ function speakVisitor(text){
   }
 
   // ---------- Chat ladder ----------
-  // Keep last 4 messages (V,S,V,S). Oldest 2 are faded via CSS.
-  
   let history = []; // { side:'visitor'|'student', text:'', meta:'' }
+
   // ---------- Hint band ----------
   function shouldShowHints(){
     return (session?.difficulty || "standard") !== "advanced";
@@ -286,7 +292,6 @@ function speakVisitor(text){
       hintBand.hidden = true;
       return;
     }
-    // In "standard" difficulty, show hints after a couple misses. In "basic", always show.
     const diff = (session?.difficulty || "standard");
     const canShow = force || diff === "basic" || (diff === "standard" && (state?.misses || 0) >= 2);
 
@@ -305,8 +310,6 @@ function speakVisitor(text){
   }
 
   function getNextHint(){
-    // Fixed intake order requested by you:
-    // 1) name, 2) purpose, 3) appointment, 4) who, 5) time, 6) about, then ID.
     const f = state?.facts || {};
     if (state?.stage === "greet") return 'Say: “Good morning. How can I help you?”';
     if (state?.stage === "help")  return 'Ask: “What do you need?”';
@@ -325,17 +328,9 @@ function speakVisitor(text){
     return "Continue the procedure.";
   }
 
-  function applySlotSide(rowEl, side){
-    if (!rowEl) return;
-    // Visitor should be LEFT, Student (soldier) should be RIGHT
-    rowEl.classList.toggle("left", side === "visitor");
-    rowEl.classList.toggle("right", side === "student");
-  }
-
   function renderHistory(){
     const slots = slotEls;
 
-    // Newest at top. Optionally prepend a typing indicator.
     let view = history.slice(0, MAX_SLOTS);
 
     const typingMsg = (state && state.typing && state.typing.visitor) ? { side: "visitor", typing: true }
@@ -358,21 +353,12 @@ function speakVisitor(text){
       }
 
       rowEl.hidden = false;
+      rowEl.classList.toggle("isVisitor", msg.side === "visitor");
+      rowEl.classList.toggle("isStudent", msg.side === "student");
 
-// 1) Speaker flags (already used by your CSS)
-rowEl.classList.toggle("isVisitor", msg.side === "visitor");
-rowEl.classList.toggle("isStudent", msg.side === "student");
-
-// 2) IMPORTANT: overwrite the *static* slot classes so CSS can never mis-style a row.
-//    This prevents “everything moves right” when a visitor message lands in a row
-//    that was originally class="student" in the HTML (slot1/slot3/slot5).
-rowEl.classList.remove("visitor", "student");
-rowEl.classList.add(msg.side === "visitor" ? "visitor" : "student");
-
-// 3) Optional: keep these if you still use them somewhere
-rowEl.classList.toggle("left", msg.side === "visitor");
-rowEl.classList.toggle("right", msg.side === "student");
-
+      // Side alignment (visitor LEFT, student RIGHT)
+      rowEl.classList.toggle("left", msg.side === "visitor");
+      rowEl.classList.toggle("right", msg.side === "student");
 
       // Avatar
       if (slot.av){
@@ -395,16 +381,18 @@ rowEl.classList.toggle("right", msg.side === "student");
     }
   }
 
-
   function pushVisitor(text){
     history.unshift({ side:"visitor", text:String(text||"").trim() });
     history = history.slice(0, MAX_SLOTS);
     state.misses = 0;
     renderHistory();
     updateHintBand();
+
+    // NEW: speak visitor out loud
+    speakVisitor(text);
   }
 
-  // Add a small delay to visitor replies to feel more natural.
+  // Add a small delay to visitor replies
   const VISITOR_REPLY_DELAY_MS = 2000;
   const _visitorQueue = [];
   let _visitorQueueBusy = false;
@@ -439,7 +427,6 @@ rowEl.classList.toggle("right", msg.side === "student");
     }, VISITOR_REPLY_DELAY_MS);
   }
 
-
   function pushStudent(text){
     if (state && state.typing) state.typing.student = false;
     history.unshift({ side:"student", text:String(text||"").trim() });
@@ -449,7 +436,7 @@ rowEl.classList.toggle("right", msg.side === "student");
     updateHintBand();
   }
 
-  // ---------- Meeting time (system clock + 17..23 min) ----------
+  // ---------- Meeting time ----------
   function getMeetingTimeHHMM(){
     state.facts = state.facts || {};
     if (state.facts.meetingTime && /^\d{2}:\d{2}$/.test(state.facts.meetingTime)) return state.facts.meetingTime;
@@ -462,12 +449,7 @@ rowEl.classList.toggle("right", msg.side === "student");
     return hhmm;
   }
 
-  // ---------- Visitor lines (mood-aware, at least 5 variants per block) ----------
-  function pick(arr){
-    if (!Array.isArray(arr) || !arr.length) return "";
-    return arr[Math.floor(Math.random() * arr.length)];
-  }
-
+  // ---------- Visitor lines (existing mood-aware system) ----------
   function moodPool(pools){
     const k = currentMood.key;
     if (k === "relaxed") return pools.relaxed || pools.neutral || pools.nervous;
@@ -475,12 +457,6 @@ rowEl.classList.toggle("right", msg.side === "student");
     if (k === "mixed") return pools.mixed || pools.neutral || pools.nervous;
     if (k === "nervous") return pools.nervous || pools.mixed || pools.neutral;
     return pools.neutral || pools.mixed || pools.nervous;
-  }
-
-  function visitorLine(key){
-    const pools = VISITOR[key];
-    if (!pools) return "Okay.";
-    return pick(moodPool(pools));
   }
 
   function maybeLie(truth, lie){
@@ -556,17 +532,96 @@ rowEl.classList.toggle("right", msg.side === "student");
     }
   };
 
-  // Ensure function pools return strings
   function resolveMaybeFn(v){
     return (typeof v === "function") ? String(v() || "").trim() : String(v || "").trim();
   }
-  // Patch visitorLine to resolve functions
+
   function visitorLineResolved(key){
     const pools = VISITOR[key];
     if (!pools) return "Okay.";
     const raw = pick(moodPool(pools));
     const out = resolveMaybeFn(raw);
     return out || "Okay.";
+  }
+
+  // ---------- Person Search Patch helpers (NEW) ----------
+  function psBand(){
+    const key = currentMood?.key || "neutral";
+    const fn = window.PS_PATCH?.bandFromMoodKey;
+    return (typeof fn === "function") ? fn(key) : "cautious";
+  }
+
+  function psPickAnswer(intentKey, ctx={}){
+    const qa = window.PS_PATCH?.QA?.[intentKey];
+    if (!qa) return "Okay.";
+    const band = psBand();
+    const arr = qa[band] || qa.cautious || [];
+    let line = pick(arr);
+
+    if (ctx.meetingTime) line = line.replace(/\{meetingTime\}/g, ctx.meetingTime);
+    return String(line || "Okay.").trim();
+  }
+
+  function handlePersonSearch(clean, intent){
+    state.ps = state.ps || { name:false, dob:false, id:false };
+    const meetingTime = getMeetingTimeHHMM();
+
+    if (intent === "ask_name"){
+      state.ps.name = true;
+      enqueueVisitor(psPickAnswer("ask_name", { meetingTime }));
+      return;
+    }
+    if (intent === "spell_last_name"){
+      state.ps.name = true;
+      enqueueVisitor(psPickAnswer("spell_last_name", { meetingTime }));
+      return;
+    }
+    if (intent === "dob_q"){
+      state.ps.dob = true;
+      enqueueVisitor(psPickAnswer("dob_q", { meetingTime }));
+      return;
+    }
+    if (intent === "nat_q"){
+      enqueueVisitor(psPickAnswer("nat_q", { meetingTime }));
+      return;
+    }
+    if (intent === "ask_id"){
+      state.ps.id = true;
+      showId();
+      enqueueVisitor(psPickAnswer("ask_id", { meetingTime }));
+      return;
+    }
+    if (intent === "purpose"){
+      enqueueVisitor(psPickAnswer("purpose", { meetingTime }));
+      return;
+    }
+    if (intent === "has_appointment"){
+      enqueueVisitor(psPickAnswer("has_appointment", { meetingTime }));
+      return;
+    }
+    if (intent === "who_meeting"){
+      enqueueVisitor(psPickAnswer("who_meeting", { meetingTime }));
+      return;
+    }
+    if (intent === "time_meeting"){
+      state.facts.meetingTime = meetingTime;
+      enqueueVisitor(psPickAnswer("time_meeting", { meetingTime }));
+      return;
+    }
+    if (intent === "about_meeting"){
+      enqueueVisitor(psPickAnswer("about_meeting", { meetingTime }));
+      return;
+    }
+
+    // Route to sign-in via speech
+    if (intent === "go_sign_in"){
+      enqueueVisitor(psPickAnswer("ps_direct_signin", { meetingTime }));
+      pushVisitor("Sign-in office (placeholder).");
+      state.stage = "start";
+      return;
+    }
+
+    nudge('Try: “Surname and date of birth, please.”');
   }
 
   // ---------- Intents ----------
@@ -577,7 +632,7 @@ rowEl.classList.toggle("right", msg.side === "student");
     { key:"has_appointment", rx:/\b(do\s+you\s+have\s+an\s+appointment|do\s+you\s+have\s+a\s+meeting|have\s+you\s+got\s+an\s+appointment|have\s+you\s+got\s+a\s+meeting|is\s+your\s+visit\s+scheduled)\b/i },
 
     { key:"ask_name", rx:/\b(who\s+are\s+you|what\s+is\s+your\s+name|may\s+i\s+have\s+your\s+name|your\s+name\s*,?\s+please)\b/i },
-        { key:"who_meeting", rx:/\b(who\s+are\s+you\s+(meeting|seeing|talking\s+to)(\s+with)?|who\s+do\s+you\s+have\s+an?\s+(appointment|meeting)\s+with|with\s+whom\s+do\s+you\s+have\s+an\s+appointment)\b/i },
+    { key:"who_meeting", rx:/\b(who\s+are\s+you\s+(meeting|seeing|talking\s+to)(\s+with)?|who\s+do\s+you\s+have\s+an?\s+(appointment|meeting)\s+with|with\s+whom\s+do\s+you\s+have\s+an\s+appointment)\b/i },
     { key:"time_meeting", rx:/\b(what\s+time\s+is\s+(the\s+)?(appointment|meeting)|when\s+is\s+(the\s+)?(appointment|meeting)|when\s+are\s+you\s+expected|what\s+time\s+are\s+you\s+expected)\b/i },
     { key:"about_meeting", rx:/\b(what\s+is\s+(the\s+)?(appointment|meeting)\s+about|can\s+you\s+tell\s+me\s+(a\s+little\s+bit\s+more|more)\s+about\s+the\s+(appointment|meeting)|tell\s+me\s+more\s+about\s+the\s+(appointment|meeting)|what\s+are\s+you\s+delivering)\b/i },
     { key:"ask_id", rx:/\b(do\s+you\s+have\s+(an\s+)?id|have\s+you\s+got\s+id|can\s+i\s+see\s+your\s+id|may\s+i\s+see\s+your\s+id|show\s+me\s+your\s+id|id\s+please|identity\s+card|passport)\b/i },
@@ -592,9 +647,10 @@ rowEl.classList.toggle("right", msg.side === "student");
     { key:"due_threat", rx:/\b(due\s+to\s+(an?\s+)?(increased\s+threat|heightened\s+security|security\s+reasons)|heightened\s+security)\b/i },
     { key:"illegal_items", rx:/\b(do\s+you\s+have\s+any\s+illegal\s+items|anything\s+illegal|contraband|prohibited\s+items)\b/i },
     { key:"illegal_clarify", rx:/\b(weapons?|drugs?|alcohol|knife|gun)\b/i },
-    { key:"go_person_search", rx:/\b(let\'?s\s+go\s+to\s+(the\s+)?person\s+search|go\s+to\s+person\s+search)\b/i }
-    { key:"go_sign_in", rx:/\b(go\s+to\s+(the\s+)?sign[\s-]*in(\s+office)?|go\s+to\s+reception|sign[\s-]*in\s+office)\b/i },
+    { key:"go_person_search", rx:/\b(let\'?s\s+go\s+to\s+(the\s+)?person\s+search|go\s+to\s+person\s+search)\b/i },
 
+    // NEW: sign-in routing via speech
+    { key:"go_sign_in", rx:/\b(go\s+to\s+(the\s+)?sign[\s-]*in(\s+office)?|go\s+to\s+reception|sign[\s-]*in\s+office)\b/i }
   ];
 
   function detectIntent(text){
@@ -604,9 +660,6 @@ rowEl.classList.toggle("right", msg.side === "student");
     }
     return "unknown";
   }
-
-  // ---------- State machine ----------
-  let state = null;
 
   function resetScenario(){
     currentMood = MOODS[randInt(0, MOODS.length - 1)];
@@ -623,19 +676,18 @@ rowEl.classList.toggle("right", msg.side === "student");
       idChecked: false,
       moodLine: currentMood.line,
       visitor: { ...ID_DATA },
-      facts: { name:"", purpose:"", appt:"", who:"", time:"", about:"" }
+      facts: { name:"", purpose:"", appt:"", who:"", time:"", about:"" },
+      ps: null
     };
 
-    // Initial visitor line
     pushVisitor("Hello.");
 
-    // Ensure all visitor portraits show the correct headshot.
     syncVisitorAvatars();
     hideId();
     updateHintBand(true);
   }
 
-function spellLastName(){
+  function spellLastName(){
     const full = (ID_DATA && ID_DATA.name) ? String(ID_DATA.name) : "Miller";
     const parts = full.trim().split(/\s+/).filter(Boolean);
     const ln = parts.length ? parts[parts.length-1] : full;
@@ -644,7 +696,6 @@ function spellLastName(){
   }
 
   function noteMismatchNat(){
-    // If the student confronts, visitor gives an excuse.
     return visitorLineResolved("nat_excuse");
   }
 
@@ -698,7 +749,6 @@ function spellLastName(){
       time: normalize(svTime.value)
     };
 
-    // Empty is allowed but should show NO (red cross) so user sees they forgot.
     const whyOk   = entered.why ? (expected.why ? entered.why.includes(expected.why) : true) : false;
     const apptOk  = entered.appt ? (expected.appt ? entered.appt === expected.appt : true) : false;
     const whoOk   = entered.who ? (expected.who ? entered.who.includes(expected.who) : true) : false;
@@ -729,6 +779,7 @@ function spellLastName(){
 
     pushStudent(clean);
     const intent = detectIntent(clean);
+
     // Track progress for hinting (intake order)
     if (intent === "ask_name") state.facts.name = state.visitor.name;
     if (intent === "purpose") state.facts.purpose = "known";
@@ -740,7 +791,6 @@ function spellLastName(){
 
     // Deny flow
     if (state.stage === "deny_reason"){
-      // Any non-empty reason ends it.
       enqueueVisitor("Okay. I understand.");
       endConversation();
       return;
@@ -762,6 +812,12 @@ function spellLastName(){
       return;
     }
 
+    // NEW: Person Search module routing
+    if (state.stage && String(state.stage).startsWith("ps_")){
+      handlePersonSearch(clean, intent);
+      return;
+    }
+
     // Stages
     switch(state.stage){
       case "start":
@@ -770,7 +826,6 @@ function spellLastName(){
           enqueueVisitor(visitorLineResolved("need_help"));
           return;
         }
-        // allow help_open as well
         if (intent === "help_open"){
           state.stage = "purpose";
           state.facts.why = "I need to get onto the base.";
@@ -800,7 +855,8 @@ function spellLastName(){
           enqueueVisitor("I have an appointment on base.");
           return;
         }
-        if (intent === "has_appointment"){ if (state && state.facts) state.facts.apptAsked = true;
+        if (intent === "has_appointment"){
+          if (state && state.facts) state.facts.apptAsked = true;
           state.facts.appt = "yes";
           enqueueVisitor(visitorLineResolved("appointment_yes"));
           return;
@@ -850,7 +906,6 @@ function spellLastName(){
           enqueueVisitor("I already gave you my ID.");
           return;
         }
-        // Move on when supervisor was called
         nudge("Try a control question, or contact your supervisor.");
         return;
 
@@ -908,7 +963,6 @@ function spellLastName(){
       case "direction":
         if (intent === "go_person_search"){
           enqueueVisitor("Okay.");
-          // placeholder screen switch later
           return;
         }
         nudge("Try: “Let’s go to the person search.”");
@@ -922,11 +976,9 @@ function spellLastName(){
 
   function endConversation(){
     state.stage = "ended";
-    // Disable inputs
     textInput.disabled = true;
     btnSend.disabled = true;
     holdToTalk.disabled = true;
-    // Leave deny button usable for now
   }
 
   // ---------- Sidebar buttons ----------
@@ -936,7 +988,6 @@ function spellLastName(){
   });
 
   btnNewScenario.addEventListener("click", () => {
-    // Keep student session, restart scenario
     textInput.disabled = false;
     btnSend.disabled = false;
     holdToTalk.disabled = false;
@@ -944,7 +995,6 @@ function spellLastName(){
   });
 
   btnReset.addEventListener("click", () => {
-    // Back to login
     loginModal.hidden = false;
     textInput.disabled = false;
     btnSend.disabled = false;
@@ -956,38 +1006,47 @@ function spellLastName(){
     textInput.value = "";
   });
 
-  // Placeholders
+  // Placeholders (Return and Sign-in remain placeholder for now)
   btnReturn.addEventListener("click", () => pushVisitor("Return (placeholder)."));
-  btnPersonSearch.addEventListener("click", () => pushVisitor("Person search (placeholder)."));
+
+  // NEW: start Person Search module instead of placeholder
+  btnPersonSearch.addEventListener("click", () => {
+    if (!state || state.stage === "ended") return;
+    state.stage = "ps_start";
+    state.ps = { name:false, dob:false, id:false };
+    enqueueVisitor("Person search. Please ask for my surname and date of birth.");
+    if (hintBand) hintBand.hidden = false;
+    setHintText('Ask: “Can I have your surname, please?”');
+  });
+
   btnSignIn.addEventListener("click", () => pushVisitor("Sign-in office (placeholder)."));
 
-// ---------- Input ----------
-btnSend.addEventListener("click", () => {
-  if (!state || state.stage === "ended") return;
-  const t = (textInput.value || "").trim();
-  textInput.value = "";
-  if (state && state.typing) state.typing.student = false;
-  renderHistory();
-  handleStudent(t);
-});
+  // ---------- Input ----------
+  btnSend.addEventListener("click", () => {
+    if (!state || state.stage === "ended") return;
+    const t = (textInput.value || "").trim();
+    textInput.value = "";
+    if (state && state.typing) state.typing.student = false;
+    renderHistory();
+    handleStudent(t);
+  });
 
-// Send on Enter
-// Push-to-talk (hold)
-holdToTalk.addEventListener("pointerdown", (e) => { e.preventDefault(); startListen(); });
-holdToTalk.addEventListener("pointerup", (e) => { e.preventDefault(); stopListen(); });
-holdToTalk.addEventListener("pointercancel", stopListen);
-holdToTalk.addEventListener("pointerleave", () => stopListen());
-// Show student typing dots while typing (or while speech is active)
-textInput.addEventListener("input", () => {
-  if (!state || !state.typing) return;
-  state.typing.student = !!(textInput.value || "").trim();
-  renderHistory();
-});
+  // Send on Enter
+  holdToTalk.addEventListener("pointerdown", (e) => { e.preventDefault(); startListen(); });
+  holdToTalk.addEventListener("pointerup", (e) => { e.preventDefault(); stopListen(); });
+  holdToTalk.addEventListener("pointercancel", stopListen);
+  holdToTalk.addEventListener("pointerleave", () => stopListen());
+
+  textInput.addEventListener("input", () => {
+    if (!state || !state.typing) return;
+    state.typing.student = !!(textInput.value || "").trim();
+    renderHistory();
+  });
+
   textInput.addEventListener("keydown", (e) => {
     if (e.key === "Enter") btnSend.click();
   });
 
-  // ID return button can be omitted in some layouts; guard to prevent boot failure.
   btnReturnId?.addEventListener("click", () => {
     hideId();
     pushVisitor(visitorLineResolved("thanks"));
@@ -1028,7 +1087,6 @@ textInput.addEventListener("input", () => {
     try{
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return true;
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      // Immediately stop; we only wanted to trigger the permission prompt.
       stream.getTracks().forEach(t => t.stop());
       return true;
     }catch(e){
@@ -1048,23 +1106,14 @@ textInput.addEventListener("input", () => {
         holdToTalk.disabled = true;
         holdToTalk.title = "SpeechRecognition not supported in this browser.";
       }
-      if (holdToTalk){
-        holdToTalk.disabled = true;
-        holdToTalk.title = "SpeechRecognition not supported in this browser.";
-      }
       return;
     }
 
-    // Secure context check: avoid permission-loop on file://
     const isLocalhost = (location.hostname === "localhost" || location.hostname === "127.0.0.1");
     const okContext = window.isSecureContext || location.protocol === "https:" || isLocalhost;
 
     if (!okContext){
       setVoiceStatusSafe("Voice: use https/localhost");
-      if (holdToTalk){
-        holdToTalk.disabled = true;
-        holdToTalk.title = "Voice requires https:// or http://localhost (not file://).";
-      }
       if (holdToTalk){
         holdToTalk.disabled = true;
         holdToTalk.title = "Voice requires https:// or http://localhost (not file://).";
@@ -1092,7 +1141,6 @@ textInput.addEventListener("input", () => {
     };
 
     recognition.onresult = (event) => {
-      // Put best-available transcript into the input (final preferred, interim as fallback).
       let finalText = "";
       let interimText = "";
       for (let i = event.resultIndex; i < event.results.length; i++){
@@ -1109,7 +1157,6 @@ textInput.addEventListener("input", () => {
     };
 
     recognition.onerror = (e) => {
-      // Typical errors: 'not-allowed', 'service-not-allowed', 'network', 'no-speech'
       const code = (e && (e.error || e.name)) ? String(e.error || e.name) : "error";
       console.warn("SpeechRecognition error:", code, e);
       isRecognizing = false;
@@ -1158,7 +1205,6 @@ textInput.addEventListener("input", () => {
       }
       recognition.start();
     } catch (err){
-      // Most common: NotAllowedError / NotSupportedError.
       console.warn("recognition.start() failed", err);
       setVoiceStatusSafe("Voice: blocked");
       voiceErrorHint("Voice start failed. Check mic permissions and that you're on https:// (or localhost)." );
@@ -1170,7 +1216,6 @@ textInput.addEventListener("input", () => {
     try { recognition.stop(); } catch {}
   }
 
-  // Use multiple event types for reliability across browsers.
   let _holdActive = false;
   function _holdStart(e){
     if (_holdActive) return;
@@ -1186,7 +1231,6 @@ textInput.addEventListener("input", () => {
   }
 
   if (holdToTalk){
-    // Fallbacks
     holdToTalk.addEventListener("mousedown", _holdStart);
     holdToTalk.addEventListener("mouseup", _holdEnd);
     holdToTalk.addEventListener("touchstart", _holdStart, { passive:false });
@@ -1211,10 +1255,13 @@ textInput.addEventListener("input", () => {
     updateStudentPill();
 
     loginModal.hidden = true;
+
+    // NEW: unlock visitor TTS after user gesture
+    primeTTS();
+
     resetScenario();
     textInput.focus();
   }
-primeTTS();
 
   btnStartTraining.addEventListener("click", tryStart);
   studentSurnameInput.addEventListener("keydown", (e) => { if (e.key === "Enter") tryStart(); });
@@ -1233,6 +1280,4 @@ primeTTS();
   setupSpeech();
   loginModal.hidden = false;
   renderHistory();
-  speakVisitor(text);
-
 })();
