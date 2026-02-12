@@ -147,3 +147,27 @@
   border-radius: 10px !important;
   border: 2px solid rgba(11,18,32,0.12) !important;
 }
+/* Bottom area should let the card grow */
+#idSlot { display:flex; flex-direction:column; min-height:0; }
+
+/* When ID is visible: make the wrapper take all available height */
+#idCardWrap:not([hidden]) {
+  display:flex !important;
+  flex: 1 1 auto !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-height: 0 !important;
+}
+
+/* Make the ID card itself fill most of the bottom half */
+#idCardWrap:not([hidden]) .idCard {
+  width: min(820px, 96%) !important;
+  height: min(380px, 92%) !important;   /* bigger: roughly ~2x */
+  padding: 18px !important;
+}
+
+/* Ensure the ID photo scales nicely inside the bigger card */
+#idCardWrap:not([hidden]) .idPhoto {
+  width: 140px !important;
+  height: 140px !important;
+}
