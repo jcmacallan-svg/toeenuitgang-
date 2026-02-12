@@ -1,0 +1,149 @@
+/* veva_patch.css (CLEAN)
+   - Visitor altijd LINKS
+   - Student altijd RECHTS
+   - Student bubble altijd BLAUW, visitor altijd LICHTGRIJS
+   - Max 4 bubbles zichtbaar (slot0..slot3)
+   - Layout: CONTENT boven/onder 50/50 (chat boven, ID+hint onder)
+   - ID card: volledig wit, groter, donkere tekst, geen full-width witte achtergrond
+*/
+
+/* ============ 0) Max 4 bubbles ============ */
+#slot4, #slot5 { display: none !important; }
+
+/* ============ 1) Respect hidden attribute (geen lege rows bij start) ============ */
+.msgRow[hidden], [hidden] { display: none !important; }
+
+/* ============ 2) Vertical split (boven/onder 50/50) ============ */
+.content{
+  height: 100%;
+  min-height: 0;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+/* Chat boven */
+.chatArea{
+  flex: 1 1 0 !important;
+  min-height: 0 !important;
+  overflow: auto !important;
+}
+
+/* ID/hint onder */
+#idSlot, .idSlot{
+  flex: 1 1 0 !important;
+  min-height: 0 !important;
+  overflow: auto !important;
+  background: transparent !important;
+}
+
+/* Inputbar blijft onderaan */
+.inputBar{
+  flex: 0 0 auto !important;
+}
+
+/* ============ 3) Alignment links/rechts ============ */
+.chatArea .msgRow{
+  display: flex !important;
+  align-items: flex-start !important;
+  gap: 14px !important;
+  width: 100% !important;
+  margin: 14px 0 !important;
+}
+
+/* Visitor links */
+.chatArea .msgRow.isVisitor,
+.chatArea .msgRow.visitor{
+  justify-content: flex-start !important;
+  flex-direction: row !important;
+}
+
+/* Student rechts, avatar buiten (rechts) */
+.chatArea .msgRow.isStudent,
+.chatArea .msgRow.student{
+  justify-content: flex-end !important;
+  flex-direction: row !important;
+}
+.chatArea .msgRow.isStudent .avatar,
+.chatArea .msgRow.student .avatar{ order: 2 !important; }
+.chatArea .msgRow.isStudent .bubbleWrap,
+.chatArea .msgRow.student .bubbleWrap{ order: 1 !important; }
+
+/* bubbleWrap */
+.chatArea .msgRow .bubbleWrap{
+  display: flex !important;
+  flex-direction: column !important;
+  max-width: min(720px, 70%) !important;
+}
+.chatArea .msgRow.isStudent .bubbleWrap,
+.chatArea .msgRow.student .bubbleWrap{
+  align-items: flex-end !important;
+  text-align: right !important;
+}
+.chatArea .msgRow.isVisitor .bubbleWrap,
+.chatArea .msgRow.visitor .bubbleWrap{
+  align-items: flex-start !important;
+  text-align: left !important;
+}
+
+/* Avatar iets groter en netjes */
+.chatArea .msgRow .avatar{
+  width: 56px !important;
+  height: 56px !important;
+  border-radius: 999px !important;
+  object-fit: cover !important;
+  flex: 0 0 56px !important;
+}
+
+/* ============ 4) Kleuren altijd per side ============ */
+:root{
+  --studentBubble: #2f6fec;
+  --studentText:   #ffffff;
+  --visitorBubble: #e6e9ef;
+  --visitorText:   #0b1220;
+}
+
+.chatArea .msgRow.isStudent .bubble,
+.chatArea .msgRow.student .bubble{
+  background: var(--studentBubble) !important;
+  color: var(--studentText) !important;
+}
+
+.chatArea .msgRow.isVisitor .bubble,
+.chatArea .msgRow.visitor .bubble{
+  background: var(--visitorBubble) !important;
+  color: var(--visitorText) !important;
+}
+
+/* ============ 5) ID card wit, groter, geen witte slab ============ */
+#idCardWrap, .idCardWrap{
+  background: transparent !important;
+  width: 100% !important;
+  display: flex !important;
+  justify-content: center !important;
+}
+
+/* Card zelf */
+.idCard, .idCard.passport{
+  background: #ffffff !important;
+  color: #0b1220 !important;
+  width: min(600px, 95%) !important;
+  border-radius: 14px !important;
+  border: 1px solid rgba(0,0,0,0.12) !important;
+  box-shadow: 0 10px 24px rgba(0,0,0,0.25) !important;
+}
+
+/* Geen grijze binnenpanelen */
+.idCard *{ background-color: transparent !important; }
+
+/* Text */
+.idCard .idRow, .idCard .idFields{ color:#0b1220 !important; }
+.idCard .idRow .k{ color: rgba(11,18,32,0.65) !important; font-weight: 700 !important; }
+
+/* Photo */
+.idCard .idPhoto{
+  width: 120px !important;
+  height: 120px !important;
+  object-fit: cover !important;
+  border-radius: 10px !important;
+  border: 2px solid rgba(11,18,32,0.12) !important;
+}
