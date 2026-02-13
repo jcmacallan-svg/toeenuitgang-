@@ -613,6 +613,28 @@
 
     const intent = detectIntent(clean);
 
+    // ---- Global 5W: name should ALWAYS be answerable (fix for "who are you?") ----
+    // Students often ask the name early. Previously, some stages didn't handle ask_name,
+    // which made the visitor dodge unintentionally. We answer consistently.
+    if (intent === "ask_name"){
+      // Progress tracking
+      state.facts = state.facts || {};
+      state.facts.name = state.visitor?.name || "known";
+
+      const q = clean.toLowerCase();
+      const first = state.visitor?.first || (state.visitor?.name || "").split(/\s+/)[0] || "";
+      const last  = state.visitor?.last  || "";
+      const full  = state.visitor?.name  || [first, last].filter(Boolean).join(" ");
+
+      // If they explicitly ask for FULL name / surname, give full; otherwise just first name.
+      if (/\b(full\s+name|surname|last\s+name)\b/i.test(q)){
+        enqueueVisitor(full ? `My name is ${full}.` : "My name is on the ID.");
+      } else {
+        enqueueVisitor(first ? `My first name is ${first}.` : "My name is on the ID.");
+      }
+      return;
+    }
+
     // Debug info
     setDebugPill(`Intent: ${intent} · Stage: ${state.stage}`);
 
