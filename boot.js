@@ -1,5 +1,5 @@
 // boot.js
-window.BUILD = { version: "7.4.16", name: "VEVA Ingang/Uitgang Trainer", date: "2026-02-13" };
+window.BUILD = { version: "7.4.14", name: "VEVA Ingang/Uitgang Trainer", date: "2026-02-13" };
 
 (function () {
   var qp = new URLSearchParams(location.search);

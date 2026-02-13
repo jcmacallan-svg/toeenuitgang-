@@ -196,13 +196,14 @@ window.PS_PATCH = {
       ]
     },
 
+    
     who_meeting: {
       cautious: [
-        "I’m meeting the duty officer.",
         "I’m meeting my contact at reception.",
-        "I’m meeting a staff member inside.",
-        "I’m here to see my contact.",
-        "I’m meeting the person listed on my email."
+        "I’m meeting {contactName}.",
+        "I’m expected by {contactName}.",
+        "I’m meeting a staff member inside — {contactName}.",
+        "I’m here to see {contactRank} {contactLast}."
       ],
       evasive: [
         "Someone inside.",
@@ -212,15 +213,27 @@ window.PS_PATCH = {
         "I don’t want to say names out loud."
       ],
       open: [
-        "I’m meeting my contact at reception.",
-        "I’m meeting the duty officer at reception.",
-        "I’m expected by my point of contact.",
-        "I’m meeting the staff member listed in my appointment.",
-        "I’m meeting my contact — I can show the email if needed."
+        "I’m meeting {contactName}.",
+        "I’m expected by {contactName}.",
+        "I have an appointment with {contactName}.",
+        "I’m here to see {contactRank} {contactLast}.",
+        "My point of contact is {contactName}."
       ]
     },
 
-    time_meeting: {
+    // If the student asks again and the visitor is evasive:
+    who_meeting_evasive2: {
+      cautious: [],
+      open: [],
+      evasive: [
+        "Uh… I think it’s {contactRank}. The name sounds like {contactLastAlt}… something like that.",
+        "I’m meeting a {contactRank}. The surname is… {contactLastAlt}? I’m not 100% sure.",
+        "{contactRank}. I can’t remember the exact spelling — maybe {contactLastAlt}.",
+        "It’s a {contactRank} at reception. The name sounds like {contactLastAlt}.",
+        "Look, I’m meeting a {contactRank}. I think the name is {contactLastAlt}."
+      ]
+    },
+time_meeting: {
       cautious: ["Soon.", "In a few minutes.", "At {meetingTime}.", "Around {meetingTime}.", "It’s scheduled for {meetingTime}."],
       evasive: ["I don’t know exactly.", "It’s on the email.", "I don’t have the time in my head.", "Can we just call my contact?", "I was told to come today."],
       open: ["At {meetingTime}.", "The appointment is at {meetingTime}.", "I’m expected at {meetingTime}.", "It’s scheduled for {meetingTime}.", "I’m due at {meetingTime}."]

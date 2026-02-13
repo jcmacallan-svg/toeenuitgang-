@@ -172,6 +172,36 @@
     };
   }
 
+  // -------- Appointment contact (POC) --------
+  function makeContact(){
+    const RANKS = ["Sergeant","Corporal","Lieutenant","Captain"];
+    const LASTS = ["Burke","Berk","Berg","de Vries","Jansen","Smit","Miller","Visser","Bos","van Dijk"];
+    const rank = pick(RANKS);
+    // Pick a base surname; for "sounds like" we generate 2 nearby variants
+    const baseLast = pick(LASTS);
+    const variants = Array.from(new Set([
+      baseLast,
+      baseLast.replace(/e/gi,"e"),
+      baseLast.replace(/e/gi,""),
+      baseLast.replace(/u/gi,"e"),
+      baseLast.replace(/k$/i,"ke"),
+      baseLast.replace(/ke$/i,"k"),
+      baseLast.replace(/g$/i,"k"),
+      baseLast.replace(/k$/i,"g"),
+    ])).filter(Boolean).slice(0,4);
+    const alt1 = variants[1] || baseLast;
+    const alt2 = variants[2] || alt1;
+    const lastAlt = (Math.random() < 0.5) ? alt1 : alt2;
+
+    return {
+      rank,
+      last: baseLast,
+      lastAlt,
+      full: `${rank} ${baseLast}`
+    };
+  }
+
+
   let ID_DATA = makeRandomId();
 
   function syncVisitorAvatars(){
@@ -224,6 +254,10 @@
       claimedName: claimed?.name || (v?.name || ""),
       claimedFirst: claimed?.first || (v?.first || ""),
       claimedLast: claimed?.last || (v?.last || ""),
+      contactName: v?.contact?.full || "",
+      contactRank: v?.contact?.rank || "",
+      contactLast: v?.contact?.last || "",
+      contactLastAlt: v?.contact?.lastAlt || (v?.contact?.last || ""),
     };
   }
 
@@ -236,11 +270,16 @@
 
   function pickBank(key, fallbackArr){
     const band = currentBand();
+    let useKey = key;
+    if (key === "who_meeting" && band === "evasive"){
+      const n = (state?.askCounts?.who_meeting) || 0;
+      if (n >= 2 && PS?.QA?.who_meeting_evasive2) useKey = "who_meeting_evasive2";
+    }
     const arr =
-      PS?.QA?.[key]?.[band] ||
-      PS?.QA?.[key]?.cautious ||
-      PS?.QA?.[key]?.open ||
-      PS?.QA?.[key]?.evasive ||
+      PS?.QA?.[useKey]?.[band] ||
+      PS?.QA?.[useKey]?.cautious ||
+      PS?.QA?.[useKey]?.open ||
+      PS?.QA?.[useKey]?.evasive ||
       fallbackArr;
 
     const line = pick(arr) || "";
@@ -499,7 +538,7 @@
     state.facts = state.facts || {};
     if (state.facts.meetingTime && /^\d{2}:\d{2}$/.test(state.facts.meetingTime)) return state.facts.meetingTime;
     const now = new Date();
-    const offsetMin = randInt(17, 23);
+    const offsetMin = randInt(15, 25);
     const dt = new Date(now.getTime() + offsetMin * 60 * 1000);
     const hhmm = `${pad2(dt.getHours())}:${pad2(dt.getMinutes())}`;
     state.facts.meetingTime = hhmm;
@@ -571,13 +610,14 @@
 
     state = {
       stage: "approach",
+      askCounts: {},
       misses: 0,
       askCounts: { purpose: 0 },
       typing: { visitor:false, student:false },
       contraband: { weapons:false, drugs:false, alcohol:false },
       idVisible: false,
       idChecked: false,
-      visitor: { ...ID_DATA },
+      visitor: { ...ID_DATA, contact: makeContact() },
       claimed: { name: ID_DATA.name, first: ID_DATA.first, last: ID_DATA.last },
       facts: { name:"", purpose:"", appt:"", who:"", time:"", about:"", meetingTime:"" }
     };
@@ -612,6 +652,12 @@
     pushStudent(clean);
 
     const intent = detectIntent(clean);
+
+    // Track how many times each intent/question was asked
+    state.askCounts = state.askCounts || {};
+    if (intent && intent !== "unknown"){
+      state.askCounts[intent] = (state.askCounts[intent] || 0) + 1;
+    }
 
     // ---- Global 5W: name should ALWAYS be answerable (fix for "who are you?") ----
     // Students often ask the name early. Previously, some stages didn't handle ask_name,
@@ -1101,8 +1147,11 @@ function setVoiceStatusSafe(text){
   history.length = 0;
   state = {
     stage: "idle",
+    askCounts: {},
+    askCounts: {},
+    askCounts: {},
     typing: { visitor:false, student:false },
-    visitor: { ...ID_DATA },
+    visitor: { ...ID_DATA, contact: makeContact() },
     claimed: { name: ID_DATA.name, first: ID_DATA.first, last: ID_DATA.last },
     facts: {},
     misses: 0,
