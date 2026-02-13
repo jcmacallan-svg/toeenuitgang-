@@ -247,6 +247,26 @@
     return resolvePlaceholders(line);
   }
 
+  function pickBankNonEvasive(key, fallbackList){
+    // For training flow: after insisting, avoid "evasive" answers for some keys (e.g., purpose)
+    try{
+      const patch = window.PS_PATCH;
+      const qa = patch?.QA?.[key];
+      if (!qa) return pick(fallbackList);
+      // Prefer cautious/open, skip evasive
+      const bandOrder = ["open","cautious"];
+      for (const band of bandOrder){
+        const arr = qa[band];
+        if (Array.isArray(arr) && arr.length){
+          return fillVars(pick(arr));
+        }
+      }
+      return fillVars(pick(qa.cautious || qa.open || qa.evasive || fallbackList));
+    }catch{
+      return pick(fallbackList);
+    }
+  }
+
   // -------- ID card show/hide --------
   let state = null;
 
@@ -552,6 +572,7 @@
     state = {
       stage: "approach",
       misses: 0,
+      askCounts: { purpose: 0 },
       typing: { visitor:false, student:false },
       contraband: { weapons:false, drugs:false, alcohol:false },
       idVisible: false,
@@ -635,7 +656,25 @@
 
       case "purpose":
         if (intent === "purpose"){
-          enqueueVisitor(pickBank("purpose", ["I have an appointment on base."]));
+          state.askCounts = state.askCounts || { purpose: 0 };
+          state.askCounts.purpose = (state.askCounts.purpose || 0) + 1;
+
+          // First answer may be evasive depending on mood; on 2nd ask we force a clear reason so training can continue.
+          if (state.askCounts.purpose >= 2){
+            state.facts.purpose = "known";
+            enqueueVisitor(pickBankNonEvasive("purpose", ["I have an appointment on base."]));
+          } else {
+            enqueueVisitor(pickBank("purpose", ["I have an appointment on base."]));
+          }
+          return;
+        }
+
+        // If student insists / gives an ultimatum, visitor will comply with a clear purpose
+        if (intent === "insist_reason" || intent === "ultimatum_reason"){
+          state.askCounts = state.askCounts || { purpose: 0 };
+          state.askCounts.purpose = Math.max(2, state.askCounts.purpose || 0);
+          state.facts.purpose = "known";
+          enqueueVisitor(pickBankNonEvasive("purpose", ["I have an appointment on base."]));
           return;
         }
         if (intent === "has_appointment"){
@@ -1044,7 +1083,8 @@ function setVoiceStatusSafe(text){
     visitor: { ...ID_DATA },
     claimed: { name: ID_DATA.name, first: ID_DATA.first, last: ID_DATA.last },
     facts: {},
-    misses: 0
+    misses: 0,
+    askCounts: { purpose: 0 }
   };
   renderHistory();
 
