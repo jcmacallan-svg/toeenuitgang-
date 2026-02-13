@@ -5,9 +5,6 @@
 (() => {
   "use strict";
 
-  // Helper: case-insensitive regex already uses /i, but keep patterns readable.
-  // We avoid \b issues by not relying solely on word boundaries.
-
   window.VEVA_INTENTS = [
     // -------------------------
     // Greeting / opening
@@ -18,7 +15,17 @@
     },
 
     // -------------------------
-    // 5W set (your preferred order in training)
+    // "How can I help you?" opener
+    // (Needed because app.js uses stage "help" -> expects help_open)
+    // Put this early so it doesn't get shadowed by purpose/appointment patterns.
+    // -------------------------
+    {
+      key: "help_open",
+      rx: /(?:^|[\s,!.?])(?:how\s+can\s+i\s+help(?:\s+you(?:\s+today)?)?|what\s+do\s+you\s+need|how\s+may\s+i\s+help|what\s+can\s+i\s+do\s+for\s+you|how\s+can\s+we\s+help)(?:$|[\s,!.?])/i
+    },
+
+    // -------------------------
+    // 5W set (training order)
     // 1) Who are you?
     // -------------------------
     {
