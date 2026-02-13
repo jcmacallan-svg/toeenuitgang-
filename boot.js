@@ -1,5 +1,5 @@
 // boot.js
-window.BUILD = { version: "7.4.14", name: "VEVA Ingang/Uitgang Trainer", date: "2026-02-13" };
+window.BUILD = { version: "7.4.15", name: "VEVA Ingang/Uitgang Trainer", date: "2026-02-13" };
 
 (function () {
   var qp = new URLSearchParams(location.search);
@@ -16,11 +16,13 @@ window.BUILD = { version: "7.4.14", name: "VEVA Ingang/Uitgang Trainer", date: "
   }
 
   load("config.js", function () {
-    // Phrasebank BEFORE app.js so window.PS_PATCH is ready immediately
-    load("phrasebank.js", function () {
-      load("app.js", function () {
-        // optional extra patches (safe if missing)
-        load("v7_4_12_patch_v2.js");
+    // Phrase bank (responses) + intent matchers are loaded BEFORE app.js
+    load("phrasebank.js", function(){
+      load("intents_patch_en.js", function () {
+        load("app.js", function () {
+          // Optional extra patches can load after app.js
+          load("v7_4_12_patch_v2.js");
+        });
       });
     });
   });
