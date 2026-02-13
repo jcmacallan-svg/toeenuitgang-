@@ -4,5 +4,6 @@ window.CONFIG = {
   assetBase: "assets/photos",
   headshotPrefix: "headshot_",
   headshotCount: 10,
-  voiceAutosend: true
+  voiceAutosend: true,
+  debug: true
 };

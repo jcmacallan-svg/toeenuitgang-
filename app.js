@@ -26,6 +26,7 @@
   const versionPill = $("#versionPill");
   const studentPill = $("#studentPill");
   const voiceStatus = $("#voiceStatus");
+  const debugPill = $("#debugPill");
 
   const loginModal = $("#loginModal");
   const studentSurnameInput = $("#studentSurname");
@@ -421,6 +422,7 @@
     history = history.slice(0, MAX_VISIBLE_BUBBLES);
     if (state) state.misses = 0;
     renderHistory();
+  setDebugPill(`Intent: — · Stage: ${state.stage}`);
     updateHintBand();
     speakVisitor(t);
   }
@@ -515,11 +517,11 @@
     { key:"purpose", rx:/\b(why\s+are\s+you\s+here|what\s+is\s+the\s+purpose|reason\s+for\s+your\s+visit)\b/i },
 
     // Appointment follow-ups (must be BEFORE "has_appointment")
-    { key:"who_meeting", rx:/\b(with\s+whom\s+do\s+you\s+have\s+an?\s+(appointment|meeting)|with\s+who(m)?\s+do\s+you\s+have\s+an?\s+(appointment|meeting)|who(m)?\s+is\s+your\s+(appointment|meeting)\s+with|who\s+are\s+you\s+(meeting|seeing)|who\s+do\s+you\s+have\s+an?\s+(appointment|meeting)\s+with)\b/i },
-    { key:"time_meeting", rx:/\b(what\s+time\s+is\s+(your|the)\s+(appointment|meeting)|when\s+is\s+(your|the)\s+(appointment|meeting))\b/i },
-    { key:"about_meeting", rx:/\b(what\s+is\s+(your|the)\s+(appointment|meeting)\s+about|what\s+is\s+(your|the)\s+meeting\s+about|what\s+are\s+you\s+delivering)\b/i },
+    { key:"who_meeting", rx:/\b(?:with\s+whom\s+(?:do\s+you\s+have|have\s+you\s+got)\s+an?\s+(?:appointment|meeting)|with\s+who(?:m)?\s+(?:do\s+you\s+have|have\s+you\s+got)\s+an?\s+(?:appointment|meeting)|who(?:m)?\s+is\s+(?:your|the)\s+(?:appointment|meeting)\s+with|who\s+is\s+(?:your|the)\s+(?:appointment|meeting)\s+with|who\s+are\s+you\s+meeting(?:\s+with)?|who\s+are\s+you\s+(?:meeting|seeing)|who\s+do\s+you\s+have\s+an?\s+(?:appointment|meeting)\s+with)\b/i },
+    { key:"time_meeting", rx:/\b(?:what\s+time\s+is\s+(?:your|the)\s+(?:appointment|meeting)|when\s+is\s+(?:your|the)\s+(?:appointment|meeting)|what\s+time\s+are\s+you\s+(?:expected|scheduled)|what\s+time\s+is\s+it)\b/i },
+    { key:"about_meeting", rx:/\b(?:what\s+is\s+(?:your|the)\s+(?:appointment|meeting)\s+about|what\s+is\s+(?:your|the)\s+meeting\s+about|what\s+is\s+it\s+about|what\s+is\s+the\s+meeting\s+for|what\s+are\s+you\s+here\s+for|what\s+are\s+you\s+delivering)\b/i },
 
-    { key:"has_appointment", rx:/\b(do\s+you\s+have\s+an\s+appointment|do\s+you\s+have\s+a\s+meeting|is\s+your\s+visit\s+scheduled)\b/i },
+    { key:"has_appointment", rx:/\b(?:do\s+you\s+have\s+(?:an?\s+)?(?:appointment|meeting)|have\s+you\s+got\s+(?:an?\s+)?(?:appointment|meeting)|is\s+your\s+visit\s+scheduled)\b/i },
 
     { key:"ask_id", rx:/\b(can\s+i\s+see\s+your\s+id|show\s+me\s+your\s+id|id\s+please|passport)\b/i },
     { key:"dob_q", rx:/\b(date\s+of\s+birth|dob|when\s+were\s+you\s+born)\b/i },
@@ -534,13 +536,28 @@
     { key:"go_person_search", rx:/\b(go\s+to\s+(the\s+)?person\s+search|person\s+search)\b/i },
   ];
 
-  function detectIntent(text){
-    const t = String(text || "");
-    for (const it of INTENTS){
-      if (it.rx.test(t)) return it.key;
-    }
-    return "unknown";
+  
+function detectIntent(text){
+  const raw = String(text || "");
+  const n = normalize(raw);
+
+  // Fast-path disambiguation (prevents "do you have an appointment" swallowing longer questions)
+  if (/with\s+who(m)?/.test(n) || /who\s+is\s+your\s+(appointment|meeting)\s+with/.test(n) || /who\s+are\s+you\s+(meeting|seeing)/.test(n)){
+    return "who_meeting";
   }
+  if (/what\s+time/.test(n) || /when\s+is\s+(the\s+)?(appointment|meeting)/.test(n)){
+    return "time_meeting";
+  }
+  if (/(what|why).*(appointment|meeting).*about/.test(n) || /what\s+are\s+you\s+(here\s+)?for/.test(n) || /what\s+is\s+the\s+purpose/.test(n)){
+    // leave detailed mapping to regex table below; but this nudges toward "about" instead of "appointment? yes/no"
+    // (will still match purpose/about_meeting as appropriate)
+  }
+
+  for (const it of INTENTS){
+    if (it.rx.test(raw)) return it.key;
+  }
+  return "unknown";
+}
 
   // -------- Scenario state --------
   function resetScenario(){
@@ -594,6 +611,9 @@
     pushStudent(clean);
 
     const intent = detectIntent(clean);
+
+    // Debug info
+    setDebugPill(`Intent: ${intent} · Stage: ${state.stage}`);
 
     // progress tracking (for hints)
     if (intent === "ask_name") state.facts.name = state.visitor.name;
@@ -810,7 +830,21 @@
   let recognition = null;
   let isRecognizing = false;
 
-  function setVoiceStatusSafe(text){
+  
+  // -------- Debug pill (intent/stage) --------
+  const DEBUG_ENABLED = (CFG.debug !== undefined) ? !!CFG.debug : true;
+
+  function setDebugPill(text){
+    if (!debugPill) return;
+    if (!DEBUG_ENABLED){
+      debugPill.hidden = true;
+      return;
+    }
+    debugPill.hidden = false;
+    debugPill.textContent = text || "Debug: —";
+  }
+
+function setVoiceStatusSafe(text){
     if (voiceStatus) voiceStatus.textContent = text;
   }
 
