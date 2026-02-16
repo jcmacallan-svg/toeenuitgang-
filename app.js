@@ -105,6 +105,22 @@
     if (!Array.isArray(arr) || !arr.length) return "";
     return arr[Math.floor(Math.random() * arr.length)];
   }
+  function fillVars(template){
+    const vars = {
+      name: state?.visitor?.name || ID_DATA?.name || "",
+      first: state?.visitor?.first || ID_DATA?.first || "",
+      last: state?.visitor?.last || ID_DATA?.last || "",
+      dob: state?.visitor?.dob || ID_DATA?.dob || "",
+      nat: state?.visitor?.nat || ID_DATA?.nat || "",
+      idNo: state?.visitor?.idNo || ID_DATA?.idNo || "",
+      meetingTime: (state?.facts?.meetingTime) || "",
+      claimedName: state?.claimed?.name || state?.visitor?.name || ID_DATA?.name || "",
+      claimedFirst: state?.claimed?.first || state?.visitor?.first || ID_DATA?.first || "",
+      claimedLast: state?.claimed?.last || state?.visitor?.last || ID_DATA?.last || ""
+    };
+    return String(template || "").replace(/\{(\w+)\}/g, (_,k)=> (vars[k]!==undefined ? String(vars[k]) : ""));
+  }
+
 
   function normalize(s){
     return String(s || "")
@@ -268,37 +284,51 @@
     });
   }
 
-  function pickBank(key, fallbackArr){
-    const band = currentBand();
-    let useKey = key;
-    if (key === "who_meeting" && band === "evasive"){
-      const n = (state?.askCounts?.who_meeting) || 0;
-      if (n >= 2 && PS?.QA?.who_meeting_evasive2) useKey = "who_meeting_evasive2";
+    function pickBank(key, fallbackArr, opts={}){
+    const bank = window.PS_PATCH?.QA?.[key];
+    if (!bank){
+      state._lastBankBand = null;
+      state._lastBankKey = null;
+      return pick(fallbackArr) || "Okay.";
     }
-    const arr =
-      PS?.QA?.[useKey]?.[band] ||
-      PS?.QA?.[useKey]?.cautious ||
-      PS?.QA?.[useKey]?.open ||
-      PS?.QA?.[useKey]?.evasive ||
-      fallbackArr;
 
-    const line = pick(arr) || "";
-    return resolvePlaceholders(line);
+    let band = window.PS_PATCH.bandFromMoodKey(currentMood?.key);
+    if (opts.forceNonEvasive && band === "evasive") band = "cautious";
+    if (opts.forceBand && bank[opts.forceBand]) band = opts.forceBand;
+
+    const arr = bank[band] || bank.cautious || bank.open || bank.evasive || [];
+    const line = pick(arr) || "Okay.";
+
+    state._lastBankBand = band;
+    state._lastBankKey = key;
+
+    return fillVars(line);
   }
 
-  function pickBankNonEvasive(key, fallbackList){
-    // For training flow: after insisting, avoid "evasive" answers for some keys (e.g., purpose)
-    try{
-      const patch = window.PS_PATCH;
-      const qa = patch?.QA?.[key];
-      if (!qa) return pick(fallbackList);
-      // Prefer cautious/open, skip evasive
-      const bandOrder = ["open","cautious"];
-      for (const band of bandOrder){
-        const arr = qa[band];
-        if (Array.isArray(arr) && arr.length){
-          return fillVars(pick(arr));
-        }
+  function pickBankNonEvasive(key, fallbackArr){
+    // If the mood maps to evasive, pick a non-evasive band so the training can always progress.
+    return pickBank(key, fallbackArr, { forceNonEvasive: true });
+  }
+
+  const PRESS_HINT_TEXT =
+    'Press for an answer: "I need an answer to that question, otherwise entry will be denied."';
+
+  function showPressHint(){
+    if (!hintBand || !shouldShowHints() || state?.idVisible) return;
+    if (state?._pressHintLock) return;
+    state._pressHintLock = true;
+    hintBand.hidden = false;
+    hintBand.style.display = "";
+    setHintText(PRESS_HINT_TEXT);
+  }
+
+  function clearPressHint(){
+    if (!hintBand) return;
+    if (!state?._pressHintLock) return;
+    state._pressHintLock = false;
+    updateHintBand();
+  }
+
       }
       return fillVars(pick(qa.cautious || qa.open || qa.evasive || fallbackList));
     }catch{
@@ -652,6 +682,41 @@
     pushStudent(clean);
 
     const intent = detectIntent(clean);
+    const QUESTION_INTENTS = new Set(["ask_name","purpose","has_appointment","who_meeting","time_meeting","about_meeting"]);
+    if (QUESTION_INTENTS.has(intent)) state.lastAsked = intent;
+
+    // If the visitor was evasive, the student can "press for an answer".
+    if (intent === "press_for_answer" || intent === "insist_reason" || intent === "ultimatum_reason"){
+      const map = {
+        ask_name: "ask_name",
+        purpose: "purpose",
+        has_appointment: "has_appointment_yes",
+        who_meeting: "who_meeting",
+        time_meeting: "time_meeting",
+        about_meeting: "about_meeting"
+      };
+      const key = map[state.lastEvasiveFor] || map[state.lastAsked] || null;
+      if (key){
+        const forced = pickBank(key, null, { forceBand: "open", forceNonEvasive: true });
+        enqueueVisitor(forced);
+
+        // Mark info as gathered so the hint logic progresses
+        if (state.lastAsked === "ask_name") state.facts.name = state.visitor.name;
+        if (state.lastAsked === "purpose") state.facts.purpose = "known";
+        if (state.lastAsked === "has_appointment") state.facts.appt = "yes";
+        if (state.lastAsked === "who_meeting") state.facts.who = "known";
+        if (state.lastAsked === "time_meeting") state.facts.time = "known";
+        if (state.lastAsked === "about_meeting") state.facts.about = "known";
+
+        state.lastEvasiveFor = null;
+        clearPressHint();
+        return;
+      }
+      enqueueVisitor("Understood.");
+      clearPressHint();
+      return;
+    }
+
 
     // Track how many times each intent/question was asked
     state.askCounts = state.askCounts || {};
@@ -703,7 +768,9 @@
         if (intent === "help_open"){
           state.stage = "purpose";
           state.facts.purpose = "pending";
-          enqueueVisitor(pickBank("purpose", VISITOR_FALLBACK.need_base));
+          const line = pickBank("purpose", VISITOR_FALLBACK.need_base);
+          enqueueVisitor(line);
+          if (state._lastBankBand === "evasive") { state.lastEvasiveFor = "purpose"; showPressHint(); } else { clearPressHint(); }
           return;
         }
         nudge("Try greeting first.");
@@ -712,7 +779,9 @@
       case "help":
         if (intent === "help_open"){
           state.stage = "purpose";
-          enqueueVisitor(pickBank("purpose", VISITOR_FALLBACK.need_base));
+          const line = pickBank("purpose", VISITOR_FALLBACK.need_base);
+          enqueueVisitor(line);
+          if (state._lastBankBand === "evasive") { state.lastEvasiveFor = "purpose"; showPressHint(); } else { clearPressHint(); }
           return;
         }
         if (intent === "greet"){
@@ -732,7 +801,9 @@
             state.facts.purpose = "known";
             enqueueVisitor(pickBankNonEvasive("purpose", ["I have an appointment on base."]));
           } else {
-            enqueueVisitor(pickBank("purpose", ["I have an appointment on base."]));
+            const line = pickBank("purpose", ["I have an appointment on base."]);
+          enqueueVisitor(line);
+          if (state._lastBankBand === "evasive") { state.lastEvasiveFor = "purpose"; showPressHint(); } else { clearPressHint(); }
           }
           return;
         }
@@ -747,27 +818,37 @@
         }
         if (intent === "has_appointment"){
           state.facts.appt = "yes";
-          enqueueVisitor(pickBank("has_appointment_yes", VISITOR_FALLBACK.appointment_yes));
+          const line = pickBank("has_appointment_yes", VISITOR_FALLBACK.appointment_yes);
+          enqueueVisitor(line);
+          if (state._lastBankBand === "evasive") { state.lastEvasiveFor = "has_appointment"; showPressHint(); } else { clearPressHint(); }
           return;
         }
         if (intent === "who_meeting"){
-          enqueueVisitor(pickBank("who_meeting", VISITOR_FALLBACK.who_meeting));
+          const line = pickBank("who_meeting", VISITOR_FALLBACK.who_meeting);
+          enqueueVisitor(line);
+          if (state._lastBankBand === "evasive") { state.lastEvasiveFor = "who_meeting"; showPressHint(); } else { clearPressHint(); }
           return;
         }
         if (intent === "time_meeting"){
           const t = getMeetingTimeHHMM();
           state.facts.meetingTime = t;
-          enqueueVisitor(pickBank("time_meeting", [`At ${t}.`]));
+          const line = pickBank("time_meeting", [`At ${t}.`]);
+          enqueueVisitor(line);
+          if (state._lastBankBand === "evasive") { state.lastEvasiveFor = "time_meeting"; showPressHint(); } else { clearPressHint(); }
           return;
         }
         if (intent === "about_meeting"){
-          enqueueVisitor(pickBank("about_meeting", VISITOR_FALLBACK.about_meeting));
+          const line = pickBank("about_meeting", VISITOR_FALLBACK.about_meeting);
+          enqueueVisitor(line);
+          if (state._lastBankBand === "evasive") { state.lastEvasiveFor = "about_meeting"; showPressHint(); } else { clearPressHint(); }
           return;
         }
         if (intent === "ask_id"){
           showId();
           state.stage = "control_q";
-          enqueueVisitor(pickBank("ask_id", ["Sure. Here you go."]));
+          const line = pickBank("ask_id", ["Sure. Here you go."]);
+          enqueueVisitor(line);
+          if (state._lastBankBand === "evasive") { state.lastEvasiveFor = "ask_id"; showPressHint(); } else { clearPressHint(); }
           return;
         }
         nudge("Try 5W questions, or ask for ID.");

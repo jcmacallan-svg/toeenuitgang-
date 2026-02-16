@@ -17,6 +17,8 @@ window.VEVA_INTENTS = [
     { key:"time_meeting", rx:/\b(?:what\s+time\s+is\s+(?:your|the)\s+(?:appointment|meeting)|when\s+is\s+(?:your|the)\s+(?:appointment|meeting)|what\s+time\s+are\s+you\s+(?:expected|scheduled)|what\s+time\s+is\s+it)\b/i },
     { key:"about_meeting", rx:/\b(?:what\s+is\s+(?:your|the)\s+(?:appointment|meeting)\s+about|what\s+is\s+(?:your|the)\s+meeting\s+about|what\s+is\s+it\s+about|what\s+is\s+the\s+meeting\s+for|what\s+are\s+you\s+here\s+for|what\s+are\s+you\s+delivering)\b/i },
 
+    { key:"press_for_answer", rx:/\b(?:answer\s+(?:my|the)\s+question|i\s+need\s+an\s+answer|you\s+(?:need|must)\s+answer|if\s+you\s+don'?t\s+answer|otherwise\s+i\s+will\s+deny\s+(?:your\s+)?entry|no\s+answer\s*,?\s*no\s+entry)\b/i },
+
     { key:"has_appointment", rx:/\b(?:do\s+you\s+have\s+(?:an?\s+)?(?:appointment|meeting)|have\s+you\s+got\s+(?:an?\s+)?(?:appointment|meeting)|is\s+your\s+visit\s+scheduled)\b/i },
 
     { key:"ask_id", rx:/\b(can\s+i\s+see\s+your\s+id|show\s+me\s+your\s+id|id\s+please|passport)\b/i },
