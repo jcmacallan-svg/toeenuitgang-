@@ -296,7 +296,7 @@
     if (opts.forceNonEvasive && band === "evasive") band = "cautious";
     if (opts.forceBand && bank[opts.forceBand]) band = opts.forceBand;
 
-    const arr = bank[band] || bank.cautious || bank.open || bank.evasive || [];
+   const arr = bank[band] || bank.cautious || bank.open || bank.evasive || [];
     const line = pick(arr) || "Okay.";
 
     state._lastBankBand = band;
@@ -353,6 +353,10 @@
     idCardWrap.hidden = false;
     idCardWrap.style.display = "";
     state.idVisible = true;
+
+    if (hintBand) hintBand.hidden = true;
+  }
+
 
     if (hintBand) hintBand.hidden = true;
   }
