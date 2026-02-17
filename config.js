@@ -11,7 +11,7 @@ window.CONFIG = {
   // Set logEndpoint to your deployed Apps Script Web App URL.
   // Example: "https://script.google.com/macros/s/AKfycb.../exec"
   logEnabled: false,
-  logEndpoint: "",
+  logEndpoint: "https://script.google.com/macros/s/AKfycbxACQ3xg43B-zHm2x3jX0B3Q9Cqf5cs4CSJtejdMKHZ4nKksQ7C2i_pVuapOWaA66gu/exec",
 
   // If true, send a single POST per event. If false, events are buffered
   // and flushed in small batches.
