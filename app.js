@@ -8,6 +8,18 @@
   const CFG = window.CONFIG || {};
   const BUILD = window.BUILD || { version: "dev", name: "VEVA Trainer", date: "" };
 
+  // -------- Logging --------
+  // The logger is provided by logger.js (loaded in boot.js). If no endpoint is configured,
+  // events are buffered locally.
+  const LOGGER = window.VEVA_LOGGER || null;
+
+  function logEvent(type, data){
+    try{
+      if (!LOGGER || !LOGGER.enabled || !LOGGER.enabled()) return;
+      LOGGER.logEvent(Object.assign({ type }, (data || {})));
+    }catch{}
+  }
+
   const ASSET_BASE = CFG.assetBase || "assets/photos";
   const HEADSHOT_PREFIX = CFG.headshotPrefix || "headshot_";
   const HEADSHOT_COUNT = Number(CFG.headshotCount || 10);
@@ -102,6 +114,11 @@
       state.supervisorOpen = true;
     }
 
+    logEvent("supervisor_open", {
+      stageFrom: state?._stageBeforeSupervisor || null,
+      visitorId: state?.visitor?.idNo || null
+    });
+
 
     supervisorModal.style.display = "";
 
@@ -142,6 +159,11 @@
       state.stage = state._stageBeforeSupervisor || "purpose";
       state._stageBeforeSupervisor = null;
     }
+
+    logEvent("supervisor_close", {
+      stageTo: state?.stage || null,
+      visitorId: state?.visitor?.idNo || null
+    });
     updateHintBand(true);
   }
 
@@ -577,9 +599,17 @@
   setDebugPill(`Intent: — · Stage: ${state.stage}`);
     updateHintBand();
     speakVisitor(t);
+
+    logEvent("chat_visitor", {
+      text: t,
+      stage: state?.stage,
+      intentKey: state?._lastBankKey || null,
+      bankBand: state?._lastBankBand || null,
+      visitorId: state?.visitor?.idNo || null
+    });
   }
 
-  function pushStudent(text){
+  function pushStudent(text, meta={}){
     const t = String(text || "").trim();
     if (!t) return;
     if (state?.typing) state.typing.student = false;
@@ -588,6 +618,13 @@
     if (state) state.misses = 0;
     renderHistory();
     updateHintBand();
+
+    logEvent("chat_student", {
+      text: t,
+      stage: state?.stage,
+      intentKey: meta.intent || null,
+      visitorId: state?.visitor?.idNo || null
+    });
   }
 
   // Visitor delayed replies with typing dots
@@ -715,6 +752,13 @@
       facts: { name:"", purpose:"", appt:"", who:"", time:"", about:"", meetingTime:"" }
     };
 
+    logEvent("scenario_reset", {
+      mood: currentMood?.key,
+      visitorId: state?.visitor?.idNo,
+      visitorNat: state?.visitor?.nat,
+      stage: state?.stage
+    });
+
     hideId();
     updateHintBand(true);
 
@@ -746,9 +790,8 @@
     if (state.stage === "supervisor") return;
 
 
-    pushStudent(clean);
-
     const intent = detectIntent(clean);
+    pushStudent(clean, { intent });
 
     // Open the Supervisor Check (5W/H) modal
     if (intent === "contact_supervisor"){
@@ -1068,6 +1111,20 @@
   });
   btnSupervisorCheck?.addEventListener("click", () => {
     // Student submits the 5W/H summary. We don't validate here; it's a training aid.
+    const payload = {
+      why: (svWhy?.value || "").trim(),
+      appt: (svAppt?.value || "").trim(),
+      who: (svWho?.value || "").trim(),
+      time: (svTime?.value || "").trim(),
+      about: (svAbout?.value || "").trim(),
+      stageFrom: state?._stageBeforeSupervisor || state?.stage || null,
+      visitorId: state?.visitor?.idNo || null,
+      studentSurname: session?.surname || "",
+      studentGroup: session?.group || "",
+      difficulty: session?.difficulty || ""
+    };
+    logEvent("supervisor_report", payload);
+
     closeSupervisorModal();
     // Friendly acknowledgement to keep the scenario moving.
     enqueueVisitor("Okay — please wait here.");
