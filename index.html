@@ -144,6 +144,60 @@
               </div>
             </div>
           </div>
+    <!-- INLINE SUPERVISOR PANEL (replaces modal) -->
+    <div id="supervisorPanel" class="supervisorPanel" hidden>
+      <div class="supHeader">
+        <div class="supTitle">Supervisor Check — 5W/H</div>
+        <div class="supSub">Fill in the details you will report to your supervisor.</div>
+      </div>
+
+      <div class="supGrid">
+        <div class="supPhotoBlock">
+          <img id="supervisorPhoto" class="supPhoto" alt="Supervisor" />
+          <div class="supCaption">Supervisor</div>
+        </div>
+
+        <div class="supForm">
+          <label>
+            Who is at the gate?
+            <input id="svWhy" type="text" />
+            <div id="svWhyStatus" class="status"></div>
+          </label>
+
+          <label>
+            Do they have an appointment? (yes/no)
+            <input id="svAppt" type="text" />
+            <div id="svApptStatus" class="status"></div>
+          </label>
+
+          <label>
+            With whom?
+            <input id="svWho" type="text" />
+            <div id="svWhoStatus" class="status"></div>
+          </label>
+
+          <label>
+            What time?
+            <input id="svTime" type="text" placeholder="HH:MM" />
+            <div id="svTimeStatus" class="status"></div>
+          </label>
+
+          <label class="span2">
+            What is it about?
+            <input id="svAbout" type="text" />
+            <div id="svAboutStatus" class="status"></div>
+          </label>
+
+          <div id="svNote" class="note"></div>
+
+          <div class="supActions">
+            <button id="btnReturnToVisitor" type="button" class="sideBtn ghost">Back to visitor</button>
+            <button id="btnSupervisorCheck" type="button" class="sideBtn primary">Send to supervisor</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
         </section>
 
         <!-- 3) HINT BAND (small band ABOVE input) -->
@@ -162,55 +216,6 @@
 
       </div>
     </main>
-  </div>
-
-  <!-- Supervisor modal -->
-  <div id="supervisorModal" class="modal" hidden>
-    <div class="modalCard">
-      <div class="modalHeader">
-        <div class="modalTitle">Supervisor Check — 5W/H</div>
-        <button id="btnCloseSupervisor" class="modalClose" type="button">✕</button>
-      </div>
-
-      <div class="modalGrid">
-        <label>
-          Who is at the gate?
-          <input id="svWhy" type="text" />
-          <div id="svWhyStatus" class="status"></div>
-        </label>
-
-        <label>
-          Do they have an appointment? (yes/no)
-          <input id="svAppt" type="text" />
-          <div id="svApptStatus" class="status"></div>
-        </label>
-
-        <label>
-          With whom?
-          <input id="svWho" type="text" />
-          <div id="svWhoStatus" class="status"></div>
-        </label>
-
-        <label>
-          What time?
-          <input id="svTime" type="text" placeholder="HH:MM" />
-          <div id="svTimeStatus" class="status"></div>
-        </label>
-
-        <label class="span2">
-          What is it about?
-          <input id="svAbout" type="text" />
-          <div id="svAboutStatus" class="status"></div>
-        </label>
-      </div>
-
-      <div id="svNote" class="note"></div>
-
-      <div class="modalActions">
-        <button id="btnReturnToVisitor" type="button">Return to visitor</button>
-        <button id="btnSupervisorCheck" type="button" class="primary">Send to supervisor</button>
-      </div>
-    </div>
   </div>
 
   <!-- Login modal -->

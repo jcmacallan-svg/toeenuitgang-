@@ -64,7 +64,8 @@
   const hintBandText = $("#hintBandText");
 
   // Supervisor modal (optional)
-  const supervisorModal = $("#supervisorModal");
+  const supervisorModal = $("#supervisorPanel");
+  const supervisorPhoto = $("#supervisorPhoto");
   const btnCloseSupervisor = $("#btnCloseSupervisor");
   const btnSupervisorCheck = $("#btnSupervisorCheck");
   const btnReturnToVisitor = $("#btnReturnToVisitor");
@@ -79,6 +80,70 @@
   const svAboutStatus = $("#svAboutStatus");
   const svTimeStatus = $("#svTimeStatus");
   const svNote = $("#svNote");
+
+  // -------- Supervisor modal helpers --------
+  function _clearEl(el){ if (el) el.textContent = ""; }
+
+  function openSupervisorModal(){
+    if (!supervisorModal) return;
+    supervisorModal.hidden = false;
+    // Inline panel: show supervisor photo
+    if (supervisorPhoto){
+      const v = String(window.__ASSET_VER__ || "");
+      supervisorPhoto.src = `${ASSET_BASE}/soldier2.png${v ? ("?v=" + encodeURIComponent(v)) : ""}`;
+    }
+    // While the panel is open, disable chat input
+    if (textInput) textInput.disabled = true;
+    if (btnSend) btnSend.disabled = true;
+    if (holdToTalk) holdToTalk.disabled = true;
+    if (state){
+      state._stageBeforeSupervisor = state.stage;
+      state.stage = "supervisor";
+      state.supervisorOpen = true;
+    }
+
+
+    supervisorModal.style.display = "";
+
+    // reset fields
+    if (svWhy) svWhy.value = "";
+    if (svAppt) svAppt.value = "";
+    if (svWho) svWho.value = "";
+    if (svTime) svTime.value = "";
+    if (svAbout) svAbout.value = "";
+    _clearEl(svWhyStatus);
+    _clearEl(svApptStatus);
+    _clearEl(svWhoStatus);
+    _clearEl(svTimeStatus);
+    _clearEl(svAboutStatus);
+
+    if (svNote) svNote.textContent = "Fill in the 5W/H. Use short, clear answers.";
+
+    // keep a return point so the flow doesn't get stuck
+    if (state && !state._stageBeforeSupervisor) state._stageBeforeSupervisor = state.stage;
+    if (state) state.stage = "supervisor";
+
+    // focus
+    setTimeout(() => { try{ svWhy?.focus?.(); }catch{} }, 0);
+  }
+
+  function closeSupervisorModal(){
+    if (!supervisorModal) return;
+    supervisorModal.hidden = true;
+    supervisorModal.style.display = "none";
+    // Re-enable chat input
+    if (textInput) textInput.disabled = false;
+    if (btnSend) btnSend.disabled = false;
+    if (holdToTalk) holdToTalk.disabled = false;
+    if (state) state.supervisorOpen = false;
+
+    // restore previous stage if we were in supervisor mode
+    if (state && state.stage === "supervisor"){
+      state.stage = state._stageBeforeSupervisor || "purpose";
+      state._stageBeforeSupervisor = null;
+    }
+    updateHintBand(true);
+  }
 
   // Chat slots
   const slotEls = [
@@ -134,6 +199,11 @@
   const soldierAvatar = new Image();
   soldierAvatar.src = `${ASSET_BASE}/soldier.png`;
   soldierAvatar.onerror = () => { soldierAvatar.src = TRANSPARENT_PX; };
+
+  // Optional supervisor avatar (falls back to soldier.png if missing)
+  const supervisorAvatar = new Image();
+  supervisorAvatar.src = `${ASSET_BASE}/soldier2.png`;
+  supervisorAvatar.onerror = () => { supervisorAvatar.src = soldierAvatar.src || TRANSPARENT_PX; };
 
   const visitorAvatar = portraitPhoto || { src: "" };
 
@@ -314,7 +384,7 @@
     'Press for an answer: "I need an answer to that question, otherwise entry will be denied."';
 
   function showPressHint(){
-    if (!hintBand || !shouldShowHints() || state?.idVisible) return;
+    if (!hintBand || !shouldShowHints() || state?.idVisible || state?.supervisorOpen) return;
     if (state?._pressHintLock) return;
     state._pressHintLock = true;
     hintBand.hidden = false;
@@ -387,7 +457,7 @@
       hintBand.style.display = "none";
       return;
     }
-    if (state?.idVisible){
+    if (state?.idVisible || state?.supervisorOpen){
       hintBand.hidden = true;
       hintBand.style.display = "none";
       return;
@@ -671,6 +741,10 @@
 
     // During the approach delay we ignore input (prevents weird pre-greeting dialogue)
     if (state.stage === "approach") return;
+
+    // While supervisor panel is open, ignore chat input
+    if (state.stage === "supervisor") return;
+
 
     pushStudent(clean);
 
@@ -976,6 +1050,28 @@
   btnReturnId?.addEventListener("click", () => {
     hideId();
     enqueueVisitor(pickBank("return_id", VISITOR_FALLBACK.thanks));
+    // Returning ID should progress the flow.
+    if (state && state.stage === "control_q") state.stage = "search_announce";
+    if (state) state.misses = 0;
+    clearPressHint();
+    updateHintBand(true);
+  });
+
+  // Supervisor modal controls
+  btnCloseSupervisor?.addEventListener("click", () => {
+    closeSupervisorModal();
+    updateHintBand(true);
+  });
+  btnReturnToVisitor?.addEventListener("click", () => {
+    closeSupervisorModal();
+    updateHintBand(true);
+  });
+  btnSupervisorCheck?.addEventListener("click", () => {
+    // Student submits the 5W/H summary. We don't validate here; it's a training aid.
+    closeSupervisorModal();
+    // Friendly acknowledgement to keep the scenario moving.
+    enqueueVisitor("Okay — please wait here.");
+    updateHintBand(true);
   });
 
   // -------- Input --------
