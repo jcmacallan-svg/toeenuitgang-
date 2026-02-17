@@ -93,6 +93,16 @@
   const svTimeStatus = $("#svTimeStatus");
   const svNote = $("#svNote");
 
+  // Person Search panel
+  const personSearchPanel = $("#personSearchPanel");
+  const psSub = $("#psSub");
+  const psVisitorImg = $("#psVisitorImg");
+  const psVisitorName = $("#psVisitorName");
+  const psDesc = $("#psDesc");
+  const psTags = $("#psTags");
+  const psPockets = $("#psPockets");
+  const psItems = $("#psItems");
+
   // -------- Supervisor modal helpers --------
   function _clearEl(el){ if (el) el.textContent = ""; }
 
@@ -165,6 +175,94 @@
       visitorId: state?.visitor?.idNo || null
     });
     updateHintBand(true);
+  }
+
+  // -------- Person Search panel helpers --------
+  function showPersonSearchPanel(){
+    if (!personSearchPanel) return;
+    personSearchPanel.hidden = false;
+    personSearchPanel.style.display = "";
+  }
+  function hidePersonSearchPanel(){
+    if (!personSearchPanel) return;
+    personSearchPanel.hidden = true;
+    personSearchPanel.style.display = "none";
+  }
+
+  function describeOutfit(ps){
+    const parts = [];
+    parts.push(ps.hasHat ? "wearing a cap" : "no hat");
+    parts.push(ps.hasJacket ? "wearing a jacket" : "no jacket");
+    if (ps.hasBag) parts.push("carrying a bag");
+    return parts.join(" · ");
+  }
+
+  function renderPersonSearchPanel(){
+    if (!personSearchPanel || !state?.ps) return;
+    const ps = state.ps;
+    if (psVisitorImg) psVisitorImg.src = state.visitor?.photoSrc || TRANSPARENT_PX;
+    if (psVisitorName) psVisitorName.textContent = state.visitor?.name || "Visitor";
+    if (psDesc) psDesc.textContent = describeOutfit(ps);
+
+    if (psTags){
+      psTags.innerHTML = "";
+      const tags = [];
+      if (ps.hasHat) tags.push("Cap");
+      if (ps.hasJacket) tags.push("Jacket");
+      if (ps.hasBag) tags.push("Bag");
+      if (ps.pocketsShown) tags.push("Pockets emptied");
+      if (ps.bagOpened) tags.push("Bag opened");
+      tags.forEach(t => {
+        const el = document.createElement("span");
+        el.className = "psTag";
+        el.textContent = t;
+        psTags.appendChild(el);
+      });
+    }
+
+    if (psPockets && psPocketGrid){
+      psPockets.hidden = !ps.pocketsShown;
+      psPockets.style.display = ps.pocketsShown ? "" : "none";
+      if (ps.pocketsShown){
+        psPocketGrid.innerHTML = "";
+        (ps.pocketItems || []).forEach(it => {
+          const c = document.createElement("div");
+          c.className = "pocketItem";
+          const i = document.createElement("div");
+          i.className = "pocketIcon";
+          i.textContent = it.icon || "";
+          const l = document.createElement("div");
+          l.className = "pocketLabel";
+          l.textContent = it.label || "";
+          c.appendChild(i);
+          c.appendChild(l);
+          psPocketGrid.appendChild(c);
+        });
+      }
+    }
+
+    if (psBag && psBagGrid){
+      psBag.hidden = !ps.bagOpened;
+      psBag.style.display = ps.bagOpened ? "" : "none";
+      if (ps.bagOpened){
+        psBagGrid.innerHTML = "";
+        (ps.bagItems || []).forEach(it => {
+          const c = document.createElement("div");
+          c.className = "pocketItem";
+          const i = document.createElement("div");
+          i.className = "pocketIcon";
+          i.textContent = it.icon || "";
+          const l = document.createElement("div");
+          l.className = "pocketLabel";
+          l.textContent = it.label || "";
+          c.appendChild(i);
+          c.appendChild(l);
+          psBagGrid.appendChild(c);
+        });
+      }
+    }
+
+    if (psSub) psSub.textContent = ps.subline || "Give clear instructions. The visitor will comply.";
   }
 
   // Chat slots
@@ -311,6 +409,62 @@
       last: baseLast,
       lastAlt,
       full: `${rank} ${baseLast}`
+    };
+  }
+
+  // -------- Person Search props (clothing + items) --------
+  function makePersonSearchProps(){
+    const hasHat = Math.random() < 0.55;
+    const hasJacket = Math.random() < 0.65;
+    const hasBag = Math.random() < 0.50;
+
+    // Pocket contents are mostly harmless; occasionally one "borderline" item to discuss.
+    const POCKET_POOL = [
+      { icon:"🪪", label:"Wallet" },
+      { icon:"📱", label:"Phone" },
+      { icon:"🔑", label:"Keys" },
+      { icon:"🪙", label:"Coins" },
+      { icon:"🧾", label:"Receipt" },
+      { icon:"🎧", label:"Earbuds" },
+      { icon:"🍬", label:"Mint" },
+      { icon:"🖊️", label:"Pen" },
+      { icon:"🧤", label:"Gloves" },
+      { icon:"🔦", label:"Small flashlight" },
+      { icon:"🧴", label:"Hand sanitizer" },
+      { icon:"🧷", label:"Safety pin" },
+    ];
+
+    const BAG_POOL = [
+      { icon:"📓", label:"Notebook" },
+      { icon:"💻", label:"Laptop" },
+      { icon:"🔌", label:"Charger" },
+      { icon:"🧥", label:"Spare hoodie" },
+      { icon:"🥪", label:"Sandwich" },
+      { icon:"💧", label:"Water bottle" },
+      { icon:"🧻", label:"Tissues" },
+      { icon:"🗂️", label:"Documents" },
+    ];
+
+    function pickMany(pool, minN, maxN){
+      const n = randInt(minN, maxN);
+      const copy = pool.slice();
+      const out = [];
+      for (let i=0;i<n && copy.length;i++){
+        out.push(copy.splice(randInt(0, copy.length-1),1)[0]);
+      }
+      return out;
+    }
+
+    return {
+      hasHat,
+      hasJacket,
+      hasBag,
+      hatRemoved: false,
+      jacketRemoved: false,
+      pocketsEmptied: false,
+      bagOpened: false,
+      pockets: pickMany(POCKET_POOL, 2, 5),
+      bag: hasBag ? pickMany(BAG_POOL, 2, 5) : [],
     };
   }
 
@@ -476,6 +630,13 @@
     hintBandText.textContent = t || "";
   }
   function getNextHint(){
+    // Stage-specific nudges (so the hint matches what is happening)
+    if (state?.stage === "search_announce") return 'Say: “You will be searched.”';
+    if (state?.stage === "why_searched") return 'Explain: routine search / heightened security.';
+    if (state?.stage === "illegal_items") return 'Ask: “Do you have any illegal items?”';
+    if (state?.stage === "direction") return 'Say: “Follow my colleague to person search.”';
+    if (state?.stage === "ps_instructions") return 'Instruct: “Take off your hat / jacket” or “Empty your pockets.”';
+
     const f = state?.facts || {};
     if (!f.name) return 'Ask: “Who are you?”';
     if (!f.purpose) return 'Ask: “What are you doing here?”';
@@ -757,6 +918,8 @@
       stage: "approach",
       forceCompliance: false,
       evasiveQuestionKey: pick(["ask_name","ask_surname","purpose","who_meeting","time_meeting","about_meeting"]),
+      psStage: "idle",
+      ps: makePersonSearchProps(),
       askCounts: {},
       misses: 0,
       askCounts: { purpose: 0 },
@@ -776,6 +939,8 @@
       stage: state?.stage
     });
 
+    closeSupervisorModal();
+    hidePersonSearchPanel();
     hideId();
     updateHintBand(true);
 
@@ -793,6 +958,38 @@
       if (state) state.stage = "start";
       pushVisitor(hello);
     }, VISITOR_APPROACH_DELAY_MS);
+  }
+
+  // -------- Person Search flow --------
+  function startPersonSearchFlow(){
+    if (!state) return;
+    // Hide other panels
+    closeSupervisorModal();
+    hideId();
+
+    state.stage = "ps_walk";
+    state.psStage = "walk";
+
+    showPersonSearchPanel();
+    // reset the visual state for this run
+    state.ps = state.ps || makePersonSearchProps();
+    state.ps.pocketsShown = false;
+    state.ps.bagOpened = false;
+    renderPersonSearchPanel();
+
+    if (psSub) psSub.textContent = "The visitor follows your colleague to person search.";
+    if (portraitMood) portraitMood.textContent = "The visitor follows your colleague to the person search.";
+
+    enqueueVisitor("Okay.");
+    setTimeout(() => {
+      if (!state || state.stage !== "ps_walk") return;
+      state.stage = "ps_instructions";
+      state.psStage = "instructions";
+      if (psSub) psSub.textContent = "Give instructions: remove cap, remove jacket, empty pockets, open bag.";
+      enqueueVisitor("We are at person search.");
+      renderPersonSearchPanel();
+      updateHintBand(true);
+    }, 1200);
   }
 
   // -------- Dialogue --------
@@ -813,6 +1010,62 @@
     // Open the Supervisor Check (5W/H) modal
     if (intent === "contact_supervisor"){
       openSupervisorModal();
+      return;
+    }
+
+    // -------- Person Search (Part 2) --------
+    // Once we arrive at Person Search, the student gives instructions.
+    // We render visuals (clothing + pockets) in the right panel.
+    if (state.stage === "ps_instructions"){
+      const p = state.ps || (state.ps = makePersonSearchProps());
+
+      if (intent === "remove_hat" || intent === "remove_cap"){
+        if (p.hasHat){
+          p.hasHat = false;
+          enqueueVisitor("Okay. I will remove my hat.");
+        } else {
+          enqueueVisitor("I am not wearing a hat.");
+        }
+        renderPersonSearchPanel();
+        return;
+      }
+
+      if (intent === "remove_jacket" || intent === "take_off_jacket"){
+        if (p.hasJacket){
+          p.hasJacket = false;
+          enqueueVisitor("Alright. I will take my jacket off.");
+        } else {
+          enqueueVisitor("I am not wearing a jacket.");
+        }
+        renderPersonSearchPanel();
+        return;
+      }
+
+      if (intent === "show_bag" || intent === "open_bag"){
+        if (p.hasBag){
+          p.bagOpened = true;
+          enqueueVisitor("Sure. My bag is open.");
+        } else {
+          enqueueVisitor("I do not have a bag with me.");
+        }
+        renderPersonSearchPanel();
+        return;
+      }
+
+      if (intent === "empty_pockets" || intent === "pockets"){
+        p.pocketsShown = true;
+        enqueueVisitor("Okay. Here is what is in my pockets.");
+        renderPersonSearchPanel();
+        return;
+      }
+
+      if (intent === "continue" || intent === "finish_search"){
+        enqueueVisitor("Understood.");
+        return;
+      }
+
+      // If the student asks other intents while in person search, just nudge.
+      nudge('Try: “Remove your hat”, “Take off your jacket”, “Empty your pockets”, or “Open your bag”.');
       return;
     }
 
@@ -916,6 +1169,12 @@
       state.facts.surname = state.visitor?.last || "known";
       const last = state.visitor?.last || "";
       enqueueVisitor(last ? `My surname is ${last}.` : "It’s on the ID.");
+      return;
+    }
+
+    // Jump to Person Search (Part 2) from any stage after approach
+    if (intent === "go_person_search" && state.stage !== "ps_instructions" && state.stage !== "ps_walk"){
+      startPersonSearchFlow();
       return;
     }
 
@@ -1117,7 +1376,7 @@
 
       case "direction":
         if (intent === "go_person_search"){
-          enqueueVisitor("Okay.");
+          startPersonSearchFlow();
           return;
         }
         nudge("Try: “Go to person search.”");
@@ -1158,7 +1417,10 @@
   });
 
   btnReturn?.addEventListener("click", () => enqueueVisitor("Return (placeholder)."));
-  btnPersonSearch?.addEventListener("click", () => enqueueVisitor("Person search (placeholder)."));
+  btnPersonSearch?.addEventListener("click", () => {
+    // Allow jumping to Part 2 for practice
+    startPersonSearchFlow();
+  });
   btnSignIn?.addEventListener("click", () => enqueueVisitor("Sign-in office (placeholder)."));
 
   btnReturnId?.addEventListener("click", () => {

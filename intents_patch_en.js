@@ -35,6 +35,13 @@ window.VEVA_INTENTS = [
     { key:"illegal_items", rx:/\b(any\s+illegal\s+items|anything\s+illegal|contraband|prohibited)\b/i },
     { key:"illegal_clarify", rx:/\b(weapons?|drugs?|alcohol|knife|gun)\b/i },
     { key:"go_person_search", rx:/\b(go\s+to\s+(the\s+)?person\s+search|person\s+search)\b/i },
+
+    // --- Person Search instructions (Part 2) ---
+    { key:"remove_hat", rx:/\b(remove|take\s*off|no)\b.*\b(hat|cap)\b|\b(hat|cap)\b.*\b(remove|take\s*off)\b/i },
+    { key:"remove_jacket", rx:/\b(remove|take\s*off|open)\b.*\b(jacket|coat)\b|\b(jacket|coat)\b.*\b(remove|take\s*off)\b/i },
+    { key:"empty_pockets", rx:/\b(empty|show|put)\b.*\b(pockets?)\b|\b(pockets?)\b.*\b(empty|show)\b/i },
+    { key:"open_bag", rx:/\b(open|show)\b.*\b(bag|backpack|rucksack)\b|\b(bag|backpack|rucksack)\b.*\b(open|show)\b/i },
+    { key:"continue_person_search", rx:/\b(continue|next|go\s+on|ok\s+continue)\b.*\b(search)\b|\bcontinue\b/i },
   // Contact supervisor (opens 5W/H modal)
 { key:"contact_supervisor", rx:/\b(i\s*(will|'ll)\s*)?(contact|call|talk\s*to|speak\s*to|ask)\s+(my\s+)?supervisor\b/i },
 { key:"contact_supervisor", rx:/\b(supervisor\s+check|check\s+with\s+my\s+supervisor)\b/i },
