@@ -203,7 +203,12 @@
       meetingTime: (state?.facts?.meetingTime) || "",
       claimedName: state?.claimed?.name || state?.visitor?.name || ID_DATA?.name || "",
       claimedFirst: state?.claimed?.first || state?.visitor?.first || ID_DATA?.first || "",
-      claimedLast: state?.claimed?.last || state?.visitor?.last || ID_DATA?.last || ""
+      claimedLast: state?.claimed?.last || state?.visitor?.last || ID_DATA?.last || "",
+      contactName: state?.visitor?.contact?.full || "",
+      contactRank: state?.visitor?.contact?.rank || "",
+      contactLast: state?.visitor?.contact?.last || "",
+      contactLastAlt: state?.visitor?.contact?.lastAlt || state?.visitor?.contact?.last || "",
+      spellLast: spellLastName(state?.visitor?.last || ID_DATA?.last || ""),
     };
     return String(template || "").replace(/\{(\w+)\}/g, (_,k)=> (vars[k]!==undefined ? String(vars[k]) : ""));
   }
@@ -376,7 +381,9 @@
     });
   }
 
-    function pickBank(key, fallbackArr, opts={}){
+      const FIVEW_KEYS = new Set(["ask_name","ask_surname","purpose","who_meeting","time_meeting","about_meeting"]);
+
+  function pickBank(key, fallbackArr, opts={}){
     const bank = window.PS_PATCH?.QA?.[key];
     if (!bank){
       state._lastBankBand = null;
@@ -385,6 +392,15 @@
     }
 
     let band = window.PS_PATCH.bandFromMoodKey(currentMood?.key);
+
+    // After the student presses for an answer, never evade again.
+    if (state?.forceCompliance && band === "evasive") band = "cautious";
+
+    // Only ONE of the 5W questions may be evasive (random per scenario).
+    if (!opts.forceBand && band === "evasive" && FIVEW_KEYS.has(key) && state?.evasiveQuestionKey && key !== state.evasiveQuestionKey){
+      band = "cautious";
+    }
+
     if (opts.forceNonEvasive && band === "evasive") band = "cautious";
     if (opts.forceBand && bank[opts.forceBand]) band = opts.forceBand;
 
@@ -675,10 +691,9 @@
     return hhmm;
   }
 
-  function spellLastName(){
-    const full = (ID_DATA?.name) ? String(ID_DATA.name) : "Miller";
-    const parts = full.trim().split(/\s+/).filter(Boolean);
-    const ln = parts.length ? parts[parts.length - 1] : full;
+  function spellLastName(lastName){
+    const ln = String(lastName || (state?.visitor?.last) || (ID_DATA?.last) || "").trim();
+    if (!ln) return "";
     const letters = ln.replace(/[^A-Za-z]/g, "").toUpperCase().split("");
     return letters.length ? letters.join("-") : ln.toUpperCase();
   }
@@ -740,6 +755,8 @@
 
     state = {
       stage: "approach",
+      forceCompliance: false,
+      evasiveQuestionKey: pick(["ask_name","ask_surname","purpose","who_meeting","time_meeting","about_meeting"]),
       askCounts: {},
       misses: 0,
       askCounts: { purpose: 0 },
@@ -804,8 +821,10 @@
 
     // If the visitor was evasive, the student can "press for an answer".
     if (intent === "press_for_answer" || intent === "insist_reason" || intent === "ultimatum_reason"){
+      state.forceCompliance = true;
       const map = {
         ask_name: "ask_name",
+        ask_surname: "ask_surname",
         purpose: "purpose",
         has_appointment: "has_appointment_yes",
         who_meeting: "who_meeting",
@@ -841,12 +860,20 @@
       state.askCounts[intent] = (state.askCounts[intent] || 0) + 1;
     }
 
-    // ---- Global 5W: name should ALWAYS be answerable (fix for "who are you?") ----
-    // Students often ask the name early. Previously, some stages didn't handle ask_name,
-    // which made the visitor dodge unintentionally. We answer consistently.
+    // ---- Global 5W: name / surname should ALWAYS be answerable ----
     if (intent === "ask_name"){
-      // Progress tracking
       state.facts = state.facts || {};
+      state.askCounts = state.askCounts || {};
+      state.askCounts.ask_name = (state.askCounts.ask_name || 0) + 1;
+
+      const band = currentBand();
+      if (!state.forceCompliance && band === "evasive" && state.evasiveQuestionKey === "ask_name" && state.askCounts.ask_name === 1){
+        state.lastEvasiveFor = "ask_name";
+        showPressHint();
+        enqueueVisitor(pickBank("ask_name", ["It’s on the ID."], { forceBand: "evasive" }));
+        return;
+      }
+
       state.facts.name = state.visitor?.name || "known";
 
       const q = clean.toLowerCase();
@@ -854,16 +881,45 @@
       const last  = state.visitor?.last  || "";
       const full  = state.visitor?.name  || [first, last].filter(Boolean).join(" ");
 
-      // If they explicitly ask for FULL name / surname, give full; otherwise just first name.
-      if (/\b(full\s+name|surname|last\s+name)\b/i.test(q)){
+      // If they explicitly ask for FULL name, give full; otherwise give first name (surname is a separate question).
+      if (/\bfull\s+name\b/i.test(q)){
         enqueueVisitor(full ? `My name is ${full}.` : "My name is on the ID.");
       } else {
-        enqueueVisitor(first ? `My first name is ${first}.` : "My name is on the ID.");
+        enqueueVisitor(first ? `My name is ${first}.` : "My name is on the ID.");
       }
+      clearPressHint();
       return;
     }
 
-    // Debug info
+    if (intent === "ask_surname"){
+      state.facts = state.facts || {};
+      state.askCounts = state.askCounts || {};
+      state.askCounts.ask_surname = (state.askCounts.ask_surname || 0) + 1;
+
+      const band = currentBand();
+      if (!state.forceCompliance && band === "evasive" && state.evasiveQuestionKey === "ask_surname" && state.askCounts.ask_surname === 1){
+        state.lastEvasiveFor = "ask_surname";
+        showPressHint();
+        enqueueVisitor(pickBank("ask_surname", ["It’s on the ID."], { forceBand: "evasive" }));
+        return;
+      }
+
+      state.facts.surname = state.visitor?.last || "known";
+      const last = state.visitor?.last || "";
+      enqueueVisitor(last ? `My surname is ${last}.` : "It’s on the ID.");
+      clearPressHint();
+      return;
+    }
+
+    if (intent === "ask_surname"){
+      state.facts = state.facts || {};
+      state.facts.surname = state.visitor?.last || "known";
+      const last = state.visitor?.last || "";
+      enqueueVisitor(last ? `My surname is ${last}.` : "It’s on the ID.");
+      return;
+    }
+
+// Debug info
     setDebugPill(`Intent: ${intent} · Stage: ${state.stage}`);
 
     // progress tracking (for hints)
@@ -941,6 +997,21 @@
           return;
         }
         if (intent === "who_meeting"){
+          state.askCounts = state.askCounts || {};
+          state.askCounts.who_meeting = (state.askCounts.who_meeting || 0) + 1;
+
+          // If the visitor was evasive, the 2nd time they give at least a rank + approximate surname.
+          const band = currentBand();
+          if (!state.forceCompliance && band === "evasive" && state.askCounts.who_meeting >= 2){
+            const c = state.visitor?.contact || {};
+            const rank = c.rank || "Sergeant";
+            const approx = c.lastAlt || c.last || "Burke";
+            enqueueVisitor(`I think it’s a ${rank}… sounds like ${approx}.`);
+            state.facts.who = "known";
+            clearPressHint();
+            return;
+          }
+
           const line = pickBank("who_meeting", VISITOR_FALLBACK.who_meeting);
           enqueueVisitor(line);
           if (state._lastBankBand === "evasive") { state.lastEvasiveFor = "who_meeting"; showPressHint(); } else { clearPressHint(); }
@@ -981,7 +1052,7 @@
           return;
         }
         if (intent === "spell_last_name"){
-          enqueueVisitor(pickBank("spell_last_name", [spellLastName()]));
+          enqueueVisitor(pickBank("spell_last_name", [spellLastName(state?.visitor?.last || ID_DATA?.last || "")]));
           return;
         }
         if (intent === "return_id"){

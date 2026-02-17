@@ -5,7 +5,10 @@
 window.VEVA_INTENTS = [
     { key:"greet", rx:/\b(hi|hello|good\s*(morning|afternoon|evening))\b/i },
     { key:"help_open", rx:/\b(how\s+can\s+i\s+help(\s+you(\s+today)?)?|what\s+do\s+you\s+need|how\s+may\s+i\s+help)\b/i },
-    { key:"ask_name", rx:/\b(who\s+are\s+you|what\s+is\s+your\s+name|your\s+name\s*,?\s+please)\b/i },
+      // Ask for surname / last name (separate from spelling)
+  { key: "ask_surname", rx: /(what\s+is\s+your\s+(last\s+name|surname)\b|your\s+(last\s+name|surname)\b|surname\?)|last\s+name\?/i },
+
+{ key: "ask_name", rx: /\b(who\s+are\s+you\b|what\s+is\s+your\s+name\b|your\s+name\b|can\s+i\s+have\s+your\s+name\b)\??/i },
     { key:"purpose", rx:/\b(why\s+are\s+you\s+here|what\s+is\s+the\s+purpose|reason\s+for\s+your\s+visit)\b/i },
 
   // If visitor is evasive about purpose, allow student to insist / warn / deny to force a clear answer

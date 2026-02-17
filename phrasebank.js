@@ -1,7 +1,7 @@
 // phrasebank.js
 // Person Search / dialogue phrasebank (EN) with mood bands: cautious / evasive / open
 // Placeholders resolved by app.js:
-// {name} {first} {last} {dob} {nat} {idNo} {meetingTime}
+// {name} {first} {last} {dob} {nat} {idNo} {meetingTime} {spellLast}
 // Optional scenario placeholders:
 // {claimedName} {claimedFirst} {claimedLast}
 
@@ -18,11 +18,11 @@ window.PS_PATCH = {
   QA: {
     ask_name: {
       cautious: [
-        "{claimedName}.",
-        "My name is {claimedName}.",
-        "It’s {claimedName}.",
-        "{claimedLast}. {claimedFirst}.",
-        "{claimedName}, yes."
+        "{claimedFirst}.",
+        "My name is {claimedFirst}.",
+        "It’s {claimedFirst}.",
+        "{claimedFirst}, yes.",
+        "{claimedFirst}."
       ],
       evasive: [
         "Why do you need my name?",
@@ -32,21 +32,45 @@ window.PS_PATCH = {
         "Can you just check my ID?"
       ],
       open: [
-        "Of course. {claimedName}.",
-        "Sure — my name is {claimedName}.",
-        "{claimedName}. How can I help?",
-        "Absolutely — {claimedName}.",
-        "Yes, {claimedName}. Thanks."
+        "Of course. {claimedFirst}.",
+        "Sure — my name is {claimedFirst}.",
+        "{claimedFirst}. How can I help?",
+        "Absolutely — {claimedFirst}.",
+        "Yes, {claimedFirst}."
+      ]
+    },
+
+    ask_surname: {
+      cautious: [
+        "My surname is {claimedLast}.",
+        "Last name: {claimedLast}.",
+        "It’s {claimedLast}.",
+        "{claimedLast}.",
+        "Surname is {claimedLast}."
+      ],
+      evasive: [
+        "It’s on the ID.",
+        "Do I really need to say that out loud?",
+        "Can you read it off the card?",
+        "I already told you my name.",
+        "Why is the surname necessary?"
+      ],
+      open: [
+        "Sure — {claimedLast}.",
+        "Of course — {claimedLast}.",
+        "Yes, my last name is {claimedLast}.",
+        "No problem — {claimedLast}.",
+        "{claimedLast}, yes."
       ]
     },
 
     spell_last_name: {
       cautious: [
-        "It’s {claimedLast}.",
-        "My surname is {claimedLast}.",
-        "It’s the same as on the ID: {claimedLast}.",
-        "{claimedLast}.",
-        "Surname: {claimedLast}."
+        "{claimedLast}. That’s {spellLast}.",
+        "Surname: {claimedLast}. Spelled {spellLast}.",
+        "It’s {claimedLast} — {spellLast}.",
+        "{spellLast}.",
+        "Spelled: {spellLast}."
       ],
       evasive: [
         "It’s on the ID.",
@@ -56,11 +80,11 @@ window.PS_PATCH = {
         "Why is spelling necessary?"
       ],
       open: [
-        "Sure — {claimedLast}.",
-        "Of course — {claimedLast}.",
-        "Yes, {claimedLast}.",
-        "No problem — {claimedLast}.",
-        "{claimedLast}, yes."
+        "Sure — {claimedLast}. That’s {spellLast}.",
+        "Of course — {spellLast}.",
+        "Yes: {spellLast}.",
+        "No problem — {spellLast}.",
+        "{spellLast}, yes."
       ]
     },
 
@@ -199,41 +223,29 @@ window.PS_PATCH = {
     
     who_meeting: {
       cautious: [
-        "I’m meeting my contact at reception.",
         "I’m meeting {contactName}.",
+        "I’m meeting my contact at reception — {contactName}.",
         "I’m expected by {contactName}.",
-        "I’m meeting a staff member inside — {contactName}.",
-        "I’m here to see {contactRank} {contactLast}."
+        "I’m here to see {contactName}.",
+        "I’m meeting a staff member — {contactName}."
       ],
       evasive: [
         "Someone inside.",
-        "I don’t remember the exact name.",
+        "I’d rather not say names out loud.",
         "It’s arranged — that’s all.",
         "I was told to ask at reception.",
-        "I don’t want to say names out loud."
+        "I don’t remember the exact name."
       ],
       open: [
         "I’m meeting {contactName}.",
         "I’m expected by {contactName}.",
-        "I have an appointment with {contactName}.",
-        "I’m here to see {contactRank} {contactLast}.",
-        "My point of contact is {contactName}."
+        "My point of contact is {contactName}.",
+        "I’m meeting {contactName} at reception.",
+        "Yes — {contactName} is expecting me."
       ]
     },
 
-    // If the student asks again and the visitor is evasive:
-    who_meeting_evasive2: {
-      cautious: [],
-      open: [],
-      evasive: [
-        "Uh… I think it’s {contactRank}. The name sounds like {contactLastAlt}… something like that.",
-        "I’m meeting a {contactRank}. The surname is… {contactLastAlt}? I’m not 100% sure.",
-        "{contactRank}. I can’t remember the exact spelling — maybe {contactLastAlt}.",
-        "It’s a {contactRank} at reception. The name sounds like {contactLastAlt}.",
-        "Look, I’m meeting a {contactRank}. I think the name is {contactLastAlt}."
-      ]
-    },
-time_meeting: {
+    time_meeting: {
       cautious: ["Soon.", "In a few minutes.", "At {meetingTime}.", "Around {meetingTime}.", "It’s scheduled for {meetingTime}."],
       evasive: ["I don’t know exactly.", "It’s on the email.", "I don’t have the time in my head.", "Can we just call my contact?", "I was told to come today."],
       open: ["At {meetingTime}.", "The appointment is at {meetingTime}.", "I’m expected at {meetingTime}.", "It’s scheduled for {meetingTime}.", "I’m due at {meetingTime}."]
