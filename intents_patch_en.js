@@ -32,4 +32,7 @@ window.VEVA_INTENTS = [
     { key:"illegal_items", rx:/\b(any\s+illegal\s+items|anything\s+illegal|contraband|prohibited)\b/i },
     { key:"illegal_clarify", rx:/\b(weapons?|drugs?|alcohol|knife|gun)\b/i },
     { key:"go_person_search", rx:/\b(go\s+to\s+(the\s+)?person\s+search|person\s+search)\b/i },
-  ];
+  // Contact supervisor (opens 5W/H modal)
+{ key:"contact_supervisor", rx:/\b(i\s*(will|'ll)\s*)?(contact|call|talk\s*to|speak\s*to|ask)\s+(my\s+)?supervisor\b/i },
+{ key:"contact_supervisor", rx:/\b(supervisor\s+check|check\s+with\s+my\s+supervisor)\b/i },
+];
